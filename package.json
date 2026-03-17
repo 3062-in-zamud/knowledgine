@@ -1,0 +1,31 @@
+{
+  "name": "knowledgine",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Developer Knowledge Infrastructure - Extract structured knowledge from your codebase for AI coding tools",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "tsc --build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "verify": "pnpm run build && pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test:run"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "eslint": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "prettier": "^3.0.0",
+    "vitest": "^3.0.0"
+  }
+}

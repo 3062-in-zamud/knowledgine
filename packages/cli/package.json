@@ -1,0 +1,27 @@
+{
+  "name": "@knowledgine/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "knowledgine": "./dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build tsconfig.build.json",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "dependencies": {
+    "@knowledgine/core": "workspace:*"
+  },
+  "files": [
+    "dist"
+  ]
+}
