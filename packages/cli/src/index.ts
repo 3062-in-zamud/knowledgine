@@ -1,24 +1,28 @@
+#!/usr/bin/env node
+import { Command } from "commander";
 import { VERSION } from "@knowledgine/core";
+import { initCommand } from "./commands/init.js";
+import { startCommand } from "./commands/start.js";
 
-export interface RunResult {
-  exitCode: number;
-  output: string;
-}
+const program = new Command();
 
-export function run(args: string[]): RunResult {
-  if (args.includes("--version")) {
-    return { exitCode: 0, output: VERSION };
-  }
+program
+  .name("knowledgine")
+  .description(
+    "Developer Knowledge Infrastructure - Extract structured knowledge from your codebase",
+  )
+  .version(VERSION);
 
-  if (args.includes("--help")) {
-    return {
-      exitCode: 0,
-      output: `knowledgine v${VERSION}\n\nUsage: knowledgine [options]\n\nOptions:\n  --version  Show version\n  --help     Show this help`,
-    };
-  }
+program
+  .command("init")
+  .description("Scan and index markdown files in the current directory")
+  .option("--path <dir>", "Root directory to scan")
+  .action(initCommand);
 
-  return {
-    exitCode: 0,
-    output: `knowledgine v${VERSION} - no command specified. Use --help for usage.`,
-  };
-}
+program
+  .command("start")
+  .description("Start MCP server with file watching")
+  .option("--path <dir>", "Root directory to serve")
+  .action(startCommand);
+
+program.parse();

@@ -10,13 +10,18 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "bin": {
+    "knowledgine-mcp": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
     "test": "vitest",
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@knowledgine/core": "workspace:*"
+    "@knowledgine/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^4.3.6"
   },
   "files": [
     "dist"
