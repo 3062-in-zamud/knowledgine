@@ -1,0 +1,467 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { createTestDb } from "../helpers/test-db.js";
+import { ValidationError, KnowledgeNotFoundError } from "../../src/errors.js";
+import type { TestContext } from "../helpers/test-db.js";
+
+describe("KnowledgeRepository", () => {
+  let ctx: TestContext;
+
+  beforeEach(() => {
+    ctx = createTestDb();
+  });
+
+  afterEach(() => {
+    ctx.db.close();
+  });
+
+  describe("saveNote", () => {
+    it("should insert a new note and return id", () => {
+      const id = ctx.repository.saveNote({
+        filePath: "test.md",
+        title: "Test",
+        content: "Content here",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      expect(typeof id).toBe("number");
+      expect(id).toBeGreaterThan(0);
+    });
+
+    it("should return same id when updating existing note", () => {
+      const id1 = ctx.repository.saveNote({
+        filePath: "test.md",
+        title: "Test",
+        content: "Initial content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const id2 = ctx.repository.saveNote({
+        filePath: "test.md",
+        title: "Test Updated",
+        content: "Updated content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      expect(id1).toBe(id2);
+    });
+
+    it("should skip update when content hash is same", () => {
+      const data = {
+        filePath: "test.md",
+        title: "Test",
+        content: "Identical content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      };
+      const id1 = ctx.repository.saveNote(data);
+      const id2 = ctx.repository.saveNote(data);
+      expect(id1).toBe(id2);
+    });
+
+    it("should store null frontmatter_json when frontmatter is empty", () => {
+      const id = ctx.repository.saveNote({
+        filePath: "test.md",
+        title: "Test",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const note = ctx.repository.getNoteById(id);
+      expect(note?.frontmatter_json).toBeNull();
+    });
+  });
+
+  describe("ValidationError", () => {
+    it("should throw ValidationError for empty filePath", () => {
+      expect(() =>
+        ctx.repository.saveNote({
+          filePath: "",
+          title: "Test",
+          content: "Content",
+          frontmatter: {},
+          createdAt: new Date().toISOString(),
+        }),
+      ).toThrow(ValidationError);
+    });
+
+    it("should throw ValidationError for empty title", () => {
+      expect(() =>
+        ctx.repository.saveNote({
+          filePath: "test.md",
+          title: "",
+          content: "Content",
+          frontmatter: {},
+          createdAt: new Date().toISOString(),
+        }),
+      ).toThrow(ValidationError);
+    });
+
+    it("should throw ValidationError for empty content", () => {
+      expect(() =>
+        ctx.repository.saveNote({
+          filePath: "test.md",
+          title: "Test",
+          content: "",
+          frontmatter: {},
+          createdAt: new Date().toISOString(),
+        }),
+      ).toThrow(ValidationError);
+    });
+  });
+
+  describe("getNoteById", () => {
+    it("should return note when it exists", () => {
+      const id = ctx.repository.saveNote({
+        filePath: "test.md",
+        title: "Test Note",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const note = ctx.repository.getNoteById(id);
+      expect(note).toBeDefined();
+      expect(note!.title).toBe("Test Note");
+    });
+
+    it("should return undefined when note does not exist", () => {
+      const note = ctx.repository.getNoteById(9999);
+      expect(note).toBeUndefined();
+    });
+  });
+
+  describe("getNoteByPath", () => {
+    it("should return note by file path when it exists", () => {
+      ctx.repository.saveNote({
+        filePath: "path/test.md",
+        title: "Test",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const note = ctx.repository.getNoteByPath("path/test.md");
+      expect(note).toBeDefined();
+      expect(note!.file_path).toBe("path/test.md");
+    });
+
+    it("should return undefined when note does not exist", () => {
+      const note = ctx.repository.getNoteByPath("nonexistent.md");
+      expect(note).toBeUndefined();
+    });
+  });
+
+  describe("getNoteByIdOrThrow", () => {
+    it("should return note when it exists", () => {
+      const id = ctx.repository.saveNote({
+        filePath: "test.md",
+        title: "Test",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const note = ctx.repository.getNoteByIdOrThrow(id);
+      expect(note.id).toBe(id);
+    });
+
+    it("should throw KnowledgeNotFoundError when note does not exist", () => {
+      expect(() => ctx.repository.getNoteByIdOrThrow(9999)).toThrow(KnowledgeNotFoundError);
+    });
+  });
+
+  describe("getNoteByPathOrThrow", () => {
+    it("should return note when it exists", () => {
+      ctx.repository.saveNote({
+        filePath: "myfile.md",
+        title: "Test",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const note = ctx.repository.getNoteByPathOrThrow("myfile.md");
+      expect(note.file_path).toBe("myfile.md");
+    });
+
+    it("should throw KnowledgeNotFoundError when note does not exist", () => {
+      expect(() => ctx.repository.getNoteByPathOrThrow("missing.md")).toThrow(
+        KnowledgeNotFoundError,
+      );
+    });
+  });
+
+  describe("searchNotes", () => {
+    it("should return notes matching FTS5 query", () => {
+      ctx.repository.saveNote({
+        filePath: "ts.md",
+        title: "TypeScript Guide",
+        content: "Learn TypeScript basics",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const results = ctx.repository.searchNotes("TypeScript");
+      expect(results.length).toBeGreaterThan(0);
+    });
+
+    it("should return empty array when no matches", () => {
+      const results = ctx.repository.searchNotes("xyzzyunknownterm");
+      expect(results).toEqual([]);
+    });
+
+    it("should respect limit parameter", () => {
+      for (let i = 0; i < 5; i++) {
+        ctx.repository.saveNote({
+          filePath: `note${i}.md`,
+          title: `Note ${i}`,
+          content: "searchable content keyword",
+          frontmatter: {},
+          createdAt: new Date().toISOString(),
+        });
+      }
+      const results = ctx.repository.searchNotes("searchable", 2);
+      expect(results.length).toBeLessThanOrEqual(2);
+    });
+  });
+
+  describe("deleteNoteById", () => {
+    it("should return true when note exists and is deleted", () => {
+      const id = ctx.repository.saveNote({
+        filePath: "delete-me.md",
+        title: "Delete",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const result = ctx.repository.deleteNoteById(id);
+      expect(result).toBe(true);
+      expect(ctx.repository.getNoteById(id)).toBeUndefined();
+    });
+
+    it("should return false when note does not exist", () => {
+      const result = ctx.repository.deleteNoteById(9999);
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("deleteNoteByPath", () => {
+    it("should return true when note exists and is deleted", () => {
+      ctx.repository.saveNote({
+        filePath: "delete-by-path.md",
+        title: "Delete",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const result = ctx.repository.deleteNoteByPath("delete-by-path.md");
+      expect(result).toBe(true);
+    });
+
+    it("should return false when note does not exist", () => {
+      const result = ctx.repository.deleteNoteByPath("nonexistent.md");
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("savePatterns and getPatternsByNoteId", () => {
+    it("should save and retrieve patterns", () => {
+      const noteId = ctx.repository.saveNote({
+        filePath: "patterns.md",
+        title: "Patterns",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.savePatterns(noteId, [
+        { type: "problem", content: "Error occurred", confidence: 0.8, lineNumber: 1 },
+        { type: "solution", content: "Fixed it", confidence: 0.9, lineNumber: 5 },
+      ]);
+      const patterns = ctx.repository.getPatternsByNoteId(noteId);
+      expect(patterns).toHaveLength(2);
+      expect(patterns.find((p) => p.pattern_type === "problem")).toBeDefined();
+      expect(patterns.find((p) => p.pattern_type === "solution")).toBeDefined();
+    });
+
+    it("should delete old patterns and insert new ones on re-call", () => {
+      const noteId = ctx.repository.saveNote({
+        filePath: "repatterns.md",
+        title: "RePat",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.savePatterns(noteId, [
+        { type: "problem", content: "Old problem", confidence: 0.8 },
+      ]);
+      ctx.repository.savePatterns(noteId, [
+        { type: "solution", content: "New solution", confidence: 0.9 },
+      ]);
+      const patterns = ctx.repository.getPatternsByNoteId(noteId);
+      expect(patterns).toHaveLength(1);
+      expect(patterns[0].pattern_type).toBe("solution");
+    });
+  });
+
+  describe("getProblemSolutionPairsByNoteId", () => {
+    it("should save PSP and retrieve with correct structure", () => {
+      const noteId = ctx.repository.saveNote({
+        filePath: "psp.md",
+        title: "PSP",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.savePatterns(noteId, [
+        { type: "problem", content: "Error X", confidence: 0.8 },
+        { type: "solution", content: "Fix X", confidence: 0.9 },
+      ]);
+      const patterns = ctx.repository.getPatternsByNoteId(noteId);
+      const problemPattern = patterns.find((p) => p.pattern_type === "problem")!;
+      const solutionPattern = patterns.find((p) => p.pattern_type === "solution")!;
+
+      ctx.repository.saveProblemSolutionPairs([
+        {
+          problemPatternId: problemPattern.id,
+          solutionPatternId: solutionPattern.id,
+          relevanceScore: 0.85,
+        },
+      ]);
+
+      const pairs = ctx.repository.getProblemSolutionPairsByNoteId(noteId);
+      expect(pairs).toHaveLength(1);
+      expect(pairs[0].problemPattern).toBe("Error X");
+      expect(pairs[0].solutionPattern).toBe("Fix X");
+      expect(pairs[0].confidence).toBe(0.85);
+    });
+  });
+
+  describe("saveNoteLinks and getNoteLinks", () => {
+    it("should save and retrieve note links sorted by similarity DESC", () => {
+      const id1 = ctx.repository.saveNote({
+        filePath: "a.md",
+        title: "A",
+        content: "Content A",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const id2 = ctx.repository.saveNote({
+        filePath: "b.md",
+        title: "B",
+        content: "Content B",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const id3 = ctx.repository.saveNote({
+        filePath: "c.md",
+        title: "C",
+        content: "Content C",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.saveNoteLinks([
+        { sourceNoteId: id1, targetNoteId: id2, linkType: "related", similarity: 0.5 },
+        { sourceNoteId: id1, targetNoteId: id3, linkType: "related", similarity: 0.9 },
+      ]);
+      const links = ctx.repository.getNoteLinks(id1);
+      expect(links).toHaveLength(2);
+      expect(links[0].similarity).toBe(0.9);
+      expect(links[1].similarity).toBe(0.5);
+    });
+  });
+
+  describe("findNotesByTagSimilarity", () => {
+    it("should find notes that share tags and exclude self", () => {
+      const id1 = ctx.repository.saveNote({
+        filePath: "tag1.md",
+        title: "Tag1",
+        content: "Content",
+        frontmatter: { tags: ["typescript"] },
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.saveNote({
+        filePath: "tag2.md",
+        title: "Tag2",
+        content: "Content",
+        frontmatter: { tags: ["typescript", "react"] },
+        createdAt: new Date().toISOString(),
+      });
+      const results = ctx.repository.findNotesByTagSimilarity(id1, ["typescript"], 10);
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.find((r) => r.id === id1)).toBeUndefined();
+    });
+  });
+
+  describe("findNotesByTitleKeywords", () => {
+    it("should find notes matching title keywords", () => {
+      const id1 = ctx.repository.saveNote({
+        filePath: "kw1.md",
+        title: "TypeScript Patterns",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.saveNote({
+        filePath: "kw2.md",
+        title: "TypeScript Guide",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const results = ctx.repository.findNotesByTitleKeywords(id1, ["TypeScript"], 10);
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.find((r) => r.id === id1)).toBeUndefined();
+    });
+  });
+
+  describe("findNotesByTimeProximity", () => {
+    it("should find notes created within specified days", () => {
+      const now = new Date().toISOString();
+      const id1 = ctx.repository.saveNote({
+        filePath: "time1.md",
+        title: "Time1",
+        content: "Content",
+        frontmatter: {},
+        createdAt: now,
+      });
+      ctx.repository.saveNote({
+        filePath: "time2.md",
+        title: "Time2",
+        content: "Content",
+        frontmatter: {},
+        createdAt: now,
+      });
+      const results = ctx.repository.findNotesByTimeProximity(id1, now, 7, 10);
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.find((r) => r.id === id1)).toBeUndefined();
+    });
+  });
+
+  describe("getStats", () => {
+    it("should return accurate counts and patternsByType", () => {
+      const id1 = ctx.repository.saveNote({
+        filePath: "s1.md",
+        title: "S1",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const id2 = ctx.repository.saveNote({
+        filePath: "s2.md",
+        title: "S2",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.savePatterns(id1, [
+        { type: "problem", content: "Error", confidence: 0.8 },
+        { type: "solution", content: "Fix", confidence: 0.9 },
+      ]);
+      ctx.repository.saveNoteLinks([
+        { sourceNoteId: id1, targetNoteId: id2, linkType: "related", similarity: 0.7 },
+      ]);
+
+      const stats = ctx.repository.getStats();
+      expect(stats.totalNotes).toBe(2);
+      expect(stats.totalPatterns).toBe(2);
+      expect(stats.totalLinks).toBe(1);
+      expect(stats.patternsByType["problem"]).toBe(1);
+      expect(stats.patternsByType["solution"]).toBe(1);
+    });
+  });
+});

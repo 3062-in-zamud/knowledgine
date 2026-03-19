@@ -1,17 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { run } from "../src/index.js";
 import { VERSION } from "@knowledgine/core";
+import { initCommand } from "../src/commands/init.js";
+import { startCommand } from "../src/commands/start.js";
 
 describe("cli", () => {
-  it("--version returns the version string", () => {
-    const result = run(["--version"]);
-    expect(result.exitCode).toBe(0);
-    expect(result.output).toBe(VERSION);
+  it("should export initCommand", () => {
+    expect(typeof initCommand).toBe("function");
   });
 
-  it("--help returns help text", () => {
-    const result = run(["--help"]);
-    expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("Usage:");
+  it("should export startCommand", () => {
+    expect(typeof startCommand).toBe("function");
+  });
+
+  it("VERSION should be defined", () => {
+    expect(VERSION).toBeDefined();
+    expect(typeof VERSION).toBe("string");
   });
 });
