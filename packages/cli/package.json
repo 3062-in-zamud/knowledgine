@@ -29,12 +29,16 @@
     "dist"
   ],
   "description": "CLI for indexing markdown files and serving MCP knowledge tools",
+  "mcpName": "io.github.3062-in-zamud/knowledgine",
   "keywords": [
     "knowledgine",
-    "cli",
     "mcp",
+    "model-context-protocol",
     "knowledge",
-    "indexer"
+    "markdown",
+    "search",
+    "cli",
+    "developer-tools"
   ],
   "license": "MIT",
   "repository": {

@@ -32,8 +32,10 @@
     "mcp",
     "model-context-protocol",
     "knowledge",
-    "ai",
-    "search"
+    "markdown",
+    "search",
+    "mcp-server",
+    "developer-tools"
   ],
   "license": "MIT",
   "repository": {

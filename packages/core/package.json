@@ -26,7 +26,11 @@
     "mcp",
     "ai",
     "markdown",
-    "fts5"
+    "fts5",
+    "vector-search",
+    "semantic-search",
+    "onnx",
+    "sqlite-vec"
   ],
   "license": "MIT",
   "repository": {

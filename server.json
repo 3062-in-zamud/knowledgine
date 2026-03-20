@@ -1,0 +1,19 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.3062-in-zamud/knowledgine",
+  "version": "0.0.1",
+  "description": "Developer knowledge infrastructure - extract structured knowledge from markdown notes for AI coding tools",
+  "repository": {
+    "url": "https://github.com/3062-in-zamud/knowledgine",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@knowledgine/cli",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
