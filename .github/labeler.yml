@@ -1,0 +1,32 @@
+"pkg: core":
+  - changed-files:
+      - any-glob-to-any-file: "packages/core/**"
+
+"pkg: cli":
+  - changed-files:
+      - any-glob-to-any-file: "packages/cli/**"
+
+"pkg: mcp-server":
+  - changed-files:
+      - any-glob-to-any-file: "packages/mcp-server/**"
+
+"pkg: ingest":
+  - changed-files:
+      - any-glob-to-any-file: "packages/ingest/**"
+
+"type: docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "*.md"
+
+"type: ci":
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+"type: docker":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "Dockerfile"
+          - "docker-compose.yml"
+          - ".dockerignore"

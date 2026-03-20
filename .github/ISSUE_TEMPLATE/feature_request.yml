@@ -5,7 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for suggesting a feature!
+        Thank you for suggesting a feature! Please describe the problem you are trying to
+        solve and your proposed solution.
+
   - type: dropdown
     id: package
     attributes:
@@ -15,27 +17,47 @@ body:
         - "@knowledgine/core"
         - "@knowledgine/cli"
         - "@knowledgine/mcp-server"
+        - "@knowledgine/ingest"
         - "Other / Multiple"
     validations:
       required: true
+
   - type: textarea
     id: problem
     attributes:
-      label: Problem
-      description: What problem does this feature solve?
+      label: Problem Description
+      description: |
+        A clear and concise description of the problem this feature would solve.
+        Example: "I'm always frustrated when [...]"
     validations:
       required: true
+
   - type: textarea
     id: solution
     attributes:
       label: Proposed Solution
-      description: How would you like this to work?
+      description: |
+        Describe how you would like this feature to work. Include API examples,
+        CLI usage, or configuration snippets if applicable.
     validations:
       required: true
+
   - type: textarea
     id: alternatives
     attributes:
       label: Alternatives Considered
-      description: Any alternative solutions you've considered
+      description: |
+        Describe any alternative solutions or workarounds you have considered.
+        Why are they insufficient?
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: |
+        Add any other context, mockups, screenshots, or references that help
+        explain the feature request.
     validations:
       required: false
