@@ -1,4 +1,6 @@
-export const VERSION = "0.0.1";
+import { createRequire } from "module";
+const _require = createRequire(import.meta.url);
+export const VERSION: string = _require("../package.json").version;
 
 // Config
 export { defineConfig } from "./config.js";
