@@ -1,9 +1,10 @@
 import type { EntityType } from "../types.js";
+import type { ExtractionRules } from "../feedback/feedback-learner.js";
 
 export interface ExtractedEntity {
   name: string;
   entityType: EntityType;
-  sourceType: "tag" | "import" | "link" | "code" | "mention" | "frontmatter";
+  sourceType: "tag" | "import" | "link" | "code" | "mention" | "frontmatter" | "whitelist";
 }
 
 /**
@@ -59,9 +60,15 @@ const STOP_LIST = new Set([
 ]);
 
 /**
- * ノートテキストからエンティティを抽出する。
+ * Extracts entities from note text, with optional post-processing via ExtractionRules.
  */
 export class EntityExtractor {
+  private rules?: ExtractionRules;
+
+  constructor(rules?: ExtractionRules) {
+    this.rules = rules;
+  }
+
   extract(content: string, frontmatter: Record<string, unknown> = {}): ExtractedEntity[] {
     const results: ExtractedEntity[] = [];
 
@@ -73,7 +80,50 @@ export class EntityExtractor {
     results.push(...this.extractMentions(content));
     results.push(...this.extractOrgRepos(content));
 
-    return this.deduplicate(results);
+    let deduped = this.deduplicate(results);
+
+    if (this.rules) {
+      deduped = this.applyRules(deduped);
+    }
+
+    return deduped;
+  }
+
+  private applyRules(entities: ExtractedEntity[]): ExtractedEntity[] {
+    const rules = this.rules!;
+
+    // 1. Filter out blacklisted entities
+    let filtered = entities.filter(
+      (e) => !rules.entityBlacklist.includes(e.name),
+    );
+
+    // 2. Apply type overrides
+    filtered = filtered.map((e) => {
+      const override = rules.typeOverrides.find(
+        (o) => o.name === e.name && o.fromType === e.entityType,
+      );
+      if (override) {
+        return { ...e, entityType: override.toType as EntityType };
+      }
+      return e;
+    });
+
+    // 3. Add whitelisted entities (if not already present)
+    for (const wl of rules.entityWhitelist) {
+      const key = `${wl.type}:${wl.name}`;
+      const exists = filtered.some(
+        (e) => `${e.entityType}:${e.name}` === key,
+      );
+      if (!exists) {
+        filtered.push({
+          name: wl.name,
+          entityType: wl.type as EntityType,
+          sourceType: "whitelist",
+        });
+      }
+    }
+
+    return filtered;
   }
 
   private extractFromFrontmatterTags(frontmatter: Record<string, unknown>): ExtractedEntity[] {

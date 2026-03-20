@@ -8,6 +8,7 @@ import {
   Migrator,
   KnowledgeRepository,
   GraphRepository,
+  FeedbackRepository,
   FileProcessor,
   PatternExtractor,
   ALL_MIGRATIONS,
@@ -51,6 +52,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
   new Migrator(db, ALL_MIGRATIONS).migrate();
   const repository = new KnowledgeRepository(db);
   const graphRepository = new GraphRepository(db);
+  const feedbackRepository = new FeedbackRepository(db);
 
   // Warn if no notes indexed (H-8)
   const stats = repository.getStats();
@@ -84,6 +86,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     rootPath,
     embeddingProvider,
     graphRepository,
+    feedbackRepository,
   });
   const transport = new StdioServerTransport();
   await server.connect(transport);

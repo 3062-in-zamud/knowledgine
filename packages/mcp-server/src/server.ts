@@ -1,8 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { KnowledgeSearcher, LocalLinkGenerator, VERSION } from "@knowledgine/core";
-import type { KnowledgeRepository, EmbeddingProvider } from "@knowledgine/core";
-import type { GraphRepository } from "@knowledgine/core";
+import type { KnowledgeRepository, EmbeddingProvider, FeedbackErrorType } from "@knowledgine/core";
+import type { GraphRepository, FeedbackRepository } from "@knowledgine/core";
 import { formatToolResult, formatToolError } from "./helpers.js";
 
 export interface McpServerOptions {
@@ -10,10 +10,11 @@ export interface McpServerOptions {
   rootPath?: string;
   embeddingProvider?: EmbeddingProvider;
   graphRepository?: GraphRepository;
+  feedbackRepository?: FeedbackRepository;
 }
 
 export function createKnowledgineMcpServer(options: McpServerOptions): McpServer {
-  const { repository, rootPath, embeddingProvider, graphRepository } = options;
+  const { repository, rootPath, embeddingProvider, graphRepository, feedbackRepository } = options;
   const server = new McpServer({ name: "knowledgine", version: VERSION });
   const searcher = new KnowledgeSearcher(repository, embeddingProvider);
 
@@ -231,6 +232,51 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           return formatToolError(`Entity not found: id=${entityId}`);
         }
         return formatToolResult(graph);
+      } catch (error) {
+        return formatToolError(error instanceof Error ? error.message : String(error));
+      }
+    },
+  );
+
+  // Tool 6: report_extraction_error
+  server.registerTool(
+    "report_extraction_error",
+    {
+      description:
+        "Report an extraction error for feedback. Helps improve entity extraction accuracy.",
+      inputSchema: {
+        entityName: z.string().describe("Name of the entity with the error"),
+        errorType: z
+          .enum(["false_positive", "wrong_type", "missed_entity"])
+          .describe("Type of error"),
+        entityType: z.string().optional().describe("Current entity type"),
+        correctType: z.string().optional().describe("Correct type (for wrong_type errors)"),
+        noteId: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe("Note ID where the error was found"),
+        details: z.string().optional().describe("Additional details"),
+      },
+    },
+    async (input) => {
+      try {
+        if (!feedbackRepository) {
+          return formatToolError("Feedback system is not available");
+        }
+        const record = feedbackRepository.create({
+          entityName: input.entityName,
+          errorType: input.errorType as FeedbackErrorType,
+          entityType: input.entityType,
+          correctType: input.correctType,
+          noteId: input.noteId,
+          details: input.details,
+        });
+        return formatToolResult({
+          message: "Feedback recorded successfully",
+          feedback: record,
+        });
       } catch (error) {
         return formatToolError(error instanceof Error ? error.message : String(error));
       }

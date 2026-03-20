@@ -33,6 +33,8 @@ export type {
   SourceType,
   KnowledgeEvent,
   IngestCursor,
+  FeedbackErrorType,
+  FeedbackStatus,
 } from "./types.js";
 
 // Errors
@@ -68,6 +70,13 @@ export { migration002 } from "./storage/migrations/002_memory_layers.js";
 export { migration003 } from "./storage/migrations/003_vector_embeddings.js";
 export { migration004 } from "./storage/migrations/004_knowledge_graph.js";
 export { migration005a } from "./storage/migrations/005a_events_layer.js";
+export { migration006 } from "./storage/migrations/006_extraction_feedback.js";
+
+// Feedback
+export { FeedbackRepository } from "./feedback/feedback-repository.js";
+export type { CreateFeedbackInput, FeedbackRecord } from "./feedback/feedback-repository.js";
+export { FeedbackLearner } from "./feedback/feedback-learner.js";
+export type { ExtractionRules, TypeOverride, WhitelistEntry } from "./feedback/feedback-learner.js";
 
 // Memory
 export { MemoryManager } from "./memory/memory-manager.js";
@@ -78,8 +87,9 @@ import { migration002 } from "./storage/migrations/002_memory_layers.js";
 import { migration003 } from "./storage/migrations/003_vector_embeddings.js";
 import { migration004 } from "./storage/migrations/004_knowledge_graph.js";
 import { migration005a } from "./storage/migrations/005a_events_layer.js";
+import { migration006 } from "./storage/migrations/006_extraction_feedback.js";
 import type { Migration } from "./storage/migrator.js";
-export const ALL_MIGRATIONS: Migration[] = [migration001, migration002, migration003, migration004, migration005a];
+export const ALL_MIGRATIONS: Migration[] = [migration001, migration002, migration003, migration004, migration005a, migration006];
 
 // Graph
 export { GraphRepository } from "./graph/graph-repository.js";

@@ -8,6 +8,12 @@ import { statusCommand } from "./commands/status.js";
 import { upgradeCommand } from "./commands/upgrade.js";
 import { ingestCommand } from "./commands/ingest.js";
 import { pluginsListCommand, pluginsStatusCommand } from "./commands/plugins.js";
+import {
+  feedbackListCommand,
+  feedbackApplyCommand,
+  feedbackDismissCommand,
+  feedbackStatsCommand,
+} from "./commands/feedback.js";
 
 const program = new Command();
 
@@ -121,5 +127,30 @@ pluginsCmd
   .option("--path <dir>", "Root directory")
   .description("Show plugin ingest status")
   .action(pluginsStatusCommand);
+
+const feedbackCmd = program
+  .command("feedback")
+  .description("Manage extraction feedback");
+feedbackCmd
+  .command("list")
+  .description("List feedback records")
+  .option("--status <status>", "Filter by status (pending, applied, dismissed)")
+  .option("--path <dir>", "Root directory")
+  .action(feedbackListCommand);
+feedbackCmd
+  .command("apply <id>")
+  .description("Apply feedback and update extraction rules")
+  .option("--path <dir>", "Root directory")
+  .action(feedbackApplyCommand);
+feedbackCmd
+  .command("dismiss <id>")
+  .description("Dismiss feedback without applying")
+  .option("--path <dir>", "Root directory")
+  .action(feedbackDismissCommand);
+feedbackCmd
+  .command("stats")
+  .description("Show feedback statistics")
+  .option("--path <dir>", "Root directory")
+  .action(feedbackStatsCommand);
 
 program.parse();

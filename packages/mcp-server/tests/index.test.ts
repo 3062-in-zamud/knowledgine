@@ -26,7 +26,7 @@ describe("MCP Server Integration", () => {
     ctx.db.close();
   });
 
-  it("should list 5 tools", async () => {
+  it("should list 6 tools", async () => {
     const result = await client.listTools();
     const toolNames = result.tools.map((t) => t.name);
     expect(toolNames).toContain("search_knowledge");
@@ -34,7 +34,8 @@ describe("MCP Server Integration", () => {
     expect(toolNames).toContain("get_stats");
     expect(toolNames).toContain("search_entities");
     expect(toolNames).toContain("get_entity_graph");
-    expect(toolNames).toHaveLength(5);
+    expect(toolNames).toContain("report_extraction_error");
+    expect(toolNames).toHaveLength(6);
   });
 
   describe("search_knowledge", () => {

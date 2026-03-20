@@ -212,3 +212,9 @@ export interface IngestCursor {
   lastIngestAt: string;
   metadataJson?: Record<string, unknown>;
 }
+
+// --- Feedback Types ---
+
+export type FeedbackErrorType = "false_positive" | "wrong_type" | "missed_entity";
+
+export type FeedbackStatus = "pending" | "applied" | "dismissed";

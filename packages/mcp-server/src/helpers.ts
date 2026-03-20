@@ -5,6 +5,7 @@ import {
   Migrator,
   KnowledgeRepository,
   GraphRepository,
+  FeedbackRepository,
   ALL_MIGRATIONS,
   OnnxEmbeddingProvider,
   ModelManager,
@@ -44,6 +45,7 @@ export async function initializeDependencies(config: KnowledgineConfig): Promise
   repository: KnowledgeRepository;
   embeddingProvider: EmbeddingProvider | undefined;
   graphRepository: GraphRepository;
+  feedbackRepository: FeedbackRepository;
 }> {
   // 1. Create database without sqlite-vec (loaded async below if needed)
   const db = createDatabase(config.dbPath);
@@ -58,6 +60,7 @@ export async function initializeDependencies(config: KnowledgineConfig): Promise
 
   const repository = new KnowledgeRepository(db);
   const graphRepository = new GraphRepository(db);
+  const feedbackRepository = new FeedbackRepository(db);
 
   // 4. EmbeddingProvider initialization (only if model exists)
   let embeddingProvider: EmbeddingProvider | undefined;
@@ -73,7 +76,7 @@ export async function initializeDependencies(config: KnowledgineConfig): Promise
     }
   }
 
-  return { repository, embeddingProvider, graphRepository };
+  return { repository, embeddingProvider, graphRepository, feedbackRepository };
 }
 
 export function formatToolResult(data: unknown): {
