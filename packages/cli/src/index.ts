@@ -14,6 +14,8 @@ import {
   feedbackDismissCommand,
   feedbackStatsCommand,
 } from "./commands/feedback.js";
+import { demoCommand } from "./commands/demo.js";
+import { searchCommand } from "./commands/search.js";
 
 const program = new Command();
 
@@ -43,12 +45,14 @@ program
   .option("--path <dir>", "Root directory to scan")
   .option("--semantic", "Enable semantic search (download model + generate embeddings)")
   .option("--skip-embeddings", "[deprecated] Use default behavior instead (embeddings are now opt-in)")
+  .option("--demo", "Initialize with sample demo notes")
   .addHelpText(
     "after",
     `
 Examples:
   knowledgine init --path ~/notes
-  knowledgine init --path ~/project --semantic`,
+  knowledgine init --path ~/project --semantic
+  knowledgine init --demo`,
   )
   .action(initCommand);
 
@@ -152,5 +156,25 @@ feedbackCmd
   .description("Show feedback statistics")
   .option("--path <dir>", "Root directory")
   .action(feedbackStatsCommand);
+
+program
+  .command("demo")
+  .description("Show demo usage information or clean up demo files")
+  .option("--clean", "Remove demo notes and data")
+  .action(demoCommand);
+
+program
+  .command("search <query>")
+  .description("Search indexed notes")
+  .option("--demo", "Search in demo notes")
+  .option("--mode <mode>", "Search mode: keyword, semantic, hybrid", "keyword")
+  .option("--limit <n>", "Maximum results", "20")
+  .action((query: string, opts: { demo?: boolean; mode?: string; limit?: string }) => {
+    return searchCommand(query, {
+      demo: opts.demo,
+      mode: opts.mode,
+      limit: Number(opts.limit),
+    });
+  });
 
 program.parse();

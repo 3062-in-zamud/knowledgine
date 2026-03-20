@@ -27,7 +27,8 @@
     "commander": "^14.0.3"
   },
   "files": [
-    "dist"
+    "dist",
+    "fixtures"
   ],
   "description": "CLI for indexing markdown files and serving MCP knowledge tools",
   "mcpName": "io.github.3062-in-zamud/knowledgine",

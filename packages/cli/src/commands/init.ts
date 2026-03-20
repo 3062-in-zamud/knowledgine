@@ -15,15 +15,27 @@ import {
 } from "@knowledgine/core";
 import { indexAll } from "../lib/indexer.js";
 import { createProgress, formatDuration } from "../lib/progress.js";
+import { copyDemoFixtures } from "../lib/demo-manager.js";
+import { getDemoNotesPath } from "./demo.js";
 
 export interface InitOptions {
   path?: string;
   semantic?: boolean;
   skipEmbeddings?: boolean;
+  demo?: boolean;
 }
 
 export async function initCommand(options: InitOptions): Promise<void> {
-  const rootPath = resolve(options.path ?? process.cwd());
+  let rootPath: string;
+
+  if (options.demo) {
+    const demoPath = getDemoNotesPath(options.path);
+    const count = copyDemoFixtures(demoPath);
+    console.error(`Copied ${count} demo notes to ${demoPath}`);
+    rootPath = demoPath;
+  } else {
+    rootPath = resolve(options.path ?? process.cwd());
+  }
 
   // Deprecation warning for --skip-embeddings
   if (options.skipEmbeddings) {
@@ -178,7 +190,17 @@ export async function initCommand(options: InitOptions): Promise<void> {
     console.error("  Hint:       Run 'knowledgine upgrade --semantic' to enable semantic search");
   }
   console.error("");
-  console.error("Next: Run 'knowledgine setup' to connect your AI tool.");
+  if (options.demo) {
+    console.error("Demo ready! Try:");
+    console.error('  knowledgine search "auth" --demo');
+    console.error('  knowledgine search "typescript" --demo');
+    console.error('  knowledgine search "docker" --demo');
+    console.error("");
+    console.error("Clean up when done:");
+    console.error("  knowledgine demo --clean");
+  } else {
+    console.error("Next: Run 'knowledgine setup' to connect your AI tool.");
+  }
 
   db.close();
 }
