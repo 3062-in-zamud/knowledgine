@@ -1,0 +1,16 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required:
+      - notesPath
+    properties:
+      notesPath:
+        type: string
+        title: Notes Path
+        description: Absolute path to the directory containing your markdown notes
+  commandFunction: |
+    (config) => ({
+      command: "npx",
+      args: ["-y", "@knowledgine/cli", "start", "--path", config.notesPath]
+    })
