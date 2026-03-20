@@ -1,0 +1,49 @@
+# KPI Alert Thresholds
+#
+# These thresholds define the minimum acceptable values for knowledgine's
+# key performance indicators. When a metric falls below its threshold the
+# check-kpi-thresholds script automatically opens a GitHub Issue labelled
+# "kpi-alert" so the team can decide whether to continue or shut down the
+# project (撤退基準).
+#
+# All numeric values use the units noted in the comments.
+# Set `enabled: false` to temporarily silence an alert without deleting it.
+
+thresholds:
+
+  # --- npm download metrics ---------------------------------------------------
+
+  npm_weekly_downloads:
+    enabled: true
+    # Minimum weekly download count from the npm registry.
+    # Source: https://api.npmjs.org/downloads/point/last-week/{package}
+    min: 50
+    package: knowledgine
+    label: "npm weekly downloads < 50"
+
+  # --- GitHub repository metrics ----------------------------------------------
+
+  github_stars:
+    enabled: true
+    # Minimum cumulative star count on the main repository.
+    min: 10
+    repo: "3062-in-zamud/knowledgine"
+    label: "GitHub stars < 10"
+
+  github_open_issues:
+    enabled: true
+    # Maximum number of open issues (excluding pull requests).
+    # Exceeding this threshold may indicate unresolved quality problems.
+    max: 100
+    repo: "3062-in-zamud/knowledgine"
+    label: "open issues > 100"
+
+  # --- Issue response time ----------------------------------------------------
+
+  issue_response_time_days:
+    enabled: true
+    # Maximum average days before a new issue receives its first response.
+    # Measured across issues opened in the last 30 days.
+    max: 7
+    repo: "3062-in-zamud/knowledgine"
+    label: "avg issue response > 7 days"

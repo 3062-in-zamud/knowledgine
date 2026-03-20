@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+#### CLI (`@knowledgine/cli`)
+
+- **KNOW-241**: Step-based progress display for the `init` command
+  - `createStepProgress()` function added to `packages/cli/src/lib/progress.ts`
+  - Named steps (startStep/completeStep/failStep/skipStep) with status icons
+  - Structured warnings via `warn()` method
+  - Text-only icons when `NO_COLOR` is set (CI-friendly)
+- **KNOW-241**: Enhanced error handling in `knowledgine init`
+  - File read failures are non-fatal: files are skipped with a warning, init continues
+  - Disk-full detection (`ENOSPC`) with required-capacity guidance (FTS5: source x2; semantic: +23 MB model + vector index)
+  - Network errors during model download: exponential backoff (1 s / 2 s / 4 s), up to 3 retries, then offline alternative instructions
+
+#### Infrastructure
+
+- **KNOW-271**: KPI alert automation for withdrawal criteria (撤退基準)
+  - `.github/kpi-thresholds.yml` — threshold configuration file for npm downloads, GitHub stars, open issues, and issue response time
+  - `scripts/check-kpi-thresholds.ts` — fetches live npm/GitHub API data, compares against thresholds, and opens labelled GitHub Issues for violations
+  - `.github/workflows/kpi-alert.yml` — weekly cron (Monday 09:00 UTC) workflow; supports manual `dry_run` trigger
+
 ## [0.2.0] - 2026-03-20
 
 ### Changed

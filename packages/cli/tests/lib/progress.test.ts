@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createProgress, formatDuration } from "../../src/lib/progress.js";
+import { createProgress, createStepProgress, formatDuration } from "../../src/lib/progress.js";
 
 describe("formatDuration", () => {
   it("should format milliseconds under 1 second", () => {
@@ -113,5 +113,126 @@ describe("createProgress", () => {
 
       delete process.env["NO_COLOR"];
     });
+  });
+});
+
+describe("createStepProgress", () => {
+  let stderrWriteSpy: ReturnType<typeof vi.spyOn>;
+  let output: string;
+
+  beforeEach(() => {
+    output = "";
+    stderrWriteSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk) => {
+        output += typeof chunk === "string" ? chunk : chunk.toString();
+        return true;
+      });
+  });
+
+  afterEach(() => {
+    stderrWriteSpy.mockRestore();
+    delete process.env["NO_COLOR"];
+  });
+
+  it("should print title when provided", () => {
+    createStepProgress(3, "My Title");
+    expect(output).toContain("My Title");
+  });
+
+  it("should print running indicator on startStep", () => {
+    const steps = createStepProgress(2);
+    steps.startStep("Loading config");
+    expect(output).toContain("Loading config");
+  });
+
+  it("should mark a completed step with done icon", () => {
+    process.env["NO_COLOR"] = "1";
+    const steps = createStepProgress(2);
+    steps.startStep("Step A");
+    output = ""; // reset after start output
+    steps.completeStep("Step A");
+    expect(output).toContain("[ok]");
+    expect(output).toContain("Step A");
+  });
+
+  it("should mark a failed step with fail icon and reason", () => {
+    process.env["NO_COLOR"] = "1";
+    const steps = createStepProgress(2);
+    steps.failStep("Step B", "disk full");
+    expect(output).toContain("[fail]");
+    expect(output).toContain("Step B");
+    expect(output).toContain("disk full");
+  });
+
+  it("should mark a skipped step with skip icon and reason", () => {
+    process.env["NO_COLOR"] = "1";
+    const steps = createStepProgress(2);
+    steps.skipStep("Step C", "already done");
+    expect(output).toContain("[skip]");
+    expect(output).toContain("Step C");
+    expect(output).toContain("already done");
+  });
+
+  it("should print warning messages with '!' prefix", () => {
+    const steps = createStepProgress(1);
+    steps.warn("Something unexpected happened");
+    expect(output).toContain("!");
+    expect(output).toContain("Something unexpected happened");
+  });
+
+  it("should include duration in finish output", () => {
+    const steps = createStepProgress(2);
+    steps.startStep("X");
+    steps.completeStep("X");
+    output = "";
+    steps.finish();
+    // Should contain a duration string like "0ms", "1ms", etc.
+    expect(output).toMatch(/\d+ms|\d+\.\d+s|\d+m \d+s/);
+  });
+
+  it("should report failed steps count in finish summary", () => {
+    process.env["NO_COLOR"] = "1";
+    const steps = createStepProgress(2);
+    steps.failStep("Step A", "error");
+    output = "";
+    steps.finish();
+    expect(output).toContain("failed");
+  });
+
+  it("should report clean success in finish when all done", () => {
+    process.env["NO_COLOR"] = "1";
+    const steps = createStepProgress(1);
+    steps.startStep("X");
+    steps.completeStep("X");
+    output = "";
+    steps.finish();
+    expect(output).toContain("completed");
+  });
+
+  it("should handle step that was not started before completing", () => {
+    process.env["NO_COLOR"] = "1";
+    const steps = createStepProgress(1);
+    // completeStep without prior startStep should not throw
+    expect(() => steps.completeStep("Orphan step")).not.toThrow();
+    expect(output).toContain("Orphan step");
+  });
+
+  it("should use text icons when NO_COLOR is set", () => {
+    process.env["NO_COLOR"] = "1";
+    const steps = createStepProgress(1);
+    steps.completeStep("Done step");
+    expect(output).toContain("[ok]");
+    steps.failStep("Fail step");
+    expect(output).toContain("[fail]");
+    steps.skipStep("Skip step");
+    expect(output).toContain("[skip]");
+  });
+
+  it("should work without title", () => {
+    const steps = createStepProgress(1);
+    // No title — first write should be triggered by a step, not by title
+    steps.startStep("First step");
+    expect(output).toContain("First step");
   });
 });
