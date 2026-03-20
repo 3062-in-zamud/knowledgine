@@ -40,10 +40,15 @@ describe("KnowledgeSearcher", () => {
   });
 
   describe("search (semantic mode)", () => {
-    it("should return empty when no embedding provider", async () => {
+    it("should fall back to keyword search with notification when no embedding provider", async () => {
       const results = await searcher.search({ query: "TypeScript", mode: "semantic" });
-      // No provider → falls back to keyword
-      expect(Array.isArray(results)).toBe(true);
+      // No provider → falls back to keyword with results
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].matchReason).toContain(
+        "Note: Fell back to keyword search (semantic search not configured)",
+      );
+      // Should still include keyword match reason
+      expect(results[0].matchReason).toContain('キーワード一致: "TypeScript"');
     });
 
     it("should use semantic mode when embedding provider is provided", async () => {
@@ -61,6 +66,24 @@ describe("KnowledgeSearcher", () => {
       const hybridSearcher = new KnowledgeSearcher(ctx.repository, provider);
       const results = await hybridSearcher.search({ query: "TypeScript", mode: "hybrid" });
       expect(results.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("search (fallback behavior)", () => {
+    it("should fall back to keyword for hybrid mode without provider", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "hybrid" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].matchReason).toContain(
+        "Note: Fell back to keyword search (semantic search not configured)",
+      );
+    });
+
+    it("should not include fallback notice for explicit keyword mode", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "keyword" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].matchReason).not.toContain(
+        "Note: Fell back to keyword search (semantic search not configured)",
+      );
     });
   });
 

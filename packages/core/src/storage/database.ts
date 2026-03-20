@@ -19,17 +19,32 @@ export function createDatabase(
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
 
-  // Load sqlite-vec extension before migrations
-  if (options.enableVec !== false) {
+  // Legacy support: load sqlite-vec synchronously if enableVec is explicitly true
+  // New code should use loadSqliteVecExtension() instead
+  if (options.enableVec === true) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const sqliteVec = require("sqlite-vec");
       sqliteVec.load(db);
     } catch {
       // sqlite-vec not available — graceful degradation
-      // Vector search will be unavailable but keyword search still works
     }
   }
 
   return db;
+}
+
+/**
+ * Asynchronously load the sqlite-vec extension into a database.
+ * Returns true if loaded successfully, false otherwise.
+ */
+export async function loadSqliteVecExtension(db: Database.Database): Promise<boolean> {
+  try {
+    const sqliteVec = await import("sqlite-vec");
+    sqliteVec.load(db);
+    return true;
+  } catch {
+    // sqlite-vec not available — vector search will be unavailable
+    return false;
+  }
 }

@@ -52,8 +52,12 @@ export {
   EmbeddingError,
 } from "./errors.js";
 
+// Config loader
+export { loadConfig, writeRcConfig } from "./config/config-loader.js";
+export type { RcConfig } from "./config/config-loader.js";
+
 // Storage
-export { createDatabase } from "./storage/database.js";
+export { createDatabase, loadSqliteVecExtension } from "./storage/database.js";
 export { KnowledgeRepository } from "./storage/knowledge-repository.js";
 export type { KnowledgeNote, ExtractedPatternRow } from "./storage/knowledge-repository.js";
 export { Migrator } from "./storage/migrator.js";

@@ -1,8 +1,10 @@
 import { resolve } from "path";
 import { mkdirSync } from "fs";
 import {
-  defineConfig,
+  loadConfig,
+  writeRcConfig,
   createDatabase,
+  loadSqliteVecExtension,
   Migrator,
   KnowledgeRepository,
   GraphRepository,
@@ -16,19 +18,41 @@ import { createProgress, formatDuration } from "../lib/progress.js";
 
 export interface InitOptions {
   path?: string;
+  semantic?: boolean;
   skipEmbeddings?: boolean;
 }
 
 export async function initCommand(options: InitOptions): Promise<void> {
   const rootPath = resolve(options.path ?? process.cwd());
 
+  // Deprecation warning for --skip-embeddings
+  if (options.skipEmbeddings) {
+    console.error(
+      "Warning: --skip-embeddings is deprecated. Embeddings are now opt-in by default.",
+    );
+    console.error("  Use 'knowledgine init --semantic' to enable semantic search.");
+    console.error("");
+  }
+
+  // Determine if semantic search should be enabled
+  const enableSemantic = options.semantic === true;
+
   // Create .knowledgine directory
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   mkdirSync(knowledgineDir, { recursive: true });
 
-  // Initialize database (sqlite-vec loaded inside createDatabase)
-  const config = defineConfig({ rootPath });
-  const db = createDatabase(config.dbPath, { enableVec: true });
+  // Initialize database
+  const config = loadConfig(rootPath);
+  if (enableSemantic) {
+    config.embedding.enabled = true;
+  }
+  const db = createDatabase(config.dbPath);
+
+  // Load sqlite-vec extension if semantic search is enabled
+  if (enableSemantic) {
+    await loadSqliteVecExtension(db);
+  }
+
   new Migrator(db, ALL_MIGRATIONS).migrate();
   const repository = new KnowledgeRepository(db);
   const graphRepository = new GraphRepository(db);
@@ -61,8 +85,8 @@ export async function initCommand(options: InitOptions): Promise<void> {
     }
   }
 
-  // Generate embeddings if not skipped
-  if (!options.skipEmbeddings) {
+  // Generate embeddings only when --semantic flag is set
+  if (enableSemantic) {
     const modelManager = new ModelManager();
 
     // Auto-download model if not available
@@ -90,7 +114,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
         console.error(
           "Semantic search unavailable. Text search (FTS5) works without embeddings.",
         );
-        console.error(`To retry: knowledgine init --path ${rootPath}`);
+        console.error(`To retry: knowledgine init --path ${rootPath} --semantic`);
         console.error("");
         console.error("knowledgine initialized (without embeddings).");
         console.error(`  Notes:      ${summary.processedFiles} indexed`);
@@ -131,8 +155,10 @@ export async function initCommand(options: InitOptions): Promise<void> {
         }
       }
     }
-  } else {
-    console.error("Skipping embeddings (--skip-embeddings flag set).");
+
+    // Write .knowledginerc.json to persist semantic search setting
+    writeRcConfig(rootPath, { semantic: true });
+    console.error("  Config: .knowledginerc.json written (semantic: true)");
   }
 
   // Final summary
@@ -143,9 +169,14 @@ export async function initCommand(options: InitOptions): Promise<void> {
   console.error("knowledgine initialized successfully.");
   console.error(`  Notes:      ${summary.processedFiles} indexed`);
   console.error(`  Patterns:   ${summary.totalPatterns} extracted`);
-  console.error(
-    `  Embeddings: ${embeddingsGenerated > 0 ? `${embeddingsGenerated} generated` : "none"}`,
-  );
+  if (enableSemantic) {
+    console.error(
+      `  Embeddings: ${embeddingsGenerated > 0 ? `${embeddingsGenerated} generated` : "none"}`,
+    );
+  } else {
+    console.error("  Search:     FTS5 full-text search (default)");
+    console.error("  Hint:       Run 'knowledgine upgrade --semantic' to enable semantic search");
+  }
   console.error("");
   console.error("Next: Run 'knowledgine setup' to connect your AI tool.");
 

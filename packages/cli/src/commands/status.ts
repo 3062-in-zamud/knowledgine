@@ -2,6 +2,7 @@ import { resolve, join } from "path";
 import { existsSync, statSync, readFileSync } from "fs";
 import { homedir } from "os";
 import {
+  loadConfig,
   createDatabase,
   Migrator,
   KnowledgeRepository,
@@ -76,7 +77,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   let totalPatterns = 0;
   let notesWithoutEmbeddings = 0;
   try {
-    const db = createDatabase(dbPath, { enableVec: true });
+    const db = createDatabase(dbPath);
     new Migrator(db, ALL_MIGRATIONS).migrate();
     const repository = new KnowledgeRepository(db);
 
@@ -102,6 +103,11 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const modelAvailable = modelManager.isModelAvailable();
   console.error(`  Model:       all-MiniLM-L6-v2 (${modelAvailable ? "available" : "not found"})`);
 
+  // Semantic search mode
+  const config = loadConfig(rootPath);
+  const semanticMode = config.embedding.enabled || modelAvailable;
+  console.error(`  Search mode: ${semanticMode ? "semantic + FTS5" : "FTS5 only"}`);
+
   // MCP config checks
   const targets: McpTargetStatus[] = [
     {
@@ -123,14 +129,17 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   }
 
   // Overall status
-  const isReady = totalNotes > 0 && modelAvailable && embeddingsGenerated > 0;
-  const isPartial = totalNotes > 0 && (!modelAvailable || embeddingsGenerated === 0);
-  const statusLabel = isReady ? "Ready" : isPartial ? "Partial (text search available)" : "Not initialized";
+  const isReady = totalNotes > 0;
+  const statusLabel = isReady
+    ? semanticMode
+      ? "Ready (semantic + FTS5)"
+      : "Ready (FTS5 only)"
+    : "Not initialized";
   console.error(`  Status:      ${statusLabel}`);
 
-  if (!modelAvailable) {
+  if (!semanticMode && totalNotes > 0) {
     console.error("");
-    console.error("  Hint: Run 'knowledgine init' to download the model and generate embeddings.");
+    console.error("  Hint: Run 'knowledgine upgrade --semantic' to enable semantic search.");
   }
 
   const unconfigured = targets.filter((t) => !t.configured);

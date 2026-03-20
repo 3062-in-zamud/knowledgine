@@ -13,7 +13,7 @@ describe("MCP Server Integration", () => {
     ctx = createTestDb();
     seedTestData(ctx.repository);
 
-    const server = createKnowledgineMcpServer(ctx.repository);
+    const server = createKnowledgineMcpServer({ repository: ctx.repository });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
     client = new Client({ name: "test-client", version: "0.0.1" });

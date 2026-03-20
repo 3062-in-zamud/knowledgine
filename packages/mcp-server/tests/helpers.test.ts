@@ -113,7 +113,7 @@ describe("initializeDependencies", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("creates DB + runs migrations + returns KnowledgeRepository", () => {
+  it("creates DB + runs migrations + returns KnowledgeRepository", async () => {
     const dbPath = join(tmpDir, "test.sqlite");
     const config = {
       rootPath: tmpDir,
@@ -124,11 +124,11 @@ describe("initializeDependencies", () => {
       search: { defaultMode: "keyword" as const, hybridAlpha: 0.3 },
     };
 
-    const { repository } = initializeDependencies(config);
+    const { repository } = await initializeDependencies(config);
     expect(repository).toBeInstanceOf(KnowledgeRepository);
   });
 
-  it("returned repository can save and retrieve notes", () => {
+  it("returned repository can save and retrieve notes", async () => {
     const dbPath = join(tmpDir, "test2.sqlite");
     const config = {
       rootPath: tmpDir,
@@ -139,7 +139,7 @@ describe("initializeDependencies", () => {
       search: { defaultMode: "keyword" as const, hybridAlpha: 0.3 },
     };
 
-    const { repository } = initializeDependencies(config);
+    const { repository } = await initializeDependencies(config);
     const noteId = repository.saveNote({
       filePath: "test.md",
       title: "Test",

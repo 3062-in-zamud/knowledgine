@@ -113,7 +113,7 @@ describe("status command", () => {
     await statusCommand({ path: testDir });
 
     const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
-    // Without model, status should be "Partial"
-    expect(output).toContain("Partial");
+    // Without model, status should be "Ready (FTS5 only)"
+    expect(output).toContain("Ready (FTS5 only)");
   });
 });

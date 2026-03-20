@@ -4,6 +4,7 @@ import { resolveConfig, initializeDependencies } from "./helpers.js";
 import { createKnowledgineMcpServer } from "./server.js";
 
 export { createKnowledgineMcpServer } from "./server.js";
+export type { McpServerOptions } from "./server.js";
 export {
   resolveConfig,
   initializeDependencies,
@@ -14,13 +15,13 @@ export { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 async function main(): Promise<void> {
   const config = resolveConfig();
-  const { repository, embeddingProvider, graphRepository } = initializeDependencies(config);
-  const server = createKnowledgineMcpServer(
+  const { repository, embeddingProvider, graphRepository } = await initializeDependencies(config);
+  const server = createKnowledgineMcpServer({
     repository,
-    config.rootPath,
+    rootPath: config.rootPath,
     embeddingProvider,
     graphRepository,
-  );
+  });
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

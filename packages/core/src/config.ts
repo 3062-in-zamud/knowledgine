@@ -43,7 +43,7 @@ const DEFAULT_CONFIG: KnowledgineConfig = {
   embedding: {
     modelName: "all-MiniLM-L6-v2",
     dimensions: 384,
-    enabled: true,
+    enabled: false,
   },
   search: {
     defaultMode: "keyword",

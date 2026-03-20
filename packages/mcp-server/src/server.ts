@@ -1,17 +1,20 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { KnowledgeSearcher, LocalLinkGenerator } from "@knowledgine/core";
+import { KnowledgeSearcher, LocalLinkGenerator, VERSION } from "@knowledgine/core";
 import type { KnowledgeRepository, EmbeddingProvider } from "@knowledgine/core";
 import type { GraphRepository } from "@knowledgine/core";
 import { formatToolResult, formatToolError } from "./helpers.js";
 
-export function createKnowledgineMcpServer(
-  repository: KnowledgeRepository,
-  rootPath?: string,
-  embeddingProvider?: EmbeddingProvider,
-  graphRepository?: GraphRepository,
-): McpServer {
-  const server = new McpServer({ name: "knowledgine", version: "0.0.1" });
+export interface McpServerOptions {
+  repository: KnowledgeRepository;
+  rootPath?: string;
+  embeddingProvider?: EmbeddingProvider;
+  graphRepository?: GraphRepository;
+}
+
+export function createKnowledgineMcpServer(options: McpServerOptions): McpServer {
+  const { repository, rootPath, embeddingProvider, graphRepository } = options;
+  const server = new McpServer({ name: "knowledgine", version: VERSION });
   const searcher = new KnowledgeSearcher(repository, embeddingProvider);
 
   // Tool 1: search_knowledge

@@ -48,6 +48,12 @@ export class KnowledgeSearcher {
       return this.hybridSearcher.search(query, limit);
     }
 
+    // Fall back to keyword search when semantic/hybrid requested but provider unavailable
+    const fellBack = mode !== "keyword" && (
+      (mode === "semantic" && !this.semanticSearcher) ||
+      (mode === "hybrid" && !this.hybridSearcher)
+    );
+
     // keyword mode (デフォルト) — FTS5
     const rows = this.repository.searchNotesWithRank(query, limit);
 
@@ -64,10 +70,14 @@ export class KnowledgeSearcher {
     return rows.map(({ note, rank }) => {
       const normalized = range > 0 ? (Math.abs(rank) - minRank) / range : 1.0;
       const score = 1 - normalized;
+      const reasons: string[] = [`キーワード一致: "${query}"`];
+      if (fellBack) {
+        reasons.push("Note: Fell back to keyword search (semantic search not configured)");
+      }
       return {
         note,
         score,
-        matchReason: [`キーワード一致: "${query}"`],
+        matchReason: reasons,
       };
     });
   }

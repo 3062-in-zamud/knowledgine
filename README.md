@@ -46,7 +46,15 @@ npm install -g @knowledgine/cli
 knowledgine init --path ./my-notes
 ```
 
-This scans all markdown files, downloads the embedding model (~23MB), and builds `.knowledgine/index.sqlite` with full-text and semantic search indices.
+This scans all markdown files and builds `.knowledgine/index.sqlite` with FTS5 full-text search. No model download required.
+
+To enable semantic search (optional, downloads ~23MB model):
+
+```bash
+knowledgine init --path ./my-notes --semantic
+# or upgrade an existing index:
+knowledgine upgrade --semantic --path ./my-notes
+```
 
 ### 3. Connect your AI tool
 
@@ -70,22 +78,32 @@ knowledgine status --path ./my-notes
 
 ## Commands
 
-| Command  | Description                                                  |
-| -------- | ------------------------------------------------------------ |
-| `init`   | Scan markdown files, download embedding model, build index   |
-| `start`  | Start MCP server with file watching for incremental updates  |
-| `setup`  | Generate MCP configuration for AI tools (Claude Desktop, Cursor) |
-| `status` | Check setup status (database, model, MCP config)             |
+| Command   | Description                                                  |
+| --------- | ------------------------------------------------------------ |
+| `init`    | Scan markdown files and build FTS5 search index              |
+| `start`   | Start MCP server with file watching for incremental updates  |
+| `setup`   | Generate MCP configuration for AI tools (Claude Desktop, Cursor) |
+| `status`  | Check setup status (database, model, MCP config)             |
+| `upgrade` | Enable additional capabilities (e.g., semantic search)       |
 
 ### init
 
 ```bash
 knowledgine init --path ./my-notes
-knowledgine init --path ./my-notes --skip-embeddings
+knowledgine init --path ./my-notes --semantic
 ```
 
 - `--path <dir>`: Root directory to scan (default: current directory)
-- `--skip-embeddings`: Skip embedding model download and generation (text search still works)
+- `--semantic`: Enable semantic search (downloads embedding model and generates embeddings)
+
+### upgrade
+
+```bash
+knowledgine upgrade --semantic --path ./my-notes
+```
+
+- `--semantic`: Download embedding model and generate embeddings for all indexed notes
+- `--path <dir>`: Root directory (default: current directory)
 
 ### setup
 
@@ -209,16 +227,10 @@ npm install --global windows-build-tools
 
 ### Embedding model download failure
 
-If `init` fails to download the model, text search (FTS5) still works. Retry with:
+If `init --semantic` or `upgrade --semantic` fails to download the model, text search (FTS5) still works. Retry with:
 
 ```bash
-knowledgine init --path ./my-notes
-```
-
-Or skip embeddings entirely:
-
-```bash
-knowledgine init --path ./my-notes --skip-embeddings
+knowledgine upgrade --semantic --path ./my-notes
 ```
 
 ### MCP connection issues

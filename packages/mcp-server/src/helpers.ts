@@ -1,5 +1,6 @@
 import {
-  defineConfig,
+  loadConfig,
+  loadSqliteVecExtension,
   createDatabase,
   Migrator,
   KnowledgeRepository,
@@ -13,27 +14,52 @@ import type { KnowledgineConfig, EmbeddingProvider } from "@knowledgine/core";
 export function resolveConfig(): KnowledgineConfig {
   const dbPath = process.env["KNOWLEDGINE_DB_PATH"];
   const rootPath = process.env["KNOWLEDGINE_ROOT_PATH"] ?? process.cwd();
-  return defineConfig({
-    rootPath,
-    ...(dbPath ? { dbPath } : {}),
-  });
+  const config = loadConfig(rootPath);
+
+  // Override dbPath from env if set
+  if (dbPath) {
+    config.dbPath = dbPath;
+  }
+
+  // Model auto-detection for backward compatibility:
+  // If semantic is not explicitly enabled, check if model is already downloaded
+  if (!config.embedding.enabled) {
+    const modelManager = new ModelManager();
+    if (modelManager.isModelAvailable(config.embedding.modelName)) {
+      config.embedding.enabled = true;
+      console.error("[knowledgine] Semantic search enabled (model detected)");
+    } else {
+      console.error(
+        "[knowledgine] Semantic search disabled (no model). Set KNOWLEDGINE_SEMANTIC=true or run 'knowledgine upgrade --semantic'",
+      );
+    }
+  } else {
+    console.error("[knowledgine] Semantic search enabled (configured)");
+  }
+
+  return config;
 }
 
-export function initializeDependencies(config: KnowledgineConfig): {
+export async function initializeDependencies(config: KnowledgineConfig): Promise<{
   repository: KnowledgeRepository;
   embeddingProvider: EmbeddingProvider | undefined;
   graphRepository: GraphRepository;
-} {
-  // 1. sqlite-vec のロードを含む DB 作成（createDatabase 内で try/catch）
-  const db = createDatabase(config.dbPath, { enableVec: true });
+}> {
+  // 1. Create database without sqlite-vec (loaded async below if needed)
+  const db = createDatabase(config.dbPath);
 
-  // 2. migrate（sqlite-vec ロード後に実行）
+  // 2. Load sqlite-vec if semantic search is enabled
+  if (config.embedding.enabled) {
+    await loadSqliteVecExtension(db);
+  }
+
+  // 3. Run migrations
   new Migrator(db, ALL_MIGRATIONS).migrate();
 
   const repository = new KnowledgeRepository(db);
   const graphRepository = new GraphRepository(db);
 
-  // 3. EmbeddingProvider 初期化（モデルが存在する場合のみ）
+  // 4. EmbeddingProvider initialization (only if model exists)
   let embeddingProvider: EmbeddingProvider | undefined;
   if (config.embedding?.enabled) {
     const modelManager = new ModelManager();
@@ -42,7 +68,7 @@ export function initializeDependencies(config: KnowledgineConfig): {
     } else {
       console.error(
         `[knowledgine] Embedding model "${config.embedding.modelName}" not found. ` +
-          "Semantic search will be unavailable. Run: node scripts/download-model.js",
+          "Semantic search will be unavailable. Run: knowledgine upgrade --semantic",
       );
     }
   }

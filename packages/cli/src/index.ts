@@ -5,6 +5,7 @@ import { initCommand } from "./commands/init.js";
 import { startCommand } from "./commands/start.js";
 import { setupCommand } from "./commands/setup.js";
 import { statusCommand } from "./commands/status.js";
+import { upgradeCommand } from "./commands/upgrade.js";
 import { ingestCommand } from "./commands/ingest.js";
 import { pluginsListCommand, pluginsStatusCommand } from "./commands/plugins.js";
 
@@ -20,24 +21,28 @@ program
     "after",
     `
 Workflow:
-  1. knowledgine init --path ~/notes    Index your files
+  1. knowledgine init --path ~/notes    Index your files (FTS5 full-text search)
   2. knowledgine setup --target claude-desktop  Configure AI tool
   3. knowledgine start --path ~/notes    Start MCP server
+
+Optional:
+  knowledgine upgrade --semantic         Enable semantic search (downloads ~23MB model)
 
 Run 'knowledgine <command> --help' for more information on a command.`,
   );
 
 program
   .command("init")
-  .description("Scan and index markdown files, download embedding model")
+  .description("Scan and index markdown files (FTS5 full-text search by default)")
   .option("--path <dir>", "Root directory to scan")
-  .option("--skip-embeddings", "Skip embedding model download and generation")
+  .option("--semantic", "Enable semantic search (download model + generate embeddings)")
+  .option("--skip-embeddings", "[deprecated] Use default behavior instead (embeddings are now opt-in)")
   .addHelpText(
     "after",
     `
 Examples:
   knowledgine init --path ~/notes
-  knowledgine init --path ~/project --skip-embeddings`,
+  knowledgine init --path ~/project --semantic`,
   )
   .action(initCommand);
 
@@ -81,6 +86,19 @@ Example:
   knowledgine status --path ~/notes`,
   )
   .action(statusCommand);
+
+program
+  .command("upgrade")
+  .description("Upgrade knowledgine capabilities")
+  .option("--semantic", "Enable semantic search (download model + generate embeddings)")
+  .option("--path <dir>", "Root directory")
+  .addHelpText(
+    "after",
+    `
+Example:
+  knowledgine upgrade --semantic --path ~/notes`,
+  )
+  .action(upgradeCommand);
 
 program
   .command("ingest")

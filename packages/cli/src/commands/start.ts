@@ -2,8 +2,9 @@ import { resolve } from "path";
 import { mkdirSync } from "fs";
 import { watch } from "chokidar";
 import {
-  defineConfig,
+  loadConfig,
   createDatabase,
+  loadSqliteVecExtension,
   Migrator,
   KnowledgeRepository,
   GraphRepository,
@@ -27,9 +28,26 @@ export async function startCommand(options: StartOptions): Promise<void> {
   // Ensure .knowledgine directory exists
   mkdirSync(resolve(rootPath, ".knowledgine"), { recursive: true });
 
-  // Initialize database + migrations (sqlite-vec loaded inside createDatabase)
-  const config = defineConfig({ rootPath });
-  const db = createDatabase(config.dbPath, { enableVec: true });
+  // Load config (respects .knowledginerc.json and env vars)
+  const config = loadConfig(rootPath);
+
+  // Auto-detect model for backward compatibility
+  if (!config.embedding.enabled) {
+    const modelManager = new ModelManager();
+    if (modelManager.isModelAvailable(config.embedding.modelName)) {
+      config.embedding.enabled = true;
+      console.error("[knowledgine] Semantic search enabled (model detected)");
+    }
+  }
+
+  // Initialize database
+  const db = createDatabase(config.dbPath);
+
+  // Load sqlite-vec if semantic search is enabled
+  if (config.embedding.enabled) {
+    await loadSqliteVecExtension(db);
+  }
+
   new Migrator(db, ALL_MIGRATIONS).migrate();
   const repository = new KnowledgeRepository(db);
   const graphRepository = new GraphRepository(db);
@@ -40,29 +58,33 @@ export async function startCommand(options: StartOptions): Promise<void> {
     console.error("Warning: No notes indexed. Run `knowledgine init` first.");
   }
 
-  // Initialize embedding provider if model is available
+  // Initialize embedding provider if model is available and semantic is enabled
   let embeddingProvider: OnnxEmbeddingProvider | undefined;
-  const modelManager = new ModelManager();
-  if (modelManager.isModelAvailable()) {
-    embeddingProvider = new OnnxEmbeddingProvider(undefined, modelManager);
-  } else {
-    // Warn if notes exist but no embeddings
-    const notesWithout = repository.getNotesWithoutEmbeddings();
-    if (notesWithout.length > 0) {
-      console.error(
-        `Warning: ${notesWithout.length} notes have no embeddings. ` +
-          "Semantic search unavailable. Run 'knowledgine init' to download the model and generate embeddings.",
-      );
+  if (config.embedding.enabled) {
+    const modelManager = new ModelManager();
+    if (modelManager.isModelAvailable()) {
+      embeddingProvider = new OnnxEmbeddingProvider(undefined, modelManager);
+    } else {
+      // Warn if notes exist but no embeddings
+      const notesWithout = repository.getNotesWithoutEmbeddings();
+      if (notesWithout.length > 0) {
+        console.error(
+          `Warning: ${notesWithout.length} notes have no embeddings. ` +
+            "Semantic search unavailable. Run 'knowledgine upgrade --semantic' to download the model and generate embeddings.",
+        );
+      }
     }
+  } else {
+    console.error("[knowledgine] Running with FTS5 full-text search only");
   }
 
   // Start MCP server via stdio
-  const server = createKnowledgineMcpServer(
+  const server = createKnowledgineMcpServer({
     repository,
     rootPath,
     embeddingProvider,
     graphRepository,
-  );
+  });
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("MCP server started on stdio");

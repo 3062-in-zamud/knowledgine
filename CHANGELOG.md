@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-03-20
+
+### Changed
+
+- **BREAKING**: Semantic search is now opt-in (FTS5 full-text search is the default)
+  - `embedding.enabled` defaults to `false` in config
+  - `onnxruntime-node` and `sqlite-vec` moved to `optionalDependencies`
+  - Use `knowledgine init --semantic` or `knowledgine upgrade --semantic` to enable
+- **MCP Server**: `createKnowledgineMcpServer` now takes an options object instead of positional arguments
+- **MCP Server**: `initializeDependencies` is now async (returns `Promise`)
+- **MCP Server**: Server version now uses the package VERSION instead of hardcoded "0.0.1"
+
+### Added
+
+- `loadConfig()` — RC file-based configuration loader (`.knowledginerc.json` / `.knowledginerc.yml`)
+- `writeRcConfig()` — Write `.knowledginerc.json` for persisting settings
+- `loadSqliteVecExtension()` — Async sqlite-vec extension loader
+- `KNOWLEDGINE_SEMANTIC` environment variable to enable semantic search
+- `knowledgine upgrade --semantic` CLI command for post-init semantic search enablement
+- `--semantic` flag on `knowledgine init` for opt-in semantic search during initialization
+- Automatic model detection for backward compatibility (existing installs with model auto-enable semantic)
+- Graceful fallback from semantic/hybrid to keyword search with informative matchReason
+- Search mode display in `knowledgine status` output
+
+### Deprecated
+
+- `--skip-embeddings` flag on `knowledgine init` (embeddings are now opt-in by default)
+
 ## [0.1.0] - 2026-03-20
 
 ### Added
@@ -31,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Integration issues from parallel agent work resolved
 
+[0.2.0]: https://github.com/3062-in-zamud/knowledgine/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/3062-in-zamud/knowledgine/compare/v0.0.1...v0.1.0
 
 ## [0.0.1] - 2026-03-19
