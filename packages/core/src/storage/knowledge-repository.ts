@@ -144,8 +144,12 @@ export class KnowledgeRepository {
         LIMIT ?
       `);
       return stmt.all(query, limit) as KnowledgeNote[];
-    } catch (error) {
-      throw new FTSIndexError("search", error, { query, limit });
+    } catch {
+      // FTS5失敗時はLIKEフォールバック（不正なクエリ構文への耐性）
+      const stmt = this.db.prepare(
+        `SELECT * FROM knowledge_notes WHERE title LIKE ? OR content LIKE ? LIMIT ?`,
+      );
+      return stmt.all(`%${query}%`, `%${query}%`, limit) as KnowledgeNote[];
     }
   }
 
@@ -455,8 +459,15 @@ export class KnowledgeRepository {
       `);
       const rows = stmt.all(query, limit) as Array<KnowledgeNote & { rank: number }>;
       return rows.map(({ rank, ...note }) => ({ note: note as KnowledgeNote, rank }));
-    } catch (error) {
-      throw new FTSIndexError("search", error, { query, limit });
+    } catch {
+      // FTS5失敗時はLIKEフォールバック（不正なクエリ構文への耐性）
+      const fallbackStmt = this.db.prepare(
+        `SELECT n.* FROM knowledge_notes n WHERE n.title LIKE ? OR n.content LIKE ? LIMIT ?`,
+      );
+      const fallbackRows = fallbackStmt.all(`%${query}%`, `%${query}%`, limit) as Array<
+        KnowledgeNote & { rank: number }
+      >;
+      return fallbackRows.map((row) => ({ note: row as KnowledgeNote, rank: 0 }));
     }
   }
 

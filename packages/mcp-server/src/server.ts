@@ -86,10 +86,15 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           // Normalize absolute paths to relative (H-5)
           let normalizedPath = input.filePath;
           if (rootPath && normalizedPath.startsWith("/")) {
-            const { relative, isAbsolute } = await import("path");
-            if (isAbsolute(normalizedPath)) {
-              normalizedPath = relative(rootPath, normalizedPath);
+            const pathModule = await import("path");
+            if (pathModule.isAbsolute(normalizedPath)) {
+              normalizedPath = pathModule.relative(rootPath, normalizedPath);
             }
+          }
+          // パストラバーサル保護: rootPath外への参照を拒否
+          const pathModule = await import("path");
+          if (normalizedPath.startsWith("..") || pathModule.isAbsolute(normalizedPath)) {
+            return formatToolError("Invalid file path: outside of root directory");
           }
           const note = repository.getNoteByPath(normalizedPath);
           if (!note) {
