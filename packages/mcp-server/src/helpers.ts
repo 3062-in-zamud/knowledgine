@@ -3,6 +3,7 @@ import {
   createDatabase,
   Migrator,
   KnowledgeRepository,
+  GraphRepository,
   ALL_MIGRATIONS,
   OnnxEmbeddingProvider,
   ModelManager,
@@ -21,6 +22,7 @@ export function resolveConfig(): KnowledgineConfig {
 export function initializeDependencies(config: KnowledgineConfig): {
   repository: KnowledgeRepository;
   embeddingProvider: EmbeddingProvider | undefined;
+  graphRepository: GraphRepository;
 } {
   // 1. sqlite-vec のロードを含む DB 作成（createDatabase 内で try/catch）
   const db = createDatabase(config.dbPath, { enableVec: true });
@@ -29,6 +31,7 @@ export function initializeDependencies(config: KnowledgineConfig): {
   new Migrator(db, ALL_MIGRATIONS).migrate();
 
   const repository = new KnowledgeRepository(db);
+  const graphRepository = new GraphRepository(db);
 
   // 3. EmbeddingProvider 初期化（モデルが存在する場合のみ）
   let embeddingProvider: EmbeddingProvider | undefined;
@@ -44,7 +47,7 @@ export function initializeDependencies(config: KnowledgineConfig): {
     }
   }
 
-  return { repository, embeddingProvider };
+  return { repository, embeddingProvider, graphRepository };
 }
 
 export function formatToolResult(data: unknown): {

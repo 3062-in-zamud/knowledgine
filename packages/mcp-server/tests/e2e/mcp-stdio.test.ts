@@ -183,7 +183,7 @@ useEffectの依存配列に注意が必要。
     rmSync(testDir, { recursive: true, force: true });
   });
 
-  it("should list 3 tools", async () => {
+  it("should list 5 tools", async () => {
     const response = await transport.send({
       jsonrpc: "2.0",
       id: nextId++,
@@ -191,11 +191,13 @@ useEffectの依存配列に注意が必要。
     });
     expect(response).toBeTruthy();
     const result = response!.result as { tools: Array<{ name: string }> };
-    expect(result.tools).toHaveLength(3);
+    expect(result.tools).toHaveLength(5);
     const names = result.tools.map((t) => t.name);
     expect(names).toContain("search_knowledge");
     expect(names).toContain("find_related");
     expect(names).toContain("get_stats");
+    expect(names).toContain("search_entities");
+    expect(names).toContain("get_entity_graph");
   });
 
   it("should search knowledge via search_knowledge tool", async () => {

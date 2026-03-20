@@ -1,4 +1,5 @@
 import type { KnowledgeRepository, KnowledgeNote } from "../storage/knowledge-repository.js";
+import type { GraphRepository } from "../graph/graph-repository.js";
 
 export interface RelatedNote {
   id: number;
@@ -9,7 +10,10 @@ export interface RelatedNote {
 }
 
 export class LocalLinkGenerator {
-  constructor(private repository: KnowledgeRepository) {}
+  constructor(
+    private repository: KnowledgeRepository,
+    private graphRepository?: GraphRepository,
+  ) {}
 
   findRelatedNotes(noteId: number, limit = 5): RelatedNote[] {
     const currentNote = this.repository.getNoteById(noteId);
@@ -21,9 +25,43 @@ export class LocalLinkGenerator {
     relatedNotes.push(...this.findByTitleSimilarity(currentNote, limit * 2));
     relatedNotes.push(...this.findByTimeProximity(currentNote, limit));
     relatedNotes.push(...this.findByProblemSolutionPairs(noteId));
+    if (this.graphRepository) {
+      relatedNotes.push(...this.findByGraphTraversal(noteId, limit));
+    }
 
     const uniqueNotes = this.deduplicateAndRank(relatedNotes, noteId);
     return uniqueNotes.slice(0, limit);
+  }
+
+  /**
+   * グラフトラバーサルで同じエンティティを共有するノートを取得する。
+   */
+  private findByGraphTraversal(noteId: number, limit: number): RelatedNote[] {
+    if (!this.graphRepository) return [];
+    const linkedEntities = this.graphRepository.getLinkedEntities(noteId);
+    const relatedNotes: RelatedNote[] = [];
+    const seen = new Set<number>([noteId]);
+
+    for (const entity of linkedEntities) {
+      const entityNotes = this.graphRepository.getLinkedNotes(entity.id!);
+      for (const { noteId: linkedNoteId } of entityNotes) {
+        if (seen.has(linkedNoteId)) continue;
+        seen.add(linkedNoteId);
+        const note = this.repository.getNoteById(linkedNoteId);
+        if (note) {
+          relatedNotes.push({
+            id: note.id,
+            filePath: note.file_path,
+            title: note.title,
+            similarity: 0.6,
+            reason: `共通エンティティ: ${entity.name}`,
+          });
+        }
+        if (relatedNotes.length >= limit * 2) break;
+      }
+    }
+
+    return relatedNotes;
   }
 
   private findByTagSimilarity(currentNote: KnowledgeNote, limit: number): RelatedNote[] {

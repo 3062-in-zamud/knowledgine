@@ -6,6 +6,7 @@ import {
   createDatabase,
   Migrator,
   KnowledgeRepository,
+  GraphRepository,
   FileProcessor,
   PatternExtractor,
   ALL_MIGRATIONS,
@@ -30,6 +31,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
   const db = createDatabase(config.dbPath, { enableVec: true });
   new Migrator(db, ALL_MIGRATIONS).migrate();
   const repository = new KnowledgeRepository(db);
+  const graphRepository = new GraphRepository(db);
 
   // Warn if no notes indexed (H-8)
   const stats = repository.getStats();
@@ -54,7 +56,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
   }
 
   // Start MCP server via stdio
-  const server = createKnowledgineMcpServer(repository, rootPath, embeddingProvider);
+  const server = createKnowledgineMcpServer(repository, rootPath, embeddingProvider, graphRepository);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("MCP server started on stdio");
@@ -72,7 +74,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   watcher.on("add", async (filePath: string) => {
     try {
-      const noteId = await indexFile(filePath, rootPath, fileProcessor, patternExtractor, repository);
+      const noteId = await indexFile(filePath, rootPath, fileProcessor, patternExtractor, repository, graphRepository);
       if (embeddingProvider) {
         const note = repository.getNoteById(noteId);
         if (note) {
@@ -88,7 +90,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   watcher.on("change", async (filePath: string) => {
     try {
-      const noteId = await indexFile(filePath, rootPath, fileProcessor, patternExtractor, repository);
+      const noteId = await indexFile(filePath, rootPath, fileProcessor, patternExtractor, repository, graphRepository);
       if (embeddingProvider) {
         const note = repository.getNoteById(noteId);
         if (note) {

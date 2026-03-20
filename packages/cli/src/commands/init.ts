@@ -5,6 +5,7 @@ import {
   createDatabase,
   Migrator,
   KnowledgeRepository,
+  GraphRepository,
   ALL_MIGRATIONS,
   OnnxEmbeddingProvider,
   ModelManager,
@@ -28,10 +29,11 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const db = createDatabase(config.dbPath, { enableVec: true });
   new Migrator(db, ALL_MIGRATIONS).migrate();
   const repository = new KnowledgeRepository(db);
+  const graphRepository = new GraphRepository(db);
 
-  // Index all markdown files
+  // Index all markdown files (with entity extraction)
   console.error("Indexing markdown files...");
-  const summary = await indexAll(rootPath, repository);
+  const summary = await indexAll(rootPath, repository, graphRepository);
 
   // Display summary (stderr to avoid MCP stdout conflicts)
   console.error(`Indexing complete:`);
