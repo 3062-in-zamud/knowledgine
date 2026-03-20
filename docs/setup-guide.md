@@ -16,7 +16,7 @@ npm install -g @knowledgine/cli
 ### ローカル開発
 
 ```bash
-git clone https://github.com/your-org/knowledgine.git
+git clone https://github.com/3062-in-zamud/knowledgine.git
 cd knowledgine
 pnpm install
 pnpm run build

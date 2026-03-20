@@ -15,6 +15,7 @@
   },
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
+    "prepublishOnly": "pnpm run build",
     "test": "vitest",
     "test:run": "vitest run"
   },
@@ -25,5 +26,29 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "description": "MCP server exposing knowledge search tools for AI coding assistants",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "knowledge",
+    "ai",
+    "search"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/3062-in-zamud/knowledgine.git",
+    "directory": "packages/mcp-server"
+  },
+  "homepage": "https://github.com/3062-in-zamud/knowledgine#readme",
+  "bugs": {
+    "url": "https://github.com/3062-in-zamud/knowledgine/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

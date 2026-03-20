@@ -35,3 +35,7 @@ jobs:
       - run: pnpm run format:check
 
       - run: pnpm run test:run
+
+      - name: Security audit
+        if: matrix.node-version == 22
+        run: pnpm audit --audit-level=moderate

@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.ts linguist-detectable
+*.js linguist-detectable
+*.md linguist-documentation

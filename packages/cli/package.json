@@ -15,6 +15,7 @@
   },
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
+    "prepublishOnly": "pnpm run build",
     "test": "vitest",
     "test:run": "vitest run"
   },
@@ -26,5 +27,29 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "description": "CLI for indexing markdown files and serving MCP knowledge tools",
+  "keywords": [
+    "knowledgine",
+    "cli",
+    "mcp",
+    "knowledge",
+    "indexer"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/3062-in-zamud/knowledgine.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/3062-in-zamud/knowledgine#readme",
+  "bugs": {
+    "url": "https://github.com/3062-in-zamud/knowledgine/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -12,12 +12,38 @@
   },
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
+    "prepublishOnly": "pnpm run build",
     "test": "vitest",
     "test:run": "vitest run"
   },
   "files": [
     "dist"
   ],
+  "description": "Core library for extracting structured knowledge from markdown files",
+  "keywords": [
+    "knowledge",
+    "extraction",
+    "mcp",
+    "ai",
+    "markdown",
+    "fts5"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/3062-in-zamud/knowledgine.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/3062-in-zamud/knowledgine#readme",
+  "bugs": {
+    "url": "https://github.com/3062-in-zamud/knowledgine/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
     "yaml": "^2.7.0"
