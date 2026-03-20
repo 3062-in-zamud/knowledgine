@@ -57,6 +57,22 @@ export interface SearchResult {
   matchReason: string[];
 }
 
+/** Semantic search options */
+export interface SemanticSearchOptions {
+  query: string;
+  limit?: number;
+  mode?: "keyword" | "semantic" | "hybrid";
+}
+
+/** Semantic search result */
+export interface SemanticSearchResult {
+  noteId: number;
+  filePath: string;
+  title: string;
+  score: number;
+  matchReason: string[];
+}
+
 // --- Knowledge Graph Types (type definitions only) ---
 
 export type EntityType =

@@ -8,7 +8,7 @@ import {
 } from "../../src/index.js";
 
 describe("Search Benchmark", () => {
-  it("should search 1000 notes within performance budget", () => {
+  it("should search 1000 notes within performance budget", async () => {
     const db = createDatabase(":memory:");
     new Migrator(db, ALL_MIGRATIONS).migrate();
     const repository = new KnowledgeRepository(db);
@@ -28,7 +28,7 @@ describe("Search Benchmark", () => {
     const searcher = new KnowledgeSearcher(repository);
 
     const start = performance.now();
-    const results = searcher.search({ query: "TypeScript" });
+    const results = await searcher.search({ query: "TypeScript" });
     const ftsElapsed = performance.now() - start;
 
     // Tag similarity search

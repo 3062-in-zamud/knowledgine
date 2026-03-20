@@ -9,6 +9,8 @@ import {
   FileProcessor,
   PatternExtractor,
   ALL_MIGRATIONS,
+  OnnxEmbeddingProvider,
+  ModelManager,
 } from "@knowledgine/core";
 import { createKnowledgineMcpServer, StdioServerTransport } from "@knowledgine/mcp-server";
 import { indexFile } from "../lib/indexer.js";
@@ -23,9 +25,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
   // Ensure .knowledgine directory exists
   mkdirSync(resolve(rootPath, ".knowledgine"), { recursive: true });
 
-  // Initialize database + migrations
+  // Initialize database + migrations (sqlite-vec loaded inside createDatabase)
   const config = defineConfig({ rootPath });
-  const db = createDatabase(config.dbPath);
+  const db = createDatabase(config.dbPath, { enableVec: true });
   new Migrator(db, ALL_MIGRATIONS).migrate();
   const repository = new KnowledgeRepository(db);
 
@@ -35,8 +37,24 @@ export async function startCommand(options: StartOptions): Promise<void> {
     console.error("Warning: No notes indexed. Run `knowledgine init` first.");
   }
 
+  // Initialize embedding provider if model is available
+  let embeddingProvider: OnnxEmbeddingProvider | undefined;
+  const modelManager = new ModelManager();
+  if (modelManager.isModelAvailable()) {
+    embeddingProvider = new OnnxEmbeddingProvider(undefined, modelManager);
+  } else {
+    // Warn if notes exist but no embeddings
+    const notesWithout = repository.getNotesWithoutEmbeddings();
+    if (notesWithout.length > 0) {
+      console.error(
+        `Warning: ${notesWithout.length} notes have no embeddings. ` +
+          "Semantic search unavailable. Run: node scripts/download-model.js",
+      );
+    }
+  }
+
   // Start MCP server via stdio
-  const server = createKnowledgineMcpServer(repository, rootPath);
+  const server = createKnowledgineMcpServer(repository, rootPath, embeddingProvider);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("MCP server started on stdio");
@@ -54,7 +72,14 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   watcher.on("add", async (filePath: string) => {
     try {
-      await indexFile(filePath, rootPath, fileProcessor, patternExtractor, repository);
+      const noteId = await indexFile(filePath, rootPath, fileProcessor, patternExtractor, repository);
+      if (embeddingProvider) {
+        const note = repository.getNoteById(noteId);
+        if (note) {
+          const embedding = await embeddingProvider.embed(note.content);
+          repository.saveEmbedding(noteId, embedding, config.embedding.modelName);
+        }
+      }
       console.error(`Indexed: ${filePath}`);
     } catch (error) {
       console.error(`Error indexing ${filePath}:`, error instanceof Error ? error.message : error);
@@ -63,7 +88,14 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   watcher.on("change", async (filePath: string) => {
     try {
-      await indexFile(filePath, rootPath, fileProcessor, patternExtractor, repository);
+      const noteId = await indexFile(filePath, rootPath, fileProcessor, patternExtractor, repository);
+      if (embeddingProvider) {
+        const note = repository.getNoteById(noteId);
+        if (note) {
+          const embedding = await embeddingProvider.embed(note.content);
+          repository.saveEmbedding(noteId, embedding, config.embedding.modelName);
+        }
+      }
       console.error(`Re-indexed: ${filePath}`);
     } catch (error) {
       console.error(
@@ -85,6 +117,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
   // Graceful shutdown
   const shutdown = async (): Promise<void> => {
     console.error("Shutting down...");
+    if (embeddingProvider) {
+      await embeddingProvider.close();
+    }
     await watcher.close();
     db.close();
     process.exit(0);

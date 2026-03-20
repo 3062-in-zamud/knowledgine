@@ -4,8 +4,10 @@ import {
   Migrator,
   KnowledgeRepository,
   ALL_MIGRATIONS,
+  OnnxEmbeddingProvider,
+  ModelManager,
 } from "@knowledgine/core";
-import type { KnowledgineConfig } from "@knowledgine/core";
+import type { KnowledgineConfig, EmbeddingProvider } from "@knowledgine/core";
 
 export function resolveConfig(): KnowledgineConfig {
   const dbPath = process.env["KNOWLEDGINE_DB_PATH"];
@@ -16,10 +18,33 @@ export function resolveConfig(): KnowledgineConfig {
   });
 }
 
-export function initializeDependencies(config: KnowledgineConfig): KnowledgeRepository {
-  const db = createDatabase(config.dbPath);
+export function initializeDependencies(config: KnowledgineConfig): {
+  repository: KnowledgeRepository;
+  embeddingProvider: EmbeddingProvider | undefined;
+} {
+  // 1. sqlite-vec のロードを含む DB 作成（createDatabase 内で try/catch）
+  const db = createDatabase(config.dbPath, { enableVec: true });
+
+  // 2. migrate（sqlite-vec ロード後に実行）
   new Migrator(db, ALL_MIGRATIONS).migrate();
-  return new KnowledgeRepository(db);
+
+  const repository = new KnowledgeRepository(db);
+
+  // 3. EmbeddingProvider 初期化（モデルが存在する場合のみ）
+  let embeddingProvider: EmbeddingProvider | undefined;
+  if (config.embedding.enabled) {
+    const modelManager = new ModelManager();
+    if (modelManager.isModelAvailable(config.embedding.modelName)) {
+      embeddingProvider = new OnnxEmbeddingProvider(config.embedding.modelName, modelManager);
+    } else {
+      console.error(
+        `[knowledgine] Embedding model "${config.embedding.modelName}" not found. ` +
+          "Semantic search will be unavailable. Run: node scripts/download-model.js",
+      );
+    }
+  }
+
+  return { repository, embeddingProvider };
 }
 
 export function formatToolResult(data: unknown): {

@@ -119,3 +119,27 @@ export class MemoryDemotionError extends KnowledgeError {
     this.name = "MemoryDemotionError";
   }
 }
+
+/** Error thrown when embedding model is not available */
+export class EmbeddingNotAvailableError extends KnowledgeError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, context);
+    this.name = "EmbeddingNotAvailableError";
+  }
+}
+
+/** Error thrown when the sqlite-vec extension is unavailable */
+export class VectorExtensionError extends KnowledgeError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, context);
+    this.name = "VectorExtensionError";
+  }
+}
+
+/** Error thrown when an embedding operation fails */
+export class EmbeddingError extends KnowledgeError {
+  constructor(message: string, cause?: Error, context?: Record<string, unknown>) {
+    super(message, { cause, ...context });
+    this.name = "EmbeddingError";
+  }
+}

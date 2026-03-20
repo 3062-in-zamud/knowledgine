@@ -377,6 +377,110 @@ export class KnowledgeRepository {
     return { totalNotes, totalPatterns, totalLinks, totalPairs, patternsByType };
   }
 
+  /**
+   * ノートの埋め込みベクトルを保存する（upsert）
+   */
+  saveEmbedding(noteId: number, embedding: Float32Array, modelName: string): void {
+    try {
+      const now = new Date().toISOString();
+      const embBuf = Buffer.from(embedding.buffer);
+
+      // note_embeddings テーブルに upsert
+      const upsertStmt = this.db.prepare(`
+        INSERT INTO note_embeddings (note_id, embedding, model_name, dimensions, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(note_id) DO UPDATE SET
+          embedding = excluded.embedding,
+          model_name = excluded.model_name,
+          dimensions = excluded.dimensions,
+          updated_at = excluded.updated_at
+      `);
+      upsertStmt.run(noteId, embBuf, modelName, embedding.length, now, now);
+
+      // note_embeddings_vec (vec0) が存在する場合は手動で同期
+      // vec0 は ON CONFLICT をサポートしないため DELETE + INSERT を使う
+      try {
+        this.db.prepare("DELETE FROM note_embeddings_vec WHERE note_id = ?").run(noteId);
+        this.db
+          .prepare("INSERT INTO note_embeddings_vec(note_id, embedding) VALUES (?, ?)")
+          .run(noteId, embBuf);
+      } catch {
+        // note_embeddings_vec が存在しない場合は無視（graceful degradation）
+      }
+    } catch (error) {
+      if (error instanceof DatabaseError) throw error;
+      throw new DatabaseError("saveEmbedding", error, { noteId });
+    }
+  }
+
+  /**
+   * ベクトル類似度検索（note_embeddings_vec を使用）
+   * sqlite-vec が利用できない場合は空配列を返す
+   */
+  searchByVector(
+    embedding: Float32Array,
+    limit: number = 10,
+  ): Array<{ note_id: number; distance: number }> {
+    try {
+      const buf = Buffer.from(embedding.buffer);
+      const stmt = this.db.prepare(`
+        SELECT note_id, distance
+        FROM note_embeddings_vec
+        WHERE embedding MATCH ?
+        ORDER BY distance
+        LIMIT ?
+      `);
+      return stmt.all(buf, limit) as Array<{ note_id: number; distance: number }>;
+    } catch {
+      // vec0テーブルが存在しない場合（sqlite-vec未ロード）は空を返す
+      return [];
+    }
+  }
+
+  /**
+   * FTS5 rank付きでノートを検索する
+   */
+  searchNotesWithRank(query: string, limit: number = 50): Array<{ note: KnowledgeNote; rank: number }> {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT n.*, fts.rank
+        FROM knowledge_notes n
+        JOIN knowledge_notes_fts fts ON n.id = fts.rowid
+        WHERE knowledge_notes_fts MATCH ?
+        ORDER BY rank
+        LIMIT ?
+      `);
+      const rows = stmt.all(query, limit) as Array<KnowledgeNote & { rank: number }>;
+      return rows.map(({ rank, ...note }) => ({ note: note as KnowledgeNote, rank }));
+    } catch (error) {
+      throw new FTSIndexError("search", error, { query, limit });
+    }
+  }
+
+  /**
+   * 埋め込みがまだ生成されていないノートを取得する
+   */
+  getNotesWithoutEmbeddings(): KnowledgeNote[] {
+    const stmt = this.db.prepare(`
+      SELECT n.* FROM knowledge_notes n
+      WHERE NOT EXISTS (SELECT 1 FROM note_embeddings e WHERE e.note_id = n.id)
+    `);
+    return stmt.all() as KnowledgeNote[];
+  }
+
+  /**
+   * content_hashが変更されて埋め込みが古くなったノートを取得する
+   */
+  getNotesWithStaleEmbeddings(): KnowledgeNote[] {
+    // note_embeddingsのupdated_atとknowledge_notesのupdated_atを比較
+    const stmt = this.db.prepare(`
+      SELECT n.* FROM knowledge_notes n
+      JOIN note_embeddings e ON e.note_id = n.id
+      WHERE n.updated_at IS NOT NULL AND n.updated_at > e.created_at
+    `);
+    return stmt.all() as KnowledgeNote[];
+  }
+
   close(): void {
     this.db.close();
   }

@@ -36,6 +36,11 @@ export function deduplicatePatterns(patterns: ExtractedPattern[]): ExtractedPatt
   return result;
 }
 
+export interface IndexFileResult {
+  noteId: number;
+  patternCount: number;
+}
+
 export async function indexFile(
   relativePath: string,
   rootPath: string,
@@ -60,7 +65,7 @@ export async function indexFile(
   const allPatterns = deduplicatePatterns([...dailyPatterns, ...ticketPatterns]);
 
   repository.savePatterns(noteId, allPatterns);
-  return allPatterns.length;
+  return noteId;
 }
 
 export async function indexAll(
@@ -74,23 +79,17 @@ export async function indexAll(
 
   const files = await discoverMarkdownFiles(rootPath);
   let processedFiles = 0;
-  let totalPatterns = 0;
 
   for (const file of files) {
     try {
-      const patternCount = await indexFile(
-        file,
-        rootPath,
-        fileProcessor,
-        patternExtractor,
-        repository,
-      );
+      await indexFile(file, rootPath, fileProcessor, patternExtractor, repository);
       processedFiles++;
-      totalPatterns += patternCount;
     } catch (error) {
       errors.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  const totalPatterns = repository.getStats().totalPatterns;
 
   return {
     totalFiles: files.length,

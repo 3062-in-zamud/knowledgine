@@ -6,11 +6,14 @@ import {
   Migrator,
   KnowledgeRepository,
   ALL_MIGRATIONS,
+  OnnxEmbeddingProvider,
+  ModelManager,
 } from "@knowledgine/core";
 import { indexAll } from "../lib/indexer.js";
 
 export interface InitOptions {
   path?: string;
+  skipEmbeddings?: boolean;
 }
 
 export async function initCommand(options: InitOptions): Promise<void> {
@@ -20,13 +23,14 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   mkdirSync(knowledgineDir, { recursive: true });
 
-  // Initialize database
+  // Initialize database (sqlite-vec loaded inside createDatabase)
   const config = defineConfig({ rootPath });
-  const db = createDatabase(config.dbPath);
+  const db = createDatabase(config.dbPath, { enableVec: true });
   new Migrator(db, ALL_MIGRATIONS).migrate();
   const repository = new KnowledgeRepository(db);
 
   // Index all markdown files
+  console.error("Indexing markdown files...");
   const summary = await indexAll(rootPath, repository);
 
   // Display summary (stderr to avoid MCP stdout conflicts)
@@ -40,6 +44,38 @@ export async function initCommand(options: InitOptions): Promise<void> {
     for (const err of summary.errors) {
       console.error(`    - ${err}`);
     }
+  }
+
+  // Generate embeddings if not skipped
+  if (!options.skipEmbeddings) {
+    const modelManager = new ModelManager();
+    if (modelManager.isModelAvailable()) {
+      console.error("Generating embeddings...");
+      const embeddingProvider = new OnnxEmbeddingProvider(undefined, modelManager);
+      const notesWithout = repository.getNotesWithoutEmbeddings();
+
+      let generated = 0;
+      let failed = 0;
+      for (const note of notesWithout) {
+        try {
+          const embedding = await embeddingProvider.embed(note.content);
+          repository.saveEmbedding(note.id, embedding, config.embedding.modelName);
+          generated++;
+          if (generated % 10 === 0) {
+            console.error(`  Embeddings: ${generated}/${notesWithout.length}`);
+          }
+        } catch {
+          failed++;
+        }
+      }
+      console.error(`  Embeddings: ${generated} generated, ${failed} failed`);
+    } else {
+      console.error(
+        "Skipping embeddings: model not found. Run: node scripts/download-model.js",
+      );
+    }
+  } else {
+    console.error("Skipping embeddings (--skip-embeddings flag set).");
   }
 
   db.close();

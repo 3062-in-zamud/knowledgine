@@ -2,7 +2,7 @@ export const VERSION = "0.0.1";
 
 // Config
 export { defineConfig } from "./config.js";
-export type { KnowledgineConfig, PatternCategory } from "./config.js";
+export type { KnowledgineConfig, PatternCategory, EmbeddingConfig, SearchConfig } from "./config.js";
 
 // Types
 export type {
@@ -36,6 +36,9 @@ export {
   MemoryNotFoundError,
   MemoryPromotionError,
   MemoryDemotionError,
+  EmbeddingNotAvailableError,
+  VectorExtensionError,
+  EmbeddingError,
 } from "./errors.js";
 
 // Storage
@@ -47,6 +50,7 @@ export type { Migration, MigrationStatus } from "./storage/migrator.js";
 export { SCHEMA_SQL } from "./storage/schema.js";
 export { migration001 } from "./storage/migrations/001_initial.js";
 export { migration002 } from "./storage/migrations/002_memory_layers.js";
+export { migration003 } from "./storage/migrations/003_vector_embeddings.js";
 
 // Memory
 export { MemoryManager } from "./memory/memory-manager.js";
@@ -54,8 +58,18 @@ export { MemoryManager } from "./memory/memory-manager.js";
 // Migration convenience array
 import { migration001 } from "./storage/migrations/001_initial.js";
 import { migration002 } from "./storage/migrations/002_memory_layers.js";
+import { migration003 } from "./storage/migrations/003_vector_embeddings.js";
 import type { Migration } from "./storage/migrator.js";
-export const ALL_MIGRATIONS: Migration[] = [migration001, migration002];
+export const ALL_MIGRATIONS: Migration[] = [migration001, migration002, migration003];
+
+// Embedding
+export type { EmbeddingProvider } from "./embedding/embedding-provider.js";
+export { OnnxEmbeddingProvider } from "./embedding/onnx-embedding-provider.js";
+export { ModelManager } from "./embedding/model-manager.js";
+
+// Search (semantic)
+export { SemanticSearcher } from "./search/semantic-searcher.js";
+export { HybridSearcher } from "./search/hybrid-searcher.js";
 
 // Extraction
 export { PatternExtractor } from "./extraction/pattern-extractor.js";

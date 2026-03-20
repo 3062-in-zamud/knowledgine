@@ -1,31 +1,42 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { KnowledgeSearcher, LocalLinkGenerator } from "@knowledgine/core";
-import type { KnowledgeRepository } from "@knowledgine/core";
+import type { KnowledgeRepository, EmbeddingProvider } from "@knowledgine/core";
 import { formatToolResult, formatToolError } from "./helpers.js";
 
 export function createKnowledgineMcpServer(
   repository: KnowledgeRepository,
   rootPath?: string,
+  embeddingProvider?: EmbeddingProvider,
 ): McpServer {
   const server = new McpServer({ name: "knowledgine", version: "0.0.1" });
+  const searcher = new KnowledgeSearcher(repository, embeddingProvider);
 
   // Tool 1: search_knowledge
   server.registerTool(
     "search_knowledge",
     {
-      description: "ナレッジベース内のノートをキーワードで全文検索",
+      description:
+        "Full-text and semantic search across notes in the knowledge base. Use mode='keyword' for exact matches, 'semantic' for conceptual similarity, or 'hybrid' to combine both.",
       inputSchema: {
-        query: z.string().describe("検索クエリ"),
-        limit: z.number().int().positive().optional().describe("最大結果数"),
+        query: z.string().describe("Search query"),
+        limit: z.number().int().positive().optional().describe("Maximum number of results"),
+        mode: z
+          .enum(["keyword", "semantic", "hybrid"])
+          .optional()
+          .describe("Search mode (default: keyword)"),
       },
     },
     async (input) => {
       try {
-        const searcher = new KnowledgeSearcher(repository);
-        const results = searcher.search({ query: input.query, limit: input.limit ?? 20 });
+        const results = await searcher.search({
+          query: input.query,
+          limit: input.limit ?? 20,
+          mode: input.mode ?? "keyword",
+        });
         return formatToolResult({
           query: input.query,
+          mode: input.mode ?? "keyword",
           totalResults: results.length,
           results: results.map((r) => ({
             noteId: r.note.id,
@@ -46,11 +57,12 @@ export function createKnowledgineMcpServer(
   server.registerTool(
     "find_related",
     {
-      description: "指定ノートの関連ノート + 問題-解決ペアを検索",
+      description:
+        "Find related notes and problem-solution pairs for a given note by ID or file path.",
       inputSchema: {
-        noteId: z.number().int().positive().optional().describe("ノートID"),
-        filePath: z.string().optional().describe("ファイルパス"),
-        limit: z.number().int().positive().optional().describe("最大結果数"),
+        noteId: z.number().int().positive().optional().describe("Note ID"),
+        filePath: z.string().optional().describe("File path"),
+        limit: z.number().int().positive().optional().describe("Maximum number of results"),
       },
     },
     async (input) => {
@@ -96,12 +108,23 @@ export function createKnowledgineMcpServer(
   server.registerTool(
     "get_stats",
     {
-      description: "ナレッジベースの統計情報",
+      description: "Get statistics for the knowledge base including note counts and embedding status.",
       inputSchema: {},
     },
     async () => {
       try {
-        return formatToolResult(repository.getStats());
+        const stats = repository.getStats();
+        const notesWithoutEmbeddings = embeddingProvider
+          ? repository.getNotesWithoutEmbeddings().length
+          : null;
+
+        return formatToolResult({
+          ...stats,
+          embeddingStatus: {
+            available: embeddingProvider != null,
+            notesWithoutEmbeddings,
+          },
+        });
       } catch (error) {
         return formatToolError(error instanceof Error ? error.message : String(error));
       }

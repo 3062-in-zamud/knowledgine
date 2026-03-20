@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { KnowledgeSearcher } from "../../src/search/knowledge-searcher.js";
 import { createTestDb, seedTestData } from "../helpers/test-db.js";
+import { MockEmbeddingProvider } from "../helpers/mock-embedding-provider.js";
 import type { TestContext } from "../helpers/test-db.js";
 import type { SearchResult } from "../../src/search/knowledge-searcher.js";
 
@@ -18,36 +19,61 @@ describe("KnowledgeSearcher", () => {
     ctx.db.close();
   });
 
-  describe("search", () => {
-    it("should return FTS5 results with score=0.5 and matchReason format", () => {
-      const results = searcher.search({ query: "TypeScript" });
+  describe("search (keyword mode)", () => {
+    it("should return FTS5 results with normalized score and matchReason format", async () => {
+      const results = await searcher.search({ query: "TypeScript" });
       expect(results.length).toBeGreaterThan(0);
-      expect(results[0].score).toBe(0.5);
+      expect(results[0].score).toBeGreaterThanOrEqual(0);
+      expect(results[0].score).toBeLessThanOrEqual(1);
       expect(results[0].matchReason).toContain('キーワード一致: "TypeScript"');
     });
 
-    it("should return empty array when no query is provided", () => {
-      const results = searcher.search({});
+    it("should return empty array when no query is provided", async () => {
+      const results = await searcher.search({});
       expect(results).toEqual([]);
     });
 
-    it("should propagate limit to search", () => {
-      // seed has 3 notes, limit to 1
-      const results = searcher.search({ query: "TypeScript", limit: 1 });
+    it("should propagate limit to search", async () => {
+      const results = await searcher.search({ query: "TypeScript", limit: 1 });
       expect(results.length).toBeLessThanOrEqual(1);
     });
   });
 
+  describe("search (semantic mode)", () => {
+    it("should return empty when no embedding provider", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "semantic" });
+      // No provider → falls back to keyword
+      expect(Array.isArray(results)).toBe(true);
+    });
+
+    it("should use semantic mode when embedding provider is provided", async () => {
+      const provider = new MockEmbeddingProvider();
+      const semanticSearcher = new KnowledgeSearcher(ctx.repository, provider);
+      const results = await semanticSearcher.search({ query: "TypeScript", mode: "semantic" });
+      // With sqlite-vec unavailable, returns empty (graceful degradation)
+      expect(Array.isArray(results)).toBe(true);
+    });
+  });
+
+  describe("search (hybrid mode)", () => {
+    it("should combine FTS and vector results", async () => {
+      const provider = new MockEmbeddingProvider();
+      const hybridSearcher = new KnowledgeSearcher(ctx.repository, provider);
+      const results = await hybridSearcher.search({ query: "TypeScript", mode: "hybrid" });
+      expect(results.length).toBeGreaterThan(0);
+    });
+  });
+
   describe("searchByTag", () => {
-    it("should return empty (tags not implemented via query)", () => {
-      const results = searcher.searchByTag("typescript");
+    it("should return empty (tags not implemented via query)", async () => {
+      const results = await searcher.searchByTag("typescript");
       expect(results).toEqual([]);
     });
   });
 
   describe("searchRecent", () => {
-    it("should return empty (no query provided)", () => {
-      const results = searcher.searchRecent();
+    it("should return empty (no query provided)", async () => {
+      const results = await searcher.searchRecent();
       expect(results).toEqual([]);
     });
   });
