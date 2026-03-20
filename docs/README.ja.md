@@ -76,7 +76,7 @@ Claude Code の MCP 設定に以下を追加してください。
 
 ### Claude Code
 
-`~/.config/claude/claude_desktop_config.json` に追加します。
+`~/Library/Application Support/Claude/claude_desktop_config.json`（macOS）または `~/.config/claude/claude_desktop_config.json`（Linux）に追加します。
 
 ```json
 {
@@ -91,18 +91,25 @@ Claude Code の MCP 設定に以下を追加してください。
 
 ### Cursor
 
-`.cursor/mcp.json` に追加します。
+プロジェクトルートの `.cursor/mcp.json`（推奨）またはグローバル設定 `~/.cursor/mcp.json` に追加します。
+
+`${workspaceFolder}` を使うと現在のプロジェクトディレクトリを自動的に参照できます。
 
 ```json
 {
   "mcpServers": {
     "knowledgine": {
       "command": "npx",
-      "args": ["-y", "@knowledgine/cli", "start", "--path", "/path/to/notes"]
+      "args": ["@knowledgine/cli", "start"],
+      "env": {
+        "KNOWLEDGINE_ROOT_PATH": "${workspaceFolder}"
+      }
     }
   }
 }
 ```
+
+詳細な手順・変数展開の説明・トラブルシューティングは [Cursor セットアップガイド](./cursor-setup.md) を参照してください。
 
 ---
 

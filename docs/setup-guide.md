@@ -78,9 +78,35 @@ knowledgine init --path /path/to/your/notes
 
 ### Cursor
 
-`.cursor/mcp.json` に以下を追加:
+Cursor には 2 通りの起動方式があります。用途に応じて選択してください。
 
-#### npx 版
+**詳細な Cursor 設定手順・変数展開の参照・トラブルシューティングは [cursor-setup.md](./cursor-setup.md) を参照してください。**
+
+#### CLI 方式（推奨）
+
+`${workspaceFolder}` 変数が使えるため、プロジェクトごとに自動でパスが解決されます。
+
+`.cursor/mcp.json`（プロジェクトレベル）または `~/.cursor/mcp.json`（グローバル）に追加:
+
+```json
+{
+  "mcpServers": {
+    "knowledgine": {
+      "command": "npx",
+      "args": ["@knowledgine/cli", "start"],
+      "env": {
+        "KNOWLEDGINE_ROOT_PATH": "${workspaceFolder}"
+      }
+    }
+  }
+}
+```
+
+#### mcp-server 直接起動方式
+
+CLI を使わず `@knowledgine/mcp-server` を直接起動する方法です。パスは絶対パスで指定する必要があります。
+
+**npx 版:**
 
 ```json
 {
@@ -97,7 +123,7 @@ knowledgine init --path /path/to/your/notes
 }
 ```
 
-#### ローカルビルド版
+**ローカルビルド版:**
 
 ```json
 {

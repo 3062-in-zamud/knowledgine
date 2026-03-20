@@ -76,7 +76,7 @@ Once connected, the following tools are available to your AI assistant.
 
 ### Claude Code
 
-Add to `~/.config/claude/claude_desktop_config.json`:
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `~/.config/claude/claude_desktop_config.json` (Linux):
 
 ```json
 {
@@ -91,18 +91,25 @@ Add to `~/.config/claude/claude_desktop_config.json`:
 
 ### Cursor
 
-Add to `.cursor/mcp.json`:
+Add to `.cursor/mcp.json` in your project root (recommended) or `~/.cursor/mcp.json` for global use.
+
+Using `${workspaceFolder}` to automatically point to the current project:
 
 ```json
 {
   "mcpServers": {
     "knowledgine": {
       "command": "npx",
-      "args": ["-y", "@knowledgine/cli", "start", "--path", "/path/to/notes"]
+      "args": ["@knowledgine/cli", "start"],
+      "env": {
+        "KNOWLEDGINE_ROOT_PATH": "${workspaceFolder}"
+      }
     }
   }
 }
 ```
+
+For detailed setup instructions, variable expansion reference, and troubleshooting, see the [Cursor Setup Guide](./docs/cursor-setup.md).
 
 ---
 
