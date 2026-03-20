@@ -29,3 +29,5 @@ export {
 } from "./normalizer.js";
 
 export { MarkdownPlugin } from "./plugins/markdown/index.js";
+export { GitHistoryPlugin } from "./plugins/git-history/index.js";
+export { ClaudeSessionsPlugin } from "./plugins/claude-sessions/index.js";

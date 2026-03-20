@@ -35,6 +35,9 @@ importers:
       '@knowledgine/core':
         specifier: workspace:*
         version: link:../core
+      '@knowledgine/ingest':
+        specifier: workspace:*
+        version: link:../ingest
       '@knowledgine/mcp-server':
         specifier: workspace:*
         version: link:../mcp-server

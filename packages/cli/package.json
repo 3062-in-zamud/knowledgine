@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@knowledgine/core": "workspace:*",
+    "@knowledgine/ingest": "workspace:*",
     "@knowledgine/mcp-server": "workspace:*",
     "chokidar": "^5.0.0",
     "commander": "^14.0.3"

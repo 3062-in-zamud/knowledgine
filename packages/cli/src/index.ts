@@ -5,6 +5,8 @@ import { initCommand } from "./commands/init.js";
 import { startCommand } from "./commands/start.js";
 import { setupCommand } from "./commands/setup.js";
 import { statusCommand } from "./commands/status.js";
+import { ingestCommand } from "./commands/ingest.js";
+import { pluginsListCommand, pluginsStatusCommand } from "./commands/plugins.js";
 
 const program = new Command();
 
@@ -43,11 +45,13 @@ program
   .command("start")
   .description("Start MCP server with file watching")
   .option("--path <dir>", "Root directory to serve")
+  .option("--ingest", "Enable IngestEngine for all plugins")
   .addHelpText(
     "after",
     `
 Example:
-  knowledgine start --path ~/notes`,
+  knowledgine start --path ~/notes
+  knowledgine start --path ~/notes --ingest`,
   )
   .action(startCommand);
 
@@ -77,5 +81,27 @@ Example:
   knowledgine status --path ~/notes`,
   )
   .action(statusCommand);
+
+program
+  .command("ingest")
+  .description("Ingest knowledge from configured sources")
+  .option("--source <pluginId>", "Specific plugin to run")
+  .option("--path <dir>", "Root directory")
+  .option("--full", "Force full re-ingest (ignore cursor)")
+  .option("--all", "Run all registered plugins")
+  .action(ingestCommand);
+
+const pluginsCmd = program
+  .command("plugins")
+  .description("Manage ingest plugins");
+pluginsCmd
+  .command("list")
+  .description("List registered plugins")
+  .action(pluginsListCommand);
+pluginsCmd
+  .command("status")
+  .option("--path <dir>", "Root directory")
+  .description("Show plugin ingest status")
+  .action(pluginsStatusCommand);
 
 program.parse();

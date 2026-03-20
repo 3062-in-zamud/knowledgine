@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import Database from "better-sqlite3";
-import { Migrator, KnowledgeRepository, ALL_MIGRATIONS } from "@knowledgine/core";
+import { Migrator, ALL_MIGRATIONS } from "@knowledgine/core";
 import { CursorStore } from "../src/cursor-store.js";
 import type { IngestCursorData } from "../src/types.js";
 

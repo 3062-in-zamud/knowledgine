@@ -18,6 +18,7 @@ import { indexFile } from "../lib/indexer.js";
 
 export interface StartOptions {
   path?: string;
+  ingest?: boolean;
 }
 
 export async function startCommand(options: StartOptions): Promise<void> {
@@ -65,6 +66,56 @@ export async function startCommand(options: StartOptions): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("MCP server started on stdio");
+
+  // IngestEngine integration (only when --ingest flag is set)
+  let ingestWatcher: import("../lib/ingest-watcher.js").IngestWatcher | undefined;
+  let ingestRegistry: import("@knowledgine/ingest").PluginRegistry | undefined;
+
+  if (options.ingest) {
+    const { createDefaultRegistry, initializePlugins } = await import(
+      "../lib/plugin-loader.js"
+    );
+    const { IngestEngine } = await import("@knowledgine/ingest");
+    const { IngestWatcher } = await import("../lib/ingest-watcher.js");
+
+    ingestRegistry = createDefaultRegistry();
+    const initResults = await initializePlugins(ingestRegistry);
+
+    // Warn about failed plugins but continue
+    for (const [pluginId, result] of initResults) {
+      if (!result.ok) {
+        console.error(
+          `Warning: Plugin "${pluginId}" failed to initialize: ${result.error}`,
+        );
+      }
+    }
+
+    const engine = new IngestEngine(ingestRegistry, db, repository);
+    ingestWatcher = new IngestWatcher({
+      engine,
+      registry: ingestRegistry,
+      rootPath,
+      onComplete: (summaries) => {
+        const total = summaries.reduce((acc, s) => acc + s.processed, 0);
+        const errors = summaries.reduce((acc, s) => acc + s.errors, 0);
+        console.error(
+          `Ingest complete: ${total} events processed, ${errors} errors`,
+        );
+      },
+      onError: (pluginId, error) => {
+        console.error(`Ingest error (${pluginId}): ${error.message}`);
+      },
+    });
+
+    // Run initial ingest in background (don't block MCP responses)
+    ingestWatcher.runInitialIngest().catch((error) => {
+      console.error(
+        `Initial ingest failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+
+    console.error("IngestEngine started (background ingestion)");
+  }
 
   // File watcher for auto-reindexing
   const fileProcessor = new FileProcessor();
@@ -138,6 +189,12 @@ export async function startCommand(options: StartOptions): Promise<void> {
   // Graceful shutdown
   const shutdown = async (): Promise<void> => {
     console.error("Shutting down...");
+    if (ingestWatcher) {
+      await ingestWatcher.stop();
+    }
+    if (ingestRegistry) {
+      await ingestRegistry.disposeAll();
+    }
     if (embeddingProvider) {
       await embeddingProvider.close();
     }
