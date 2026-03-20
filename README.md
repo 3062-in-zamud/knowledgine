@@ -153,6 +153,16 @@ knowledgine uses sensible defaults. You can override them by passing options to 
 
 ---
 
+## Feedback
+
+We'd love to hear from you:
+
+- **Bug reports**: [Open an issue](https://github.com/3062-in-zamud/knowledgine/issues/new?template=bug_report.yml)
+- **Feature requests**: [Open an issue](https://github.com/3062-in-zamud/knowledgine/issues/new?template=feature_request.yml)
+- **Questions & discussions**: [GitHub Discussions](https://github.com/3062-in-zamud/knowledgine/discussions)
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, commit conventions, and pull request guidelines.
