@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.0] - 2026-03-20
+
+### Added
+
+#### Core (`@knowledgine/core`)
+
+- **Knowledge Graph**: Entity-Relation-Observation model for structured knowledge representation
+  - Entity creation, relation management, and observation tracking
+  - Graph traversal and querying capabilities
+- **Semantic Search**: Vector similarity search powered by SQLite-vec and ONNX Runtime
+  - Embedding generation with all-MiniLM-L6-v2 model
+  - Hybrid search combining FTS5 full-text and vector similarity
+
+#### Documentation
+
+- Cursor MCP setup guide with step-by-step instructions
+- Troubleshooting guide for common MCP integration issues
+
+#### Infrastructure
+
+- MCP directory registration materials (server.json, descriptions)
+
+### Fixed
+
+- Integration issues from parallel agent work resolved
+
+[0.1.0]: https://github.com/3062-in-zamud/knowledgine/compare/v0.0.1...v0.1.0
+
 ## [0.0.1] - 2026-03-19
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "knowledgine",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Developer Knowledge Infrastructure - Extract structured knowledge from your codebase for AI coding tools",
