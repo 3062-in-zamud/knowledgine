@@ -1,0 +1,9 @@
+node_modules
+dist
+.git
+coverage
+.claude
+*.md
+!README.md
+!CONTRIBUTING.md
+!CHANGELOG.md

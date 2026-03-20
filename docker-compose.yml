@@ -1,0 +1,26 @@
+services:
+  knowledgine:
+    build: .
+    platform: linux/amd64  # ARM64 ONNX compat issues
+    volumes:
+      - ./notes:/data/notes
+      - knowledgine-data:/app/.knowledgine
+    environment:
+      - KNOWLEDGINE_ROOT_PATH=/data/notes
+      - KNOWLEDGINE_SEMANTIC=${KNOWLEDGINE_SEMANTIC:-false}
+    stdin_open: true
+    profiles: ["default"]
+
+  knowledgine-init:
+    build: .
+    platform: linux/amd64
+    volumes:
+      - ./notes:/data/notes
+      - knowledgine-data:/app/.knowledgine
+    environment:
+      - KNOWLEDGINE_ROOT_PATH=/data/notes
+    entrypoint: ["node", "packages/cli/dist/index.js", "init", "--path", "/data/notes"]
+    profiles: ["init"]
+
+volumes:
+  knowledgine-data:
