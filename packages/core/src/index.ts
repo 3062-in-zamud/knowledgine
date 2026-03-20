@@ -27,6 +27,10 @@ export type {
   MemoryLayer,
   MemoryEntry,
   MemoryContext,
+  EventType,
+  SourceType,
+  KnowledgeEvent,
+  IngestCursor,
 } from "./types.js";
 
 // Errors
@@ -57,6 +61,7 @@ export { migration001 } from "./storage/migrations/001_initial.js";
 export { migration002 } from "./storage/migrations/002_memory_layers.js";
 export { migration003 } from "./storage/migrations/003_vector_embeddings.js";
 export { migration004 } from "./storage/migrations/004_knowledge_graph.js";
+export { migration005a } from "./storage/migrations/005a_events_layer.js";
 
 // Memory
 export { MemoryManager } from "./memory/memory-manager.js";
@@ -66,8 +71,9 @@ import { migration001 } from "./storage/migrations/001_initial.js";
 import { migration002 } from "./storage/migrations/002_memory_layers.js";
 import { migration003 } from "./storage/migrations/003_vector_embeddings.js";
 import { migration004 } from "./storage/migrations/004_knowledge_graph.js";
+import { migration005a } from "./storage/migrations/005a_events_layer.js";
 import type { Migration } from "./storage/migrator.js";
-export const ALL_MIGRATIONS: Migration[] = [migration001, migration002, migration003, migration004];
+export const ALL_MIGRATIONS: Migration[] = [migration001, migration002, migration003, migration004, migration005a];
 
 // Graph
 export { GraphRepository } from "./graph/graph-repository.js";

@@ -160,3 +160,55 @@ export interface MemoryContext {
   semantic: MemoryEntry[];
   procedural: MemoryEntry[];
 }
+
+// --- Event Sourcing Types ---
+
+export type EventType =
+  | "git_commit"
+  | "pr_opened"
+  | "pr_merged"
+  | "pr_comment"
+  | "issue_created"
+  | "issue_closed"
+  | "ci_result"
+  | "session_start"
+  | "session_end"
+  | "session_message"
+  | "slack_message"
+  | "document_change"
+  | "task_update"
+  | "manual_observation";
+
+export type SourceType =
+  | "git"
+  | "github"
+  | "claude_code"
+  | "cursor"
+  | "slack"
+  | "notion"
+  | "markdown"
+  | "manual";
+
+export interface KnowledgeEvent {
+  id?: number;
+  eventType: EventType;
+  sourceType: SourceType;
+  sourceId?: string;
+  sourceUri?: string;
+  actor?: string;
+  content: string;
+  contentHash: string;
+  occurredAt: string;
+  ingestedAt?: string;
+  metadataJson?: Record<string, unknown>;
+  projectId?: string;
+  sessionId?: string;
+}
+
+export interface IngestCursor {
+  pluginId: string;
+  sourcePath: string;
+  checkpoint: string;
+  lastIngestAt: string;
+  metadataJson?: Record<string, unknown>;
+}
