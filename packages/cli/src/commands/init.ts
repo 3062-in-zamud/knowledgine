@@ -9,8 +9,10 @@ import {
   ALL_MIGRATIONS,
   OnnxEmbeddingProvider,
   ModelManager,
+  downloadModel,
 } from "@knowledgine/core";
 import { indexAll } from "../lib/indexer.js";
+import { createProgress, formatDuration } from "../lib/progress.js";
 
 export interface InitOptions {
   path?: string;
@@ -31,18 +33,29 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const repository = new KnowledgeRepository(db);
   const graphRepository = new GraphRepository(db);
 
-  // Index all markdown files (with entity extraction)
-  console.error("Indexing markdown files...");
-  const summary = await indexAll(rootPath, repository, graphRepository);
+  // Index all markdown files (with entity extraction and progress)
+  let indexProgress: ReturnType<typeof createProgress> | null = null;
 
-  // Display summary (stderr to avoid MCP stdout conflicts)
-  console.error(`Indexing complete:`);
-  console.error(`  Files:    ${summary.processedFiles}/${summary.totalFiles}`);
-  console.error(`  Patterns: ${summary.totalPatterns}`);
-  console.error(`  Time:     ${summary.elapsedMs}ms`);
+  const summary = await indexAll(rootPath, repository, graphRepository, {
+    onProgress: (current, total, filePath) => {
+      if (!indexProgress) {
+        console.error(`Found ${total} markdown files`);
+        indexProgress = createProgress(total, "Indexing");
+      }
+      indexProgress.update(current, filePath);
+    },
+  });
+
+  if (summary.totalFiles === 0) {
+    console.error("No markdown files found.");
+  }
+
+  console.error(
+    `Indexing complete (${formatDuration(summary.elapsedMs)}): ${summary.processedFiles} files, ${summary.totalPatterns} patterns`,
+  );
 
   if (summary.errors.length > 0) {
-    console.error(`  Errors:   ${summary.errors.length}`);
+    console.error(`  Errors: ${summary.errors.length}`);
     for (const err of summary.errors) {
       console.error(`    - ${err}`);
     }
@@ -51,32 +64,90 @@ export async function initCommand(options: InitOptions): Promise<void> {
   // Generate embeddings if not skipped
   if (!options.skipEmbeddings) {
     const modelManager = new ModelManager();
+
+    // Auto-download model if not available
+    if (!modelManager.isModelAvailable()) {
+      console.error("");
+      console.error("Downloading embedding model (~23MB)...");
+      try {
+        await downloadModel(modelManager, {
+          onProgress: (progress) => {
+            if (progress.total) {
+              const mb = (progress.downloaded / (1024 * 1024)).toFixed(1);
+              const totalMb = (progress.total / (1024 * 1024)).toFixed(1);
+              process.stderr.write(`\r  ${progress.file}: ${mb}/${totalMb} MB`);
+            }
+          },
+          onFileComplete: (file) => {
+            process.stderr.write(`\r  [done] ${file}          \n`);
+          },
+        });
+        console.error("Model download complete.");
+      } catch (error) {
+        console.error(
+          `\nModel download failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        console.error(
+          "Semantic search unavailable. Text search (FTS5) works without embeddings.",
+        );
+        console.error(`To retry: knowledgine init --path ${rootPath}`);
+        console.error("");
+        console.error("knowledgine initialized (without embeddings).");
+        console.error(`  Notes:      ${summary.processedFiles} indexed`);
+        console.error(`  Patterns:   ${summary.totalPatterns} extracted`);
+        console.error(`  Embeddings: skipped (model download failed)`);
+        console.error("");
+        console.error("Next: Run 'knowledgine setup' to connect your AI tool.");
+        db.close();
+        return;
+      }
+    }
+
+    // Generate embeddings
     if (modelManager.isModelAvailable()) {
-      console.error("Generating embeddings...");
+      console.error("");
       const embeddingProvider = new OnnxEmbeddingProvider(undefined, modelManager);
       const notesWithout = repository.getNotesWithoutEmbeddings();
 
-      let generated = 0;
-      let failed = 0;
-      for (const note of notesWithout) {
-        try {
-          const embedding = await embeddingProvider.embed(note.content);
-          repository.saveEmbedding(note.id, embedding, config.embedding.modelName);
-          generated++;
-          if (generated % 10 === 0) {
-            console.error(`  Embeddings: ${generated}/${notesWithout.length}`);
+      if (notesWithout.length > 0) {
+        const embProgress = createProgress(notesWithout.length, "Generating embeddings");
+        let generated = 0;
+        let failed = 0;
+
+        for (const note of notesWithout) {
+          try {
+            const embedding = await embeddingProvider.embed(note.content);
+            repository.saveEmbedding(note.id, embedding, config.embedding.modelName);
+            generated++;
+            embProgress.update(generated);
+          } catch {
+            failed++;
           }
-        } catch {
-          failed++;
+        }
+
+        embProgress.finish();
+        if (failed > 0) {
+          console.error(`  (${failed} failed)`);
         }
       }
-      console.error(`  Embeddings: ${generated} generated, ${failed} failed`);
-    } else {
-      console.error("Skipping embeddings: model not found. Run: node scripts/download-model.js");
     }
   } else {
     console.error("Skipping embeddings (--skip-embeddings flag set).");
   }
+
+  // Final summary
+  const notesWithoutEmb = repository.getNotesWithoutEmbeddings().length;
+  const embeddingsGenerated = summary.processedFiles - notesWithoutEmb;
+
+  console.error("");
+  console.error("knowledgine initialized successfully.");
+  console.error(`  Notes:      ${summary.processedFiles} indexed`);
+  console.error(`  Patterns:   ${summary.totalPatterns} extracted`);
+  console.error(
+    `  Embeddings: ${embeddingsGenerated > 0 ? `${embeddingsGenerated} generated` : "none"}`,
+  );
+  console.error("");
+  console.error("Next: Run 'knowledgine setup' to connect your AI tool.");
 
   db.close();
 }

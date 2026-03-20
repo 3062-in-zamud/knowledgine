@@ -50,7 +50,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     if (notesWithout.length > 0) {
       console.error(
         `Warning: ${notesWithout.length} notes have no embeddings. ` +
-          "Semantic search unavailable. Run: node scripts/download-model.js",
+          "Semantic search unavailable. Run 'knowledgine init' to download the model and generate embeddings.",
       );
     }
   }

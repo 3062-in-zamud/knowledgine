@@ -80,6 +80,8 @@ export type { InferredRelation } from "./graph/relation-inferrer.js";
 export type { EmbeddingProvider } from "./embedding/embedding-provider.js";
 export { OnnxEmbeddingProvider } from "./embedding/onnx-embedding-provider.js";
 export { ModelManager } from "./embedding/model-manager.js";
+export { downloadModel, MODEL_FILES } from "./embedding/model-downloader.js";
+export type { DownloadProgress, DownloadOptions, ModelFile } from "./embedding/model-downloader.js";
 
 // Search (semantic)
 export { SemanticSearcher } from "./search/semantic-searcher.js";

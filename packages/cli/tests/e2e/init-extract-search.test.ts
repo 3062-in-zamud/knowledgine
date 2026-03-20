@@ -191,7 +191,7 @@ solved: テスト環境をDockerで統一して修正完了。
   });
 
   it("should run init command successfully", () => {
-    execSync(`node ${cliDist} init --path ${testDir}`, {
+    execSync(`node ${cliDist} init --path ${testDir} --skip-embeddings`, {
       encoding: "utf-8",
       timeout: 30_000,
     });

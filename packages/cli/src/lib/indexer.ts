@@ -120,10 +120,15 @@ export async function indexFile(
   return noteId;
 }
 
+export interface IndexAllOptions {
+  onProgress?: (current: number, total: number, filePath: string) => void;
+}
+
 export async function indexAll(
   rootPath: string,
   repository: KnowledgeRepository,
   graphRepository?: GraphRepository,
+  options?: IndexAllOptions,
 ): Promise<IndexSummary> {
   const start = Date.now();
   const fileProcessor = new FileProcessor();
@@ -137,6 +142,7 @@ export async function indexAll(
     try {
       await indexFile(file, rootPath, fileProcessor, patternExtractor, repository, graphRepository);
       processedFiles++;
+      options?.onProgress?.(processedFiles, files.length, file);
     } catch (error) {
       errors.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
     }

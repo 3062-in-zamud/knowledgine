@@ -22,7 +22,7 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
 
     if (!this.modelManager.isModelAvailable(this.modelName)) {
       throw new EmbeddingNotAvailableError(
-        `Model "${this.modelName}" not found. Run the download script first: node scripts/download-model.js`,
+        `Model "${this.modelName}" not found. Run 'knowledgine init' to download the model automatically.`,
       );
     }
 
@@ -45,7 +45,7 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
     if (this.tokenizer) return this.tokenizer;
     if (!this.modelManager.isModelAvailable(this.modelName)) {
       throw new EmbeddingNotAvailableError(
-        `Model "${this.modelName}" not found. Run the download script first: node scripts/download-model.js`,
+        `Model "${this.modelName}" not found. Run 'knowledgine init' to download the model automatically.`,
       );
     }
     this.tokenizer = new WordPieceTokenizer(this.modelManager.getTokenizerPath(this.modelName));

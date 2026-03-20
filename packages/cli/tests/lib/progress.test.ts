@@ -1,0 +1,117 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createProgress, formatDuration } from "../../src/lib/progress.js";
+
+describe("formatDuration", () => {
+  it("should format milliseconds under 1 second", () => {
+    expect(formatDuration(0)).toBe("0ms");
+    expect(formatDuration(42)).toBe("42ms");
+    expect(formatDuration(999)).toBe("999ms");
+  });
+
+  it("should format seconds under 1 minute", () => {
+    expect(formatDuration(1000)).toBe("1.0s");
+    expect(formatDuration(1200)).toBe("1.2s");
+    expect(formatDuration(59999)).toBe("60.0s");
+  });
+
+  it("should format minutes", () => {
+    expect(formatDuration(60_000)).toBe("1m 0s");
+    expect(formatDuration(83_000)).toBe("1m 23s");
+    expect(formatDuration(150_000)).toBe("2m 30s");
+  });
+
+  it("should handle boundary at 999ms → 1000ms", () => {
+    expect(formatDuration(999)).toBe("999ms");
+    expect(formatDuration(1000)).toBe("1.0s");
+  });
+});
+
+describe("createProgress", () => {
+  let stderrWriteSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    stderrWriteSpy.mockRestore();
+  });
+
+  describe("TTY mode", () => {
+    beforeEach(() => {
+      Object.defineProperty(process.stderr, "isTTY", { value: true, configurable: true });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process.stderr, "isTTY", { value: true, configurable: true });
+    });
+
+    it("should output in-place updates with \\r", () => {
+      const progress = createProgress(10, "Testing");
+      progress.update(3, "file.md");
+
+      expect(stderrWriteSpy).toHaveBeenCalledWith(
+        expect.stringContaining("\r[3/10] Testing... file.md"),
+      );
+    });
+
+    it("should output finish line with newline", () => {
+      const progress = createProgress(5, "Indexing");
+      progress.finish();
+
+      const calls = stderrWriteSpy.mock.calls;
+      const lastCall = calls[calls.length - 1][0] as string;
+      expect(lastCall).toMatch(/\r\[5\/5\] Indexing \(\d+ms\)\n/);
+    });
+  });
+
+  describe("non-TTY mode", () => {
+    beforeEach(() => {
+      Object.defineProperty(process.stderr, "isTTY", { value: false, configurable: true });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process.stderr, "isTTY", { value: true, configurable: true });
+    });
+
+    it("should output milestone lines only", () => {
+      const progress = createProgress(100, "Processing");
+
+      // First call triggers milestone 0
+      progress.update(1);
+      expect(stderrWriteSpy).toHaveBeenCalledTimes(1);
+
+      // Calls within same milestone range should not output
+      stderrWriteSpy.mockClear();
+      progress.update(10);
+      expect(stderrWriteSpy).toHaveBeenCalledTimes(0);
+
+      // 25% milestone
+      progress.update(26);
+      expect(stderrWriteSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("should output finish with total and duration", () => {
+      const progress = createProgress(50, "Building");
+      progress.finish();
+
+      const calls = stderrWriteSpy.mock.calls;
+      const lastCall = calls[calls.length - 1][0] as string;
+      expect(lastCall).toMatch(/Building: 50 done \(\d+ms\)\n/);
+    });
+  });
+
+  describe("NO_COLOR support", () => {
+    it("should work with NO_COLOR set", () => {
+      process.env["NO_COLOR"] = "1";
+      Object.defineProperty(process.stderr, "isTTY", { value: true, configurable: true });
+
+      const progress = createProgress(10, "Test");
+      progress.update(5);
+
+      expect(stderrWriteSpy).toHaveBeenCalled();
+
+      delete process.env["NO_COLOR"];
+    });
+  });
+});

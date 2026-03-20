@@ -117,7 +117,7 @@ useEffectの依存配列に注意が必要。
     );
 
     // Run CLI init to create DB
-    execSync(`node ${cliDist} init --path ${testDir}`, { timeout: 30_000 });
+    execSync(`node ${cliDist} init --path ${testDir} --skip-embeddings`, { timeout: 30_000 });
 
     const dbPath = join(testDir, ".knowledgine", "index.sqlite");
 

@@ -19,9 +19,20 @@ knowledgine bridges that gap. It scans your markdown files, detects patterns (pr
 
 ---
 
+## Prerequisites
+
+- **Node.js** >= 18.17.0
+- **pnpm** >= 9 (for contributing / local builds)
+- **Native build tools** for `better-sqlite3`:
+  - macOS: `xcode-select --install`
+  - Linux (Ubuntu/Debian): `sudo apt-get install build-essential python3`
+  - Windows: `npm install --global windows-build-tools`
+
+---
+
 ## Quick Start
 
-Five minutes from install to working MCP integration.
+Three steps from install to working MCP integration.
 
 ### 1. Install
 
@@ -35,28 +46,65 @@ npm install -g @knowledgine/cli
 knowledgine init --path ./my-notes
 ```
 
-This scans all markdown files under `./my-notes` and builds `.knowledgine/index.sqlite`.
+This scans all markdown files, downloads the embedding model (~23MB), and builds `.knowledgine/index.sqlite` with full-text and semantic search indices.
 
-### 3. Start the MCP server
+### 3. Connect your AI tool
 
 ```bash
-knowledgine start --path ./my-notes
+knowledgine setup --target claude-desktop --path ./my-notes
 ```
 
-### 4. Connect your AI tool
+This generates the MCP configuration for your AI tool. Add `--write` to write it directly:
 
-Add the following to your Claude Code MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "knowledgine": {
-      "command": "npx",
-      "args": ["-y", "@knowledgine/cli", "start", "--path", "/path/to/notes"]
-    }
-  }
-}
+```bash
+knowledgine setup --target claude-desktop --path ./my-notes --write
 ```
+
+Restart your AI tool to activate. Verify with:
+
+```bash
+knowledgine status --path ./my-notes
+```
+
+---
+
+## Commands
+
+| Command  | Description                                                  |
+| -------- | ------------------------------------------------------------ |
+| `init`   | Scan markdown files, download embedding model, build index   |
+| `start`  | Start MCP server with file watching for incremental updates  |
+| `setup`  | Generate MCP configuration for AI tools (Claude Desktop, Cursor) |
+| `status` | Check setup status (database, model, MCP config)             |
+
+### init
+
+```bash
+knowledgine init --path ./my-notes
+knowledgine init --path ./my-notes --skip-embeddings
+```
+
+- `--path <dir>`: Root directory to scan (default: current directory)
+- `--skip-embeddings`: Skip embedding model download and generation (text search still works)
+
+### setup
+
+```bash
+knowledgine setup --target claude-desktop --path ./my-notes
+knowledgine setup --target cursor --path ./my-notes --write
+```
+
+- `--target <tool>`: Target AI tool (`claude-desktop`, `cursor`)
+- `--path <dir>`: Root directory of indexed notes
+- `--write`: Write configuration to file (default: dry-run, shows config only)
+
+### status
+
+```bash
+knowledgine status --path ./my-notes
+```
+
+Shows database stats, model availability, MCP configuration status, and overall readiness.
 
 ---
 
@@ -69,14 +117,16 @@ Once connected, the following tools are available to your AI assistant.
 | `search_knowledge` | Full-text search across all indexed notes using FTS5                                                     | `query` (string, required), `limit` (number, optional, default 10) |
 | `find_related`     | Find notes related to a given note by tags, title similarity, time proximity, and problem-solution pairs | `notePath` (string, required), `strategies` (array, optional)      |
 | `get_stats`        | Retrieve knowledge base statistics (total notes, indexed size, last updated)                             | —                                                                  |
+| `search_entities`  | Search knowledge graph entities by name or type                                                          | `query` (string, required), `entityType` (string, optional)        |
+| `get_entity_graph` | Get entity with its relationships and linked notes                                                       | `entityName` (string, required)                                    |
 
 ---
 
 ## MCP Client Setup
 
-### Claude Code
+### Claude Desktop
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `~/.config/claude/claude_desktop_config.json` (Linux):
+Use `knowledgine setup` for automatic configuration, or manually add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `~/.config/claude/claude_desktop_config.json` (Linux):
 
 ```json
 {
@@ -91,7 +141,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 
 ### Cursor
 
-Add to `.cursor/mcp.json` in your project root (recommended) or `~/.cursor/mcp.json` for global use.
+Use `knowledgine setup --target cursor` for automatic configuration, or manually add to `.cursor/mcp.json` in your project root (recommended) or `~/.cursor/mcp.json` for global use.
 
 Using `${workspaceFolder}` to automatically point to the current project:
 
@@ -125,8 +175,8 @@ For detailed setup instructions, variable expansion reference, and troubleshooti
 | Package                   | Description                                                                                                                                                                  |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@knowledgine/core`       | Knowledge extraction engine. Detects patterns in markdown (problem-solution pairs, code blocks, tags), manages the 3-tier memory model, and provides FTS5 search via SQLite. |
-| `@knowledgine/mcp-server` | MCP server that exposes `search_knowledge`, `find_related`, and `get_stats` tools to MCP-compatible AI clients.                                                              |
-| `@knowledgine/cli`        | Command-line interface. `init` runs a batch index of your notes; `start` launches the MCP server with a file watcher for incremental updates.                                |
+| `@knowledgine/mcp-server` | MCP server that exposes `search_knowledge`, `find_related`, `get_stats`, `search_entities`, and `get_entity_graph` tools to MCP-compatible AI clients.                       |
+| `@knowledgine/cli`        | Command-line interface. `init` indexes notes and downloads the embedding model; `setup` configures AI tools; `start` launches the MCP server with file watching.             |
 
 ---
 
@@ -142,14 +192,41 @@ knowledgine uses sensible defaults. You can override them by passing options to 
 
 ---
 
-## Prerequisites
+## Troubleshooting
 
-- **Node.js** >= 18.17.0
-- **pnpm** >= 9 (for contributing / local builds)
-- **Native build tools** for `better-sqlite3`:
-  - macOS: `xcode-select --install`
-  - Linux (Ubuntu/Debian): `sudo apt-get install build-essential python3`
-  - Windows: `npm install --global windows-build-tools`
+### Native build failure (`better-sqlite3`)
+
+```bash
+# macOS
+xcode-select --install
+
+# Ubuntu/Debian
+sudo apt-get install build-essential python3
+
+# Windows
+npm install --global windows-build-tools
+```
+
+### Embedding model download failure
+
+If `init` fails to download the model, text search (FTS5) still works. Retry with:
+
+```bash
+knowledgine init --path ./my-notes
+```
+
+Or skip embeddings entirely:
+
+```bash
+knowledgine init --path ./my-notes --skip-embeddings
+```
+
+### MCP connection issues
+
+1. Verify setup: `knowledgine status --path ./my-notes`
+2. Re-generate config: `knowledgine setup --target claude-desktop --path ./my-notes --write`
+3. Restart your AI tool after writing the config
+4. Check that the path in the config matches your notes directory
 
 ---
 
