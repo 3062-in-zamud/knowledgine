@@ -62,10 +62,7 @@ const STOP_LIST = new Set([
  * ノートテキストからエンティティを抽出する。
  */
 export class EntityExtractor {
-  extract(
-    content: string,
-    frontmatter: Record<string, unknown> = {},
-  ): ExtractedEntity[] {
+  extract(content: string, frontmatter: Record<string, unknown> = {}): ExtractedEntity[] {
     const results: ExtractedEntity[] = [];
 
     results.push(...this.extractFromFrontmatterTags(frontmatter));
@@ -79,9 +76,7 @@ export class EntityExtractor {
     return this.deduplicate(results);
   }
 
-  private extractFromFrontmatterTags(
-    frontmatter: Record<string, unknown>,
-  ): ExtractedEntity[] {
+  private extractFromFrontmatterTags(frontmatter: Record<string, unknown>): ExtractedEntity[] {
     const results: ExtractedEntity[] = [];
     const tags = frontmatter["tags"];
     if (!Array.isArray(tags)) return results;
@@ -95,20 +90,26 @@ export class EntityExtractor {
     return results;
   }
 
-  private extractFromFrontmatterFields(
-    frontmatter: Record<string, unknown>,
-  ): ExtractedEntity[] {
+  private extractFromFrontmatterFields(frontmatter: Record<string, unknown>): ExtractedEntity[] {
     const results: ExtractedEntity[] = [];
 
     // author/reviewer → person
     for (const field of ["author", "reviewer", "assignee"]) {
       const val = frontmatter[field];
       if (typeof val === "string" && val.trim()) {
-        results.push({ name: val.trim().toLowerCase(), entityType: "person", sourceType: "frontmatter" });
+        results.push({
+          name: val.trim().toLowerCase(),
+          entityType: "person",
+          sourceType: "frontmatter",
+        });
       } else if (Array.isArray(val)) {
         for (const v of val) {
           if (typeof v === "string" && v.trim()) {
-            results.push({ name: v.trim().toLowerCase(), entityType: "person", sourceType: "frontmatter" });
+            results.push({
+              name: v.trim().toLowerCase(),
+              entityType: "person",
+              sourceType: "frontmatter",
+            });
           }
         }
       }
@@ -117,7 +118,11 @@ export class EntityExtractor {
     // project → project
     const project = frontmatter["project"];
     if (typeof project === "string" && project.trim()) {
-      results.push({ name: project.trim().toLowerCase(), entityType: "project", sourceType: "frontmatter" });
+      results.push({
+        name: project.trim().toLowerCase(),
+        entityType: "project",
+        sourceType: "frontmatter",
+      });
     }
 
     return results;

@@ -32,8 +32,6 @@ export class ModelManager {
   }
 
   isModelAvailable(modelName: string = DEFAULT_MODEL_NAME): boolean {
-    return (
-      existsSync(this.getModelPath(modelName)) && existsSync(this.getTokenizerPath(modelName))
-    );
+    return existsSync(this.getModelPath(modelName)) && existsSync(this.getTokenizerPath(modelName));
   }
 }

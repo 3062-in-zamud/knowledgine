@@ -440,7 +440,10 @@ export class KnowledgeRepository {
   /**
    * FTS5 rank付きでノートを検索する
    */
-  searchNotesWithRank(query: string, limit: number = 50): Array<{ note: KnowledgeNote; rank: number }> {
+  searchNotesWithRank(
+    query: string,
+    limit: number = 50,
+  ): Array<{ note: KnowledgeNote; rank: number }> {
     try {
       const stmt = this.db.prepare(`
         SELECT n.*, fts.rank

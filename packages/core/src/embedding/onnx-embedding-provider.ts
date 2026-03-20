@@ -69,11 +69,10 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
         const encoded = tokenizer.encode(text);
         const seqLen = encoded.inputIds.length;
 
-        const inputIds = new ort.Tensor(
-          "int64",
-          BigInt64Array.from(encoded.inputIds.map(BigInt)),
-          [1, seqLen],
-        );
+        const inputIds = new ort.Tensor("int64", BigInt64Array.from(encoded.inputIds.map(BigInt)), [
+          1,
+          seqLen,
+        ]);
         const attentionMask = new ort.Tensor(
           "int64",
           BigInt64Array.from(encoded.attentionMask.map(BigInt)),

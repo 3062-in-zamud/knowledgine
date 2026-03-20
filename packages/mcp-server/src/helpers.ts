@@ -35,7 +35,7 @@ export function initializeDependencies(config: KnowledgineConfig): {
 
   // 3. EmbeddingProvider 初期化（モデルが存在する場合のみ）
   let embeddingProvider: EmbeddingProvider | undefined;
-  if (config.embedding.enabled) {
+  if (config.embedding?.enabled) {
     const modelManager = new ModelManager();
     if (modelManager.isModelAvailable(config.embedding.modelName)) {
       embeddingProvider = new OnnxEmbeddingProvider(config.embedding.modelName, modelManager);

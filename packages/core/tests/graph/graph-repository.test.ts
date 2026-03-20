@@ -40,7 +40,11 @@ describe("GraphRepository", () => {
 
     it("should throw on empty name", () => {
       expect(() =>
-        graph.createEntity({ name: "", entityType: "technology", createdAt: new Date().toISOString() }),
+        graph.createEntity({
+          name: "",
+          entityType: "technology",
+          createdAt: new Date().toISOString(),
+        }),
       ).toThrow();
     });
   });
@@ -130,9 +134,18 @@ describe("GraphRepository", () => {
   describe("createRelation / getRelationsByEntityId", () => {
     it("should create relation and retrieve it", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "react", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "react",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "my-app", entityType: "project", createdAt: now });
-      graph.createRelation({ fromEntityId: fromId, toEntityId: toId, relationType: "uses", createdAt: now });
+      graph.createRelation({
+        fromEntityId: fromId,
+        toEntityId: toId,
+        relationType: "uses",
+        createdAt: now,
+      });
 
       const relations = graph.getRelationsByEntityId(fromId);
       expect(relations.length).toBe(1);
@@ -143,11 +156,27 @@ describe("GraphRepository", () => {
   describe("upsertRelation", () => {
     it("should update strength to MAX value", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "lib-a", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "lib-a",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "lib-b", entityType: "technology", createdAt: now });
 
-      graph.upsertRelation({ fromEntityId: fromId, toEntityId: toId, relationType: "depends_on", strength: 0.3, createdAt: now });
-      graph.upsertRelation({ fromEntityId: fromId, toEntityId: toId, relationType: "depends_on", strength: 0.8, createdAt: now });
+      graph.upsertRelation({
+        fromEntityId: fromId,
+        toEntityId: toId,
+        relationType: "depends_on",
+        strength: 0.3,
+        createdAt: now,
+      });
+      graph.upsertRelation({
+        fromEntityId: fromId,
+        toEntityId: toId,
+        relationType: "depends_on",
+        strength: 0.8,
+        createdAt: now,
+      });
 
       const relations = graph.getRelationsByEntityId(fromId);
       expect(relations[0].strength).toBe(0.8);
@@ -155,11 +184,27 @@ describe("GraphRepository", () => {
 
     it("should keep higher strength even when new value is lower", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "lib-c", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "lib-c",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "lib-d", entityType: "technology", createdAt: now });
 
-      graph.upsertRelation({ fromEntityId: fromId, toEntityId: toId, relationType: "related_to", strength: 0.9, createdAt: now });
-      graph.upsertRelation({ fromEntityId: fromId, toEntityId: toId, relationType: "related_to", strength: 0.1, createdAt: now });
+      graph.upsertRelation({
+        fromEntityId: fromId,
+        toEntityId: toId,
+        relationType: "related_to",
+        strength: 0.9,
+        createdAt: now,
+      });
+      graph.upsertRelation({
+        fromEntityId: fromId,
+        toEntityId: toId,
+        relationType: "related_to",
+        strength: 0.1,
+        createdAt: now,
+      });
 
       const relations = graph.getRelationsByEntityId(fromId);
       expect(relations[0].strength).toBe(0.9);
@@ -171,7 +216,11 @@ describe("GraphRepository", () => {
   describe("createObservation / getObservationsByEntityId", () => {
     it("should create and retrieve observations", () => {
       const now = new Date().toISOString();
-      const entityId = graph.createEntity({ name: "ts-obs", entityType: "technology", createdAt: now });
+      const entityId = graph.createEntity({
+        name: "ts-obs",
+        entityType: "technology",
+        createdAt: now,
+      });
       graph.createObservation({
         entityId,
         content: "Has excellent type inference",
@@ -197,7 +246,11 @@ describe("GraphRepository", () => {
         frontmatter: {},
         createdAt: now,
       });
-      const entityId = graph.createEntity({ name: "linked-tech", entityType: "technology", createdAt: now });
+      const entityId = graph.createEntity({
+        name: "linked-tech",
+        entityType: "technology",
+        createdAt: now,
+      });
       graph.linkEntityToNote(entityId, noteId);
 
       const linked = graph.getLinkedNotes(entityId);
@@ -218,7 +271,11 @@ describe("GraphRepository", () => {
         frontmatter: {},
         createdAt: now,
       });
-      const entityId = graph.createEntity({ name: "dup-entity", entityType: "concept", createdAt: now });
+      const entityId = graph.createEntity({
+        name: "dup-entity",
+        entityType: "concept",
+        createdAt: now,
+      });
       graph.linkEntityToNote(entityId, noteId);
       graph.linkEntityToNote(entityId, noteId); // should not throw
       expect(graph.getLinkedNotes(entityId).length).toBe(1);
@@ -232,7 +289,12 @@ describe("GraphRepository", () => {
       const now = new Date().toISOString();
       const a = graph.createEntity({ name: "entity-a", entityType: "technology", createdAt: now });
       const b = graph.createEntity({ name: "entity-b", entityType: "project", createdAt: now });
-      graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "uses", createdAt: now });
+      graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "uses",
+        createdAt: now,
+      });
 
       const related = graph.findRelatedEntities(a, 1);
       expect(related.some((e) => e.id === b)).toBe(true);
@@ -241,9 +303,22 @@ describe("GraphRepository", () => {
 
     it("should not return the start entity itself", () => {
       const now = new Date().toISOString();
-      const a = graph.createEntity({ name: "self-start", entityType: "technology", createdAt: now });
-      const b = graph.createEntity({ name: "self-neighbor", entityType: "project", createdAt: now });
-      graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "related_to", createdAt: now });
+      const a = graph.createEntity({
+        name: "self-start",
+        entityType: "technology",
+        createdAt: now,
+      });
+      const b = graph.createEntity({
+        name: "self-neighbor",
+        entityType: "project",
+        createdAt: now,
+      });
+      graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "related_to",
+        createdAt: now,
+      });
 
       const related = graph.findRelatedEntities(a, 1);
       expect(related.every((e) => e.id !== a)).toBe(true);
@@ -251,10 +326,28 @@ describe("GraphRepository", () => {
 
     it("should handle circular graphs without infinite loop (A→B→A)", () => {
       const now = new Date().toISOString();
-      const a = graph.createEntity({ name: "circular-a", entityType: "technology", createdAt: now });
-      const b = graph.createEntity({ name: "circular-b", entityType: "technology", createdAt: now });
-      graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "related_to", createdAt: now });
-      graph.createRelation({ fromEntityId: b, toEntityId: a, relationType: "related_to", createdAt: now });
+      const a = graph.createEntity({
+        name: "circular-a",
+        entityType: "technology",
+        createdAt: now,
+      });
+      const b = graph.createEntity({
+        name: "circular-b",
+        entityType: "technology",
+        createdAt: now,
+      });
+      graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "related_to",
+        createdAt: now,
+      });
+      graph.createRelation({
+        fromEntityId: b,
+        toEntityId: a,
+        relationType: "related_to",
+        createdAt: now,
+      });
 
       // Should complete without hanging
       const related = graph.findRelatedEntities(a, 3);
@@ -272,7 +365,12 @@ describe("GraphRepository", () => {
         ids.push(graph.createEntity({ name: `chain-${i}`, entityType: "concept", createdAt: now }));
       }
       for (let i = 0; i < 4; i++) {
-        graph.createRelation({ fromEntityId: ids[i], toEntityId: ids[i + 1], relationType: "related_to", createdAt: now });
+        graph.createRelation({
+          fromEntityId: ids[i],
+          toEntityId: ids[i + 1],
+          relationType: "related_to",
+          createdAt: now,
+        });
       }
 
       // maxHops=10 should be capped at 3, so entity at hop 4 (ids[4]) should not be reachable
@@ -282,7 +380,11 @@ describe("GraphRepository", () => {
     });
 
     it("should return empty for isolated entity", () => {
-      const id = graph.createEntity({ name: "isolated", entityType: "concept", createdAt: new Date().toISOString() });
+      const id = graph.createEntity({
+        name: "isolated",
+        entityType: "concept",
+        createdAt: new Date().toISOString(),
+      });
       const related = graph.findRelatedEntities(id, 2);
       expect(related).toEqual([]);
     });
@@ -295,8 +397,18 @@ describe("GraphRepository", () => {
       const now = new Date().toISOString();
       const a = graph.createEntity({ name: "stat-a", entityType: "technology", createdAt: now });
       const b = graph.createEntity({ name: "stat-b", entityType: "project", createdAt: now });
-      graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "uses", createdAt: now });
-      graph.createObservation({ entityId: a, content: "test obs", observationType: "fact", createdAt: now });
+      graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "uses",
+        createdAt: now,
+      });
+      graph.createObservation({
+        entityId: a,
+        content: "test obs",
+        observationType: "fact",
+        createdAt: now,
+      });
 
       const stats = graph.getGraphStats();
       expect(stats.totalEntities).toBeGreaterThanOrEqual(2);
@@ -321,8 +433,18 @@ describe("GraphRepository", () => {
       });
       const a = graph.createEntity({ name: "graph-a", entityType: "technology", createdAt: now });
       const b = graph.createEntity({ name: "graph-b", entityType: "project", createdAt: now });
-      graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "uses", createdAt: now });
-      graph.createObservation({ entityId: a, content: "obs content", observationType: "insight", createdAt: now });
+      graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "uses",
+        createdAt: now,
+      });
+      graph.createObservation({
+        entityId: a,
+        content: "obs content",
+        observationType: "insight",
+        createdAt: now,
+      });
       graph.linkEntityToNote(a, noteId);
 
       const withGraph = graph.getEntityWithGraph(a);

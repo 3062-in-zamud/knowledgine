@@ -136,7 +136,8 @@ export function createKnowledgineMcpServer(
   server.registerTool(
     "get_stats",
     {
-      description: "Get statistics for the knowledge base including note counts, embedding status, and knowledge graph stats.",
+      description:
+        "Get statistics for the knowledge base including note counts, embedding status, and knowledge graph stats.",
       inputSchema: {},
     },
     async () => {
@@ -165,7 +166,8 @@ export function createKnowledgineMcpServer(
   server.registerTool(
     "search_entities",
     {
-      description: "Search for entities (people, technologies, projects, concepts) in the knowledge graph.",
+      description:
+        "Search for entities (people, technologies, projects, concepts) in the knowledge graph.",
       inputSchema: {
         query: z.string().describe("Entity name or description to search for"),
         limit: z.number().int().positive().optional().describe("Maximum number of results"),
@@ -198,7 +200,8 @@ export function createKnowledgineMcpServer(
   server.registerTool(
     "get_entity_graph",
     {
-      description: "Get full graph data for a specific entity including observations, relations, and linked notes.",
+      description:
+        "Get full graph data for a specific entity including observations, relations, and linked notes.",
       inputSchema: {
         entityId: z.number().int().positive().optional().describe("Entity ID"),
         entityName: z.string().optional().describe("Entity name (case-insensitive)"),

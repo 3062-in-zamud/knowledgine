@@ -24,12 +24,19 @@ export class RelationInferrer {
 
     const persons = entities.filter((e) => e.entityType === "person");
     const projects = entities.filter((e) => e.entityType === "project");
-    const technologies = entities.filter((e) => e.entityType === "technology" || e.entityType === "tool");
+    const technologies = entities.filter(
+      (e) => e.entityType === "technology" || e.entityType === "tool",
+    );
 
     // author → project: created_by
     const author = frontmatter["author"];
     const projectName = frontmatter["project"];
-    if (typeof author === "string" && author.trim() && typeof projectName === "string" && projectName.trim()) {
+    if (
+      typeof author === "string" &&
+      author.trim() &&
+      typeof projectName === "string" &&
+      projectName.trim()
+    ) {
       results.push({
         fromName: author.trim().toLowerCase(),
         fromType: "person",

@@ -69,16 +69,24 @@ describe("migration004: knowledge_graph", () => {
     ctx.db
       .prepare("INSERT INTO entities (name, entity_type, created_at) VALUES (?, ?, ?)")
       .run("entity-b", "project", now);
-    const fromId = (ctx.db.prepare("SELECT id FROM entities WHERE name='entity-a'").get() as { id: number }).id;
-    const toId = (ctx.db.prepare("SELECT id FROM entities WHERE name='entity-b'").get() as { id: number }).id;
+    const fromId = (
+      ctx.db.prepare("SELECT id FROM entities WHERE name='entity-a'").get() as { id: number }
+    ).id;
+    const toId = (
+      ctx.db.prepare("SELECT id FROM entities WHERE name='entity-b'").get() as { id: number }
+    ).id;
 
     ctx.db
-      .prepare("INSERT INTO relations (from_entity_id, to_entity_id, relation_type, strength, created_at) VALUES (?,?,?,?,?)")
+      .prepare(
+        "INSERT INTO relations (from_entity_id, to_entity_id, relation_type, strength, created_at) VALUES (?,?,?,?,?)",
+      )
       .run(fromId, toId, "uses", 1.0, now);
 
     expect(() => {
       ctx.db
-        .prepare("INSERT INTO relations (from_entity_id, to_entity_id, relation_type, strength, created_at) VALUES (?,?,?,?,?)")
+        .prepare(
+          "INSERT INTO relations (from_entity_id, to_entity_id, relation_type, strength, created_at) VALUES (?,?,?,?,?)",
+        )
         .run(fromId, toId, "uses", 1.0, now);
     }).toThrow();
   });

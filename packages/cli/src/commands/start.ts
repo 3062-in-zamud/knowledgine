@@ -56,7 +56,12 @@ export async function startCommand(options: StartOptions): Promise<void> {
   }
 
   // Start MCP server via stdio
-  const server = createKnowledgineMcpServer(repository, rootPath, embeddingProvider, graphRepository);
+  const server = createKnowledgineMcpServer(
+    repository,
+    rootPath,
+    embeddingProvider,
+    graphRepository,
+  );
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("MCP server started on stdio");
@@ -74,7 +79,14 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   watcher.on("add", async (filePath: string) => {
     try {
-      const noteId = await indexFile(filePath, rootPath, fileProcessor, patternExtractor, repository, graphRepository);
+      const noteId = await indexFile(
+        filePath,
+        rootPath,
+        fileProcessor,
+        patternExtractor,
+        repository,
+        graphRepository,
+      );
       if (embeddingProvider) {
         const note = repository.getNoteById(noteId);
         if (note) {
@@ -90,7 +102,14 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   watcher.on("change", async (filePath: string) => {
     try {
-      const noteId = await indexFile(filePath, rootPath, fileProcessor, patternExtractor, repository, graphRepository);
+      const noteId = await indexFile(
+        filePath,
+        rootPath,
+        fileProcessor,
+        patternExtractor,
+        repository,
+        graphRepository,
+      );
       if (embeddingProvider) {
         const note = repository.getNoteById(noteId);
         if (note) {

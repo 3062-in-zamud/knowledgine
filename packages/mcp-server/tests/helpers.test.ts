@@ -120,9 +120,11 @@ describe("initializeDependencies", () => {
       dbPath,
       patterns: { enabled: ["problem", "solution", "learning", "time"] as const },
       frontmatter: { requiredFields: [] },
+      embedding: { enabled: false, modelName: "all-MiniLM-L6-v2", dimensions: 384 },
+      search: { defaultMode: "keyword" as const, hybridAlpha: 0.3 },
     };
 
-    const repository = initializeDependencies(config);
+    const { repository } = initializeDependencies(config);
     expect(repository).toBeInstanceOf(KnowledgeRepository);
   });
 
@@ -133,9 +135,11 @@ describe("initializeDependencies", () => {
       dbPath,
       patterns: { enabled: ["problem", "solution", "learning", "time"] as const },
       frontmatter: { requiredFields: [] },
+      embedding: { enabled: false, modelName: "all-MiniLM-L6-v2", dimensions: 384 },
+      search: { defaultMode: "keyword" as const, hybridAlpha: 0.3 },
     };
 
-    const repository = initializeDependencies(config);
+    const { repository } = initializeDependencies(config);
     const noteId = repository.saveNote({
       filePath: "test.md",
       title: "Test",

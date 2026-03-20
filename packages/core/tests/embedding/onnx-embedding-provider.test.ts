@@ -14,9 +14,8 @@ describe("OnnxEmbeddingProvider", () => {
     let provider: import("../../src/embedding/onnx-embedding-provider.js").OnnxEmbeddingProvider;
 
     beforeAll(async () => {
-      const { OnnxEmbeddingProvider } = await import(
-        "../../src/embedding/onnx-embedding-provider.js"
-      );
+      const { OnnxEmbeddingProvider } =
+        await import("../../src/embedding/onnx-embedding-provider.js");
       provider = new OnnxEmbeddingProvider("all-MiniLM-L6-v2", modelManager);
     });
 
@@ -67,9 +66,8 @@ describe("OnnxEmbeddingProvider", () => {
       const emptyManager = new ModelManager(emptyDir);
       expect(existsSync(emptyDir)).toBe(false);
 
-      const { OnnxEmbeddingProvider } = await import(
-        "../../src/embedding/onnx-embedding-provider.js"
-      );
+      const { OnnxEmbeddingProvider } =
+        await import("../../src/embedding/onnx-embedding-provider.js");
       const { EmbeddingNotAvailableError } = await import("../../src/errors.js");
       const provider = new OnnxEmbeddingProvider("all-MiniLM-L6-v2", emptyManager);
 

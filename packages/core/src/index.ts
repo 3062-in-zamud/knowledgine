@@ -2,7 +2,12 @@ export const VERSION = "0.0.1";
 
 // Config
 export { defineConfig } from "./config.js";
-export type { KnowledgineConfig, PatternCategory, EmbeddingConfig, SearchConfig } from "./config.js";
+export type {
+  KnowledgineConfig,
+  PatternCategory,
+  EmbeddingConfig,
+  SearchConfig,
+} from "./config.js";
 
 // Types
 export type {

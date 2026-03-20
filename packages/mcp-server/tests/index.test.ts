@@ -26,13 +26,15 @@ describe("MCP Server Integration", () => {
     ctx.db.close();
   });
 
-  it("should list 3 tools", async () => {
+  it("should list 5 tools", async () => {
     const result = await client.listTools();
     const toolNames = result.tools.map((t) => t.name);
     expect(toolNames).toContain("search_knowledge");
     expect(toolNames).toContain("find_related");
     expect(toolNames).toContain("get_stats");
-    expect(toolNames).toHaveLength(3);
+    expect(toolNames).toContain("search_entities");
+    expect(toolNames).toContain("get_entity_graph");
+    expect(toolNames).toHaveLength(5);
   });
 
   describe("search_knowledge", () => {

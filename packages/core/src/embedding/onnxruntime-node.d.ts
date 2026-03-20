@@ -11,7 +11,11 @@ declare module "onnxruntime-node" {
     readonly data: Float32Array | BigInt64Array | Int32Array | Uint8Array;
     readonly dims: readonly number[];
     readonly type: string;
-    constructor(type: string, data: BigInt64Array | Float32Array | Int32Array | Uint8Array, dims?: readonly number[]);
+    constructor(
+      type: string,
+      data: BigInt64Array | Float32Array | Int32Array | Uint8Array,
+      dims?: readonly number[],
+    );
   }
 
   export interface RunOptions {
@@ -19,10 +23,7 @@ declare module "onnxruntime-node" {
   }
 
   export interface InferenceSession {
-    run(
-      feeds: Record<string, Tensor>,
-      options?: RunOptions,
-    ): Promise<Record<string, Tensor>>;
+    run(feeds: Record<string, Tensor>, options?: RunOptions): Promise<Record<string, Tensor>>;
     release(): Promise<void>;
     readonly inputNames: readonly string[];
     readonly outputNames: readonly string[];

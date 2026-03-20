@@ -50,7 +50,9 @@ function rowToEntity(row: EntityRow): Entity & { id: number } {
     description: row.description ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? undefined,
-    metadata: row.metadata_json ? (JSON.parse(row.metadata_json) as Record<string, unknown>) : undefined,
+    metadata: row.metadata_json
+      ? (JSON.parse(row.metadata_json) as Record<string, unknown>)
+      : undefined,
   };
 }
 
@@ -76,7 +78,9 @@ function rowToObservation(row: ObservationRow): Observation & { id: number } {
     sourceNoteId: row.source_note_id ?? undefined,
     sourcePatternId: row.source_pattern_id ?? undefined,
     createdAt: row.created_at,
-    metadata: row.metadata_json ? (JSON.parse(row.metadata_json) as Record<string, unknown>) : undefined,
+    metadata: row.metadata_json
+      ? (JSON.parse(row.metadata_json) as Record<string, unknown>)
+      : undefined,
   };
 }
 
@@ -145,9 +149,9 @@ export class GraphRepository {
   }
 
   getEntityById(id: number): (Entity & { id: number }) | undefined {
-    const row = this.db
-      .prepare("SELECT * FROM entities WHERE id = ?")
-      .get(id) as EntityRow | undefined;
+    const row = this.db.prepare("SELECT * FROM entities WHERE id = ?").get(id) as
+      | EntityRow
+      | undefined;
     return row ? rowToEntity(row) : undefined;
   }
 
@@ -178,13 +182,15 @@ export class GraphRepository {
     }
     try {
       const rows = this.db
-        .prepare(`
+        .prepare(
+          `
           SELECT e.* FROM entities e
           JOIN entities_fts fts ON e.id = fts.rowid
           WHERE entities_fts MATCH ?
           ORDER BY rank
           LIMIT ?
-        `)
+        `,
+        )
         .all(query, limit) as EntityRow[];
       return rows.map(rowToEntity);
     } catch {
@@ -338,9 +344,7 @@ export class GraphRepository {
   linkEntityToNote(entityId: number, noteId: number): void {
     try {
       this.db
-        .prepare(
-          "INSERT OR IGNORE INTO entity_note_links (entity_id, note_id) VALUES (?, ?)",
-        )
+        .prepare("INSERT OR IGNORE INTO entity_note_links (entity_id, note_id) VALUES (?, ?)")
         .run(entityId, noteId);
     } catch (error) {
       throw new DatabaseError("linkEntityToNote", error, { entityId, noteId });
@@ -356,11 +360,13 @@ export class GraphRepository {
 
   getLinkedEntities(noteId: number): Array<Entity & { id: number }> {
     const rows = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT e.* FROM entities e
         JOIN entity_note_links l ON e.id = l.entity_id
         WHERE l.note_id = ?
-      `)
+      `,
+      )
       .all(noteId) as EntityRow[];
     return rows.map(rowToEntity);
   }
@@ -374,23 +380,27 @@ export class GraphRepository {
     const observations = this.getObservationsByEntityId(entityId);
 
     const outgoingRows = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT r.*, e.id as te_id, e.name as te_name, e.entity_type as te_type,
                e.description as te_desc, e.created_at as te_created, e.updated_at as te_updated, e.metadata_json as te_meta
         FROM relations r
         JOIN entities e ON e.id = r.to_entity_id
         WHERE r.from_entity_id = ?
         ORDER BY r.strength DESC
-      `)
-      .all(entityId) as Array<RelationRow & {
-      te_id: number;
-      te_name: string;
-      te_type: string;
-      te_desc: string | null;
-      te_created: string;
-      te_updated: string | null;
-      te_meta: string | null;
-    }>;
+      `,
+      )
+      .all(entityId) as Array<
+      RelationRow & {
+        te_id: number;
+        te_name: string;
+        te_type: string;
+        te_desc: string | null;
+        te_created: string;
+        te_updated: string | null;
+        te_meta: string | null;
+      }
+    >;
 
     const outgoingRelations = outgoingRows.map((row) => ({
       ...rowToRelation(row),
@@ -406,23 +416,27 @@ export class GraphRepository {
     }));
 
     const incomingRows = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT r.*, e.id as se_id, e.name as se_name, e.entity_type as se_type,
                e.description as se_desc, e.created_at as se_created, e.updated_at as se_updated, e.metadata_json as se_meta
         FROM relations r
         JOIN entities e ON e.id = r.from_entity_id
         WHERE r.to_entity_id = ?
         ORDER BY r.strength DESC
-      `)
-      .all(entityId) as Array<RelationRow & {
-      se_id: number;
-      se_name: string;
-      se_type: string;
-      se_desc: string | null;
-      se_created: string;
-      se_updated: string | null;
-      se_meta: string | null;
-    }>;
+      `,
+      )
+      .all(entityId) as Array<
+      RelationRow & {
+        se_id: number;
+        se_name: string;
+        se_type: string;
+        se_desc: string | null;
+        se_created: string;
+        se_updated: string | null;
+        se_meta: string | null;
+      }
+    >;
 
     const incomingRelations = incomingRows.map((row) => ({
       ...rowToRelation(row),
@@ -438,12 +452,14 @@ export class GraphRepository {
     }));
 
     const linkedNoteRows = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT l.entity_id, l.note_id, n.file_path, n.title, n.created_at
         FROM entity_note_links l
         JOIN knowledge_notes n ON n.id = l.note_id
         WHERE l.entity_id = ?
-      `)
+      `,
+      )
       .all(entityId) as Array<{
       entity_id: number;
       note_id: number;
@@ -490,13 +506,15 @@ export class GraphRepository {
       const nextIds: number[] = [];
 
       const rows = this.db
-        .prepare(`
+        .prepare(
+          `
           SELECT DISTINCT
             CASE WHEN r.from_entity_id IN (${placeholders}) THEN r.to_entity_id
                  ELSE r.from_entity_id END as neighbor_id
           FROM relations r
           WHERE r.from_entity_id IN (${placeholders}) OR r.to_entity_id IN (${placeholders})
-        `)
+        `,
+        )
         .all(...frontier, ...frontier, ...frontier) as Array<{ neighbor_id: number }>;
 
       for (const { neighbor_id } of rows) {

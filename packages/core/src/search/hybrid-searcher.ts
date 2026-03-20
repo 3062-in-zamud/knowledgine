@@ -16,7 +16,9 @@ export class HybridSearcher {
     // 両方のスコアを並行取得
     const [ftsRows, vecResults] = await Promise.all([
       Promise.resolve(this.repository.searchNotesWithRank(query, limit * 2)),
-      this.embeddingProvider.embed(query).then((emb) => this.repository.searchByVector(emb, limit * 2)),
+      this.embeddingProvider
+        .embed(query)
+        .then((emb) => this.repository.searchByVector(emb, limit * 2)),
     ]);
 
     // FTSスコアのMin-Max正規化（rankは負値なので絶対値を使う）

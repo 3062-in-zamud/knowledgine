@@ -5,14 +5,7 @@ import { fileURLToPath } from "url";
 import type { WordPieceTokenizer as WordPieceTokenizerType } from "../../src/embedding/tokenizer.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const tokenizerPath = join(
-  __dirname,
-  "..",
-  "..",
-  "models",
-  "all-MiniLM-L6-v2",
-  "tokenizer.json",
-);
+const tokenizerPath = join(__dirname, "..", "..", "models", "all-MiniLM-L6-v2", "tokenizer.json");
 const modelAvailable = existsSync(tokenizerPath);
 
 describe.skipIf(!modelAvailable)("WordPieceTokenizer (requires model files)", () => {

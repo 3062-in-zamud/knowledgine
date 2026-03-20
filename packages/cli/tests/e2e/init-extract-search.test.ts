@@ -221,12 +221,12 @@ solved: テスト環境をDockerで統一して修正完了。
     db.close();
   });
 
-  it("should find notes via FTS search", () => {
+  it("should find notes via FTS search", async () => {
     const db = createDatabase(join(testDir, ".knowledgine", "index.sqlite"));
     new Migrator(db, ALL_MIGRATIONS).migrate();
     const repository = new KnowledgeRepository(db);
     const searcher = new KnowledgeSearcher(repository);
-    const results = searcher.search({ query: "TypeScript" });
+    const results = await searcher.search({ query: "TypeScript" });
     expect(results.length).toBeGreaterThanOrEqual(1);
     // Check that result note content mentions TypeScript
     const hasTypeScript = results.some(

@@ -15,9 +15,7 @@ describe("migration003: vector_embeddings", () => {
 
   it("should create note_embeddings table", () => {
     const result = ctx.db
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='note_embeddings'",
-      )
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='note_embeddings'")
       .get();
     expect(result).toBeDefined();
   });
@@ -87,9 +85,7 @@ describe("migration003: vector_embeddings", () => {
     ctx.repository.saveEmbedding(noteId, new Float32Array(384), "test-model");
     ctx.repository.deleteNoteById(noteId);
 
-    const row = ctx.db
-      .prepare("SELECT * FROM note_embeddings WHERE note_id = ?")
-      .get(noteId);
+    const row = ctx.db.prepare("SELECT * FROM note_embeddings WHERE note_id = ?").get(noteId);
     expect(row).toBeUndefined();
   });
 

@@ -72,9 +72,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
       }
       console.error(`  Embeddings: ${generated} generated, ${failed} failed`);
     } else {
-      console.error(
-        "Skipping embeddings: model not found. Run: node scripts/download-model.js",
-      );
+      console.error("Skipping embeddings: model not found. Run: node scripts/download-model.js");
     }
   } else {
     console.error("Skipping embeddings (--skip-embeddings flag set).");

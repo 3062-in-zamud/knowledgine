@@ -15,7 +15,12 @@ export { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 async function main(): Promise<void> {
   const config = resolveConfig();
   const { repository, embeddingProvider, graphRepository } = initializeDependencies(config);
-  const server = createKnowledgineMcpServer(repository, config.rootPath, embeddingProvider, graphRepository);
+  const server = createKnowledgineMcpServer(
+    repository,
+    config.rootPath,
+    embeddingProvider,
+    graphRepository,
+  );
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

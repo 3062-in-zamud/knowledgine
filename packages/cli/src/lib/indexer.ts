@@ -83,7 +83,10 @@ export async function indexFile(
       const now = new Date().toISOString();
 
       // エンティティを登録してnoteにリンク
-      const entityList: Array<{ name: string; entityType: import("@knowledgine/core").EntityType }> = [];
+      const entityList: Array<{
+        name: string;
+        entityType: import("@knowledgine/core").EntityType;
+      }> = [];
       for (const entity of extractedEntities) {
         const entityId = graphRepository.upsertEntity({
           name: entity.name,
