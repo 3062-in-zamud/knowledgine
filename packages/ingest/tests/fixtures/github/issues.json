@@ -1,0 +1,13 @@
+[
+  {
+    "number": 10,
+    "title": "Bug: crash on startup",
+    "body": "The app crashes when starting up with the following error...",
+    "author": { "login": "user3" },
+    "state": "OPEN",
+    "createdAt": "2025-01-05T00:00:00Z",
+    "updatedAt": "2025-01-06T00:00:00Z",
+    "url": "https://github.com/owner/repo/issues/10",
+    "labels": [{ "name": "bug" }, { "name": "priority:high" }]
+  }
+]

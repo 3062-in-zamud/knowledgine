@@ -34,6 +34,7 @@ const EVENT_TYPE_MAP: Record<string, EventType> = {
   decision: "manual_observation",
   learning: "manual_observation",
   problem_solution: "manual_observation",
+  capture: "manual_observation",
 };
 
 const SOURCE_TYPE_MAP: Record<string, SourceType> = {
@@ -44,6 +45,7 @@ const SOURCE_TYPE_MAP: Record<string, SourceType> = {
   obsidian: "markdown",
   slack: "slack",
   notion: "notion",
+  capture: "manual",
 };
 
 export function normalizeToKnowledgeData(event: NormalizedEvent): KnowledgeData {

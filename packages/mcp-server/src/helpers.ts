@@ -46,6 +46,7 @@ export async function initializeDependencies(config: KnowledgineConfig): Promise
   embeddingProvider: EmbeddingProvider | undefined;
   graphRepository: GraphRepository;
   feedbackRepository: FeedbackRepository;
+  db: import("better-sqlite3").Database;
 }> {
   // 1. Create database without sqlite-vec (loaded async below if needed)
   const db = createDatabase(config.dbPath);
@@ -76,7 +77,7 @@ export async function initializeDependencies(config: KnowledgineConfig): Promise
     }
   }
 
-  return { repository, embeddingProvider, graphRepository, feedbackRepository };
+  return { repository, embeddingProvider, graphRepository, feedbackRepository, db };
 }
 
 export function formatToolResult(data: unknown): {

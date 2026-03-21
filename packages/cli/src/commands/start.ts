@@ -87,6 +87,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     embeddingProvider,
     graphRepository,
     feedbackRepository,
+    db,
   });
   const transport = new StdioServerTransport();
   await server.connect(transport);

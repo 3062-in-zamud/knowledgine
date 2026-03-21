@@ -16,6 +16,7 @@ import {
 } from "./commands/feedback.js";
 import { demoCommand } from "./commands/demo.js";
 import { searchCommand } from "./commands/search.js";
+import { captureCommand } from "./commands/capture.js";
 import { registerToolCommands } from "./commands/tool.js";
 
 const program = new Command();
@@ -170,13 +171,32 @@ program
   .option("--demo", "Search in demo notes")
   .option("--mode <mode>", "Search mode: keyword, semantic, hybrid", "keyword")
   .option("--limit <n>", "Maximum results", "20")
-  .action((query: string, opts: { demo?: boolean; mode?: string; limit?: string }) => {
+  .option("--format <format>", "Output format: json, table, plain", "plain")
+  .option("--related <noteId>", "Find related notes by note ID")
+  .option("--related-file <path>", "Find related notes by file path")
+  .option("--path <dir>", "Root directory")
+  .action((query: string, opts: { demo?: boolean; mode?: string; limit?: string; format?: string; related?: string; relatedFile?: string; path?: string }) => {
     return searchCommand(query, {
       demo: opts.demo,
       mode: opts.mode,
       limit: Number(opts.limit),
+      format: opts.format,
+      related: opts.related,
+      relatedFile: opts.relatedFile,
+      path: opts.path,
     });
   });
+
+program
+  .command("capture [text]")
+  .description("Capture knowledge from text, URL, or file")
+  .option("-u, --url <url>", "URL to fetch and capture")
+  .option("-f, --file <path>", "File path to capture")
+  .option("-t, --tags <tags>", "Comma-separated tags")
+  .option("--title <title>", "Title for the captured knowledge")
+  .option("--path <dir>", "Root directory")
+  .option("--format <format>", "Output format: json, plain", "plain")
+  .action(captureCommand);
 
 registerToolCommands(program);
 

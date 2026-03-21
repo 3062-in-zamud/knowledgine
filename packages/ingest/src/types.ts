@@ -65,7 +65,8 @@ export type NormalizedEventType =
   | "ci_result"
   | "decision"
   | "learning"
-  | "problem_solution";
+  | "problem_solution"
+  | "capture";
 
 export interface EventMetadata {
   sourcePlugin: string;

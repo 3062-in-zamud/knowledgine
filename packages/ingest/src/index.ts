@@ -21,6 +21,7 @@ export type {
 export { PluginRegistry } from "./plugin-registry.js";
 export { CursorStore } from "./cursor-store.js";
 export { IngestEngine } from "./ingest-engine.js";
+export { EventWriter } from "./event-writer.js";
 export {
   sanitizeContent,
   computeContentHash,
@@ -31,3 +32,5 @@ export {
 export { MarkdownPlugin } from "./plugins/markdown/index.js";
 export { GitHistoryPlugin } from "./plugins/git-history/index.js";
 export { ClaudeSessionsPlugin } from "./plugins/claude-sessions/index.js";
+export { GitHubPlugin } from "./plugins/github/index.js";
+export { ObsidianPlugin } from "./plugins/obsidian/index.js";

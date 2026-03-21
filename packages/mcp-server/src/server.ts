@@ -3,6 +3,7 @@ import { z } from "zod";
 import { KnowledgeService, VERSION } from "@knowledgine/core";
 import type { KnowledgeRepository, EmbeddingProvider, FeedbackErrorType } from "@knowledgine/core";
 import type { GraphRepository, FeedbackRepository } from "@knowledgine/core";
+import type Database from "better-sqlite3";
 import { formatToolResult, formatToolError } from "./helpers.js";
 
 export interface McpServerOptions {
@@ -11,6 +12,7 @@ export interface McpServerOptions {
   embeddingProvider?: EmbeddingProvider;
   graphRepository?: GraphRepository;
   feedbackRepository?: FeedbackRepository;
+  db?: Database.Database;
 }
 
 export function createKnowledgineMcpServer(options: McpServerOptions): McpServer {
@@ -193,6 +195,53 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           details: input.details,
         });
         return formatToolResult(result);
+      } catch (error) {
+        return formatToolError(error instanceof Error ? error.message : String(error));
+      }
+    },
+  );
+
+  // Tool 7: capture_knowledge
+  server.registerTool(
+    "capture_knowledge",
+    {
+      description:
+        "Capture and store knowledge. Use after solving problems, making decisions, or discovering patterns.",
+      inputSchema: {
+        content: z.string().describe("Knowledge content to capture"),
+        title: z.string().optional().describe("Optional title"),
+        tags: z.array(z.string()).optional().describe("Optional tags"),
+        source: z.string().optional().describe("Optional source description"),
+      },
+    },
+    async (input) => {
+      try {
+        if (!options.db) {
+          return formatToolError("Database not available for capture");
+        }
+        const { EventWriter, sanitizeContent } = await import("@knowledgine/ingest");
+        const writer = new EventWriter(options.db, options.repository);
+        const title = input.title || input.content.slice(0, 50).replace(/\n/g, " ").trim();
+        const sourceUri = input.source ? `capture://${input.source}` : "capture://mcp";
+        const event = {
+          sourceUri,
+          eventType: "capture" as const,
+          title,
+          content: sanitizeContent(input.content),
+          timestamp: new Date(),
+          metadata: {
+            sourcePlugin: "capture",
+            sourceId: `capture-${Date.now()}`,
+            tags: input.tags,
+          },
+        };
+        const result = writer.writeEvent(event);
+        return formatToolResult({
+          id: result.id,
+          title,
+          tags: input.tags ?? [],
+          sourceUri,
+        });
       } catch (error) {
         return formatToolError(error instanceof Error ? error.message : String(error));
       }

@@ -1,0 +1,26 @@
+[
+  {
+    "number": 1,
+    "title": "Add feature X",
+    "body": "This PR adds feature X to the project.\n\n## Changes\n- Added new module\n- Updated docs",
+    "author": { "login": "user1" },
+    "state": "MERGED",
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-02T00:00:00Z",
+    "url": "https://github.com/owner/repo/pull/1",
+    "labels": [{ "name": "feature" }, { "name": "approved" }],
+    "reviewDecision": "APPROVED"
+  },
+  {
+    "number": 2,
+    "title": "Fix bug Y",
+    "body": "Fixes the bug in module Y.",
+    "author": { "login": "user2" },
+    "state": "OPEN",
+    "createdAt": "2025-01-03T00:00:00Z",
+    "updatedAt": "2025-01-04T00:00:00Z",
+    "url": "https://github.com/owner/repo/pull/2",
+    "labels": [{ "name": "bug" }],
+    "reviewDecision": ""
+  }
+]

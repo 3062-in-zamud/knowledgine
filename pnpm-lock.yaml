@@ -86,12 +86,19 @@ importers:
       '@knowledgine/core':
         specifier: workspace:*
         version: link:../core
+      '@knowledgine/ingest':
+        specifier: workspace:*
+        version: link:../ingest
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.1
         version: 1.27.1(zod@4.3.6)
       zod:
         specifier: ^4.3.6
         version: 4.3.6
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.0.0
+        version: 7.6.13
 
 packages:
 

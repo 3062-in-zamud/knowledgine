@@ -3,6 +3,8 @@ import {
   MarkdownPlugin,
   GitHistoryPlugin,
   ClaudeSessionsPlugin,
+  GitHubPlugin,
+  ObsidianPlugin,
 } from "@knowledgine/ingest";
 import type { PluginConfig, PluginInitResult } from "@knowledgine/ingest";
 
@@ -11,6 +13,8 @@ export function createDefaultRegistry(): PluginRegistry {
   registry.register(new MarkdownPlugin());
   registry.register(new GitHistoryPlugin());
   registry.register(new ClaudeSessionsPlugin());
+  registry.register(new GitHubPlugin());
+  registry.register(new ObsidianPlugin());
   return registry;
 }
 

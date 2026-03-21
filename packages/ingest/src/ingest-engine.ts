@@ -3,12 +3,13 @@ import type { KnowledgeRepository } from "@knowledgine/core";
 import type { IngestSummary, NormalizedEvent } from "./types.js";
 import type { PluginRegistry } from "./plugin-registry.js";
 import { CursorStore } from "./cursor-store.js";
-import { normalizeToKnowledgeData, normalizeToKnowledgeEvent } from "./normalizer.js";
+import { EventWriter } from "./event-writer.js";
 
 const BATCH_SIZE = 100;
 
 export class IngestEngine {
   private cursorStore: CursorStore;
+  private eventWriter: EventWriter;
 
   constructor(
     private registry: PluginRegistry,
@@ -16,6 +17,7 @@ export class IngestEngine {
     private repository: KnowledgeRepository,
   ) {
     this.cursorStore = new CursorStore(db);
+    this.eventWriter = new EventWriter(db, repository);
   }
 
   async ingest(
@@ -72,44 +74,6 @@ export class IngestEngine {
   }
 
   private processBatch(batch: NormalizedEvent[]): { processed: number; errors: number } {
-    let processed = 0;
-    let errors = 0;
-
-    const insertEvent = this.db.prepare(`
-      INSERT INTO events (event_type, source_type, source_id, source_uri, actor, content, content_hash, occurred_at, metadata_json, project_id, session_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const runBatch = this.db.transaction(() => {
-      for (const event of batch) {
-        try {
-          const knowledgeEvent = normalizeToKnowledgeEvent(event);
-
-          insertEvent.run(
-            knowledgeEvent.eventType,
-            knowledgeEvent.sourceType,
-            knowledgeEvent.sourceId ?? null,
-            knowledgeEvent.sourceUri ?? null,
-            knowledgeEvent.actor ?? null,
-            knowledgeEvent.content,
-            knowledgeEvent.contentHash,
-            knowledgeEvent.occurredAt,
-            knowledgeEvent.metadataJson ? JSON.stringify(knowledgeEvent.metadataJson) : null,
-            knowledgeEvent.projectId ?? null,
-            knowledgeEvent.sessionId ?? null,
-          );
-
-          const knowledgeData = normalizeToKnowledgeData(event);
-          this.repository.saveNote(knowledgeData);
-
-          processed++;
-        } catch {
-          errors++;
-        }
-      }
-    });
-
-    runBatch();
-    return { processed, errors };
+    return this.eventWriter.writeBatch(batch);
   }
 }
