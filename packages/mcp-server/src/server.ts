@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { KnowledgeSearcher, LocalLinkGenerator, VERSION } from "@knowledgine/core";
+import { KnowledgeService, VERSION } from "@knowledgine/core";
 import type { KnowledgeRepository, EmbeddingProvider, FeedbackErrorType } from "@knowledgine/core";
 import type { GraphRepository, FeedbackRepository } from "@knowledgine/core";
 import { formatToolResult, formatToolError } from "./helpers.js";
@@ -14,9 +14,8 @@ export interface McpServerOptions {
 }
 
 export function createKnowledgineMcpServer(options: McpServerOptions): McpServer {
-  const { repository, rootPath, embeddingProvider, graphRepository, feedbackRepository } = options;
   const server = new McpServer({ name: "knowledgine", version: VERSION });
-  const searcher = new KnowledgeSearcher(repository, embeddingProvider);
+  const service = new KnowledgeService(options);
 
   // Tool 1: search_knowledge
   server.registerTool(
@@ -35,24 +34,12 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
     },
     async (input) => {
       try {
-        const results = await searcher.search({
+        const result = await service.search({
           query: input.query,
           limit: input.limit ?? 20,
           mode: input.mode ?? "keyword",
         });
-        return formatToolResult({
-          query: input.query,
-          mode: input.mode ?? "keyword",
-          totalResults: results.length,
-          results: results.map((r) => ({
-            noteId: r.note.id,
-            filePath: r.note.file_path,
-            title: r.note.title,
-            score: r.score,
-            matchReason: r.matchReason,
-            createdAt: r.note.created_at,
-          })),
-        });
+        return formatToolResult(result);
       } catch (error) {
         return formatToolError(error instanceof Error ? error.message : String(error));
       }
@@ -80,63 +67,17 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
     },
     async (input) => {
       try {
-        let resolvedNoteId = input.noteId;
-
-        if (!resolvedNoteId && input.filePath) {
-          // Normalize absolute paths to relative (H-5)
-          let normalizedPath = input.filePath;
-          if (rootPath && normalizedPath.startsWith("/")) {
-            const pathModule = await import("path");
-            if (pathModule.isAbsolute(normalizedPath)) {
-              normalizedPath = pathModule.relative(rootPath, normalizedPath);
-            }
-          }
-          // パストラバーサル保護: rootPath外への参照を拒否
-          const pathModule = await import("path");
-          if (normalizedPath.startsWith("..") || pathModule.isAbsolute(normalizedPath)) {
-            return formatToolError("Invalid file path: outside of root directory");
-          }
-          const note = repository.getNoteByPath(normalizedPath);
-          if (!note) {
-            return formatToolError(`Note not found for path: ${input.filePath}`);
-          }
-          resolvedNoteId = note.id;
-        }
-
-        if (!resolvedNoteId) {
-          return formatToolError("Either noteId or filePath is required");
-        }
-
-        const linkGenerator = new LocalLinkGenerator(repository, graphRepository);
-        const relatedNotes = linkGenerator.findRelatedNotes(resolvedNoteId, input.limit ?? 5);
-        const problemSolutionPairs = repository.getProblemSolutionPairsByNoteId(resolvedNoteId);
-
-        // Graph relations if available
-        let graphRelations: unknown[] = [];
-        if (graphRepository) {
-          const linkedEntities = graphRepository.getLinkedEntities(resolvedNoteId);
-          const maxHops = input.maxHops ?? 1;
-          graphRelations = linkedEntities.map((entity) => ({
-            entityId: entity.id,
-            name: entity.name,
-            entityType: entity.entityType,
-            relatedEntities: graphRepository.findRelatedEntities(entity.id!, maxHops).map((e) => ({
-              id: e.id,
-              name: e.name,
-              entityType: e.entityType,
-              hops: e.hops,
-            })),
-          }));
-        }
-
-        return formatToolResult({
-          noteId: resolvedNoteId,
-          relatedNotes,
-          problemSolutionPairs,
-          graphRelations,
+        const result = await service.findRelated({
+          noteId: input.noteId,
+          filePath: input.filePath,
+          limit: input.limit ?? 5,
+          maxHops: input.maxHops ?? 1,
         });
+        return formatToolResult(result);
       } catch (error) {
-        return formatToolError(error instanceof Error ? error.message : String(error));
+        const msg = error instanceof Error ? error.message : String(error);
+        // findRelated throws Error for user-facing errors
+        return formatToolError(msg);
       }
     },
   );
@@ -151,20 +92,8 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
     },
     async () => {
       try {
-        const stats = repository.getStats();
-        const notesWithoutEmbeddings = embeddingProvider
-          ? repository.getNotesWithoutEmbeddings().length
-          : null;
-        const graphStats = graphRepository ? graphRepository.getGraphStats() : null;
-
-        return formatToolResult({
-          ...stats,
-          embeddingStatus: {
-            available: embeddingProvider != null,
-            notesWithoutEmbeddings,
-          },
-          graphStats,
-        });
+        const result = service.getStats();
+        return formatToolResult(result);
       } catch (error) {
         return formatToolError(error instanceof Error ? error.message : String(error));
       }
@@ -184,21 +113,11 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
     },
     async (input) => {
       try {
-        if (!graphRepository) {
+        if (!options.graphRepository) {
           return formatToolError("Knowledge graph is not available");
         }
-        const entities = graphRepository.searchEntities(input.query, input.limit ?? 20);
-        return formatToolResult({
-          query: input.query,
-          totalResults: entities.length,
-          entities: entities.map((e) => ({
-            id: e.id,
-            name: e.name,
-            entityType: e.entityType,
-            description: e.description,
-            createdAt: e.createdAt,
-          })),
-        });
+        const result = service.searchEntities({ query: input.query, limit: input.limit ?? 20 });
+        return formatToolResult(result);
       } catch (error) {
         return formatToolError(error instanceof Error ? error.message : String(error));
       }
@@ -218,23 +137,21 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
     },
     async (input) => {
       try {
-        if (!graphRepository) {
+        if (!options.graphRepository) {
           return formatToolError("Knowledge graph is not available");
         }
-        let entityId = input.entityId;
-        if (!entityId && input.entityName) {
-          const entity = graphRepository.getEntityByName(input.entityName);
-          if (!entity) {
-            return formatToolError(`Entity not found: ${input.entityName}`);
-          }
-          entityId = entity.id;
-        }
-        if (!entityId) {
+        if (!input.entityId && !input.entityName) {
           return formatToolError("Either entityId or entityName is required");
         }
-        const graph = graphRepository.getEntityWithGraph(entityId);
+        const graph = service.getEntityGraph({
+          entityId: input.entityId,
+          entityName: input.entityName,
+        });
         if (!graph) {
-          return formatToolError(`Entity not found: id=${entityId}`);
+          if (input.entityName) {
+            return formatToolError(`Entity not found: ${input.entityName}`);
+          }
+          return formatToolError(`Entity not found: id=${input.entityId}`);
         }
         return formatToolResult(graph);
       } catch (error) {
@@ -267,10 +184,7 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
     },
     async (input) => {
       try {
-        if (!feedbackRepository) {
-          return formatToolError("Feedback system is not available");
-        }
-        const record = feedbackRepository.create({
+        const result = service.reportExtractionError({
           entityName: input.entityName,
           errorType: input.errorType as FeedbackErrorType,
           entityType: input.entityType,
@@ -278,10 +192,7 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           noteId: input.noteId,
           details: input.details,
         });
-        return formatToolResult({
-          message: "Feedback recorded successfully",
-          feedback: record,
-        });
+        return formatToolResult(result);
       } catch (error) {
         return formatToolError(error instanceof Error ? error.message : String(error));
       }

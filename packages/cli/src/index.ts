@@ -16,6 +16,7 @@ import {
 } from "./commands/feedback.js";
 import { demoCommand } from "./commands/demo.js";
 import { searchCommand } from "./commands/search.js";
+import { registerToolCommands } from "./commands/tool.js";
 
 const program = new Command();
 
@@ -176,5 +177,7 @@ program
       limit: Number(opts.limit),
     });
   });
+
+registerToolCommands(program);
 
 program.parse();

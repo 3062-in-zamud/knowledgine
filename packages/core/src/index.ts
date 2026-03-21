@@ -71,6 +71,8 @@ export { migration003 } from "./storage/migrations/003_vector_embeddings.js";
 export { migration004 } from "./storage/migrations/004_knowledge_graph.js";
 export { migration005a } from "./storage/migrations/005a_events_layer.js";
 export { migration006 } from "./storage/migrations/006_extraction_feedback.js";
+export { migration005b } from "./storage/migrations/005b_bitemporal.js";
+export { migration005c } from "./storage/migrations/005c_provenance.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -87,9 +89,19 @@ import { migration002 } from "./storage/migrations/002_memory_layers.js";
 import { migration003 } from "./storage/migrations/003_vector_embeddings.js";
 import { migration004 } from "./storage/migrations/004_knowledge_graph.js";
 import { migration005a } from "./storage/migrations/005a_events_layer.js";
+import { migration005b } from "./storage/migrations/005b_bitemporal.js";
+import { migration005c } from "./storage/migrations/005c_provenance.js";
 import { migration006 } from "./storage/migrations/006_extraction_feedback.js";
 import type { Migration } from "./storage/migrator.js";
-export const ALL_MIGRATIONS: Migration[] = [migration001, migration002, migration003, migration004, migration005a, migration006];
+export const ALL_MIGRATIONS: Migration[] = [migration001, migration002, migration003, migration004, migration005a, migration006, migration005b, migration005c];
+
+// Provenance
+export { ProvenanceRepository } from "./provenance/provenance-repository.js";
+export type {
+  ProvenanceRecord,
+  FileTimelineEntry,
+  Snapshot,
+} from "./provenance/provenance-repository.js";
 
 // Graph
 export { GraphRepository } from "./graph/graph-repository.js";
@@ -137,3 +149,19 @@ export type { ProcessedFile } from "./processing/file-processor.js";
 // Utils
 export { CodeBlockDetector } from "./utils/code-block-detector.js";
 export type { CodeBlockRange } from "./utils/code-block-detector.js";
+
+// Services
+export { KnowledgeService } from "./services/knowledge-service.js";
+export type {
+  KnowledgeServiceOptions,
+  SearchKnowledgeResult,
+  FindRelatedResult,
+  StatsResult,
+  SearchEntitiesResult,
+  ReportErrorResult,
+  SearchInput,
+  FindRelatedInput,
+  SearchEntitiesInput,
+  GetEntityGraphInput,
+  ReportErrorInput,
+} from "./services/knowledge-service.js";

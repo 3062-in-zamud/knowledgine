@@ -28,6 +28,10 @@ interface RelationRow {
   strength: number;
   description: string | null;
   created_at: string;
+  valid_from: string | null;
+  valid_to: string | null;
+  recorded_at: string | null;
+  superseded_at: string | null;
 }
 
 interface ObservationRow {
@@ -40,6 +44,10 @@ interface ObservationRow {
   source_pattern_id: number | null;
   created_at: string;
   metadata_json: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  recorded_at: string | null;
+  superseded_at: string | null;
 }
 
 function rowToEntity(row: EntityRow): Entity & { id: number } {
@@ -217,8 +225,8 @@ export class GraphRepository {
     try {
       const now = new Date().toISOString();
       const stmt = this.db.prepare(`
-        INSERT INTO relations (from_entity_id, to_entity_id, relation_type, strength, description, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO relations (from_entity_id, to_entity_id, relation_type, strength, description, created_at, valid_from, recorded_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       `);
       const info = stmt.run(
         relation.fromEntityId,
@@ -246,8 +254,8 @@ export class GraphRepository {
       const strength = relation.strength ?? 1.0;
       const insertStmt = this.db.prepare(`
         INSERT OR IGNORE INTO relations
-          (from_entity_id, to_entity_id, relation_type, strength, description, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+          (from_entity_id, to_entity_id, relation_type, strength, description, created_at, valid_from, recorded_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       `);
       insertStmt.run(
         relation.fromEntityId,
@@ -282,7 +290,7 @@ export class GraphRepository {
   getRelationsByEntityId(entityId: number): Array<Relation & { id: number }> {
     const rows = this.db
       .prepare(
-        "SELECT * FROM relations WHERE from_entity_id = ? OR to_entity_id = ? ORDER BY strength DESC",
+        "SELECT * FROM active_relations WHERE from_entity_id = ? OR to_entity_id = ? ORDER BY strength DESC",
       )
       .all(entityId, entityId) as RelationRow[];
     return rows.map(rowToRelation);
@@ -304,8 +312,8 @@ export class GraphRepository {
       const now = new Date().toISOString();
       const stmt = this.db.prepare(`
         INSERT INTO observations
-          (entity_id, content, observation_type, confidence, source_note_id, source_pattern_id, created_at, metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          (entity_id, content, observation_type, confidence, source_note_id, source_pattern_id, created_at, metadata_json, valid_from, recorded_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       `);
       const info = stmt.run(
         observation.entityId,
@@ -325,7 +333,7 @@ export class GraphRepository {
 
   getObservationsByEntityId(entityId: number): Array<Observation & { id: number }> {
     const rows = this.db
-      .prepare("SELECT * FROM observations WHERE entity_id = ? ORDER BY created_at DESC")
+      .prepare("SELECT * FROM active_observations WHERE entity_id = ? ORDER BY created_at DESC")
       .all(entityId) as ObservationRow[];
     return rows.map(rowToObservation);
   }
@@ -384,7 +392,7 @@ export class GraphRepository {
         `
         SELECT r.*, e.id as te_id, e.name as te_name, e.entity_type as te_type,
                e.description as te_desc, e.created_at as te_created, e.updated_at as te_updated, e.metadata_json as te_meta
-        FROM relations r
+        FROM active_relations r
         JOIN entities e ON e.id = r.to_entity_id
         WHERE r.from_entity_id = ?
         ORDER BY r.strength DESC
@@ -420,7 +428,7 @@ export class GraphRepository {
         `
         SELECT r.*, e.id as se_id, e.name as se_name, e.entity_type as se_type,
                e.description as se_desc, e.created_at as se_created, e.updated_at as se_updated, e.metadata_json as se_meta
-        FROM relations r
+        FROM active_relations r
         JOIN entities e ON e.id = r.from_entity_id
         WHERE r.to_entity_id = ?
         ORDER BY r.strength DESC
@@ -511,7 +519,7 @@ export class GraphRepository {
           SELECT DISTINCT
             CASE WHEN r.from_entity_id IN (${placeholders}) THEN r.to_entity_id
                  ELSE r.from_entity_id END as neighbor_id
-          FROM relations r
+          FROM active_relations r
           WHERE r.from_entity_id IN (${placeholders}) OR r.to_entity_id IN (${placeholders})
         `,
         )
@@ -547,10 +555,12 @@ export class GraphRepository {
       this.db.prepare("SELECT COUNT(*) as count FROM entities").get() as { count: number }
     ).count;
     const totalRelations = (
-      this.db.prepare("SELECT COUNT(*) as count FROM relations").get() as { count: number }
+      this.db.prepare("SELECT COUNT(*) as count FROM active_relations").get() as { count: number }
     ).count;
     const totalObservations = (
-      this.db.prepare("SELECT COUNT(*) as count FROM observations").get() as { count: number }
+      this.db.prepare("SELECT COUNT(*) as count FROM active_observations").get() as {
+        count: number;
+      }
     ).count;
 
     const entityTypeRows = this.db
@@ -562,7 +572,9 @@ export class GraphRepository {
     }
 
     const relationTypeRows = this.db
-      .prepare("SELECT relation_type, COUNT(*) as count FROM relations GROUP BY relation_type")
+      .prepare(
+        "SELECT relation_type, COUNT(*) as count FROM active_relations GROUP BY relation_type",
+      )
       .all() as Array<{ relation_type: string; count: number }>;
     const relationsByType: Record<string, number> = {};
     for (const row of relationTypeRows) {
@@ -570,5 +582,51 @@ export class GraphRepository {
     }
 
     return { totalEntities, totalRelations, totalObservations, entitiesByType, relationsByType };
+  }
+
+  // ── Bi-temporal Operations ────────────────────────────────────
+
+  invalidateRelation(id: number, validTo?: string): boolean {
+    try {
+      const info = this.db
+        .prepare(
+          `UPDATE relations SET valid_to = COALESCE(?, datetime('now')) WHERE id = ? AND valid_to IS NULL`,
+        )
+        .run(validTo ?? null, id);
+      return info.changes > 0;
+    } catch (error) {
+      throw new DatabaseError("invalidateRelation", error, { id });
+    }
+  }
+
+  invalidateObservation(id: number, validTo?: string): boolean {
+    try {
+      const info = this.db
+        .prepare(
+          `UPDATE observations SET valid_to = COALESCE(?, datetime('now')) WHERE id = ? AND valid_to IS NULL`,
+        )
+        .run(validTo ?? null, id);
+      return info.changes > 0;
+    } catch (error) {
+      throw new DatabaseError("invalidateObservation", error, { id });
+    }
+  }
+
+  getRelationHistory(
+    fromEntityId: number,
+    toEntityId: number,
+  ): Array<Relation & { id: number; validFrom: string | null; validTo: string | null; recordedAt: string | null; supersededAt: string | null }> {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM relations WHERE from_entity_id = ? AND to_entity_id = ? ORDER BY recorded_at DESC`,
+      )
+      .all(fromEntityId, toEntityId) as RelationRow[];
+    return rows.map((row) => ({
+      ...rowToRelation(row),
+      validFrom: row.valid_from,
+      validTo: row.valid_to,
+      recordedAt: row.recorded_at,
+      supersededAt: row.superseded_at,
+    }));
   }
 }

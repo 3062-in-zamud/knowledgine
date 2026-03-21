@@ -4,7 +4,6 @@ import {
   ValidationError,
   DatabaseError,
   KnowledgeNotFoundError,
-  FTSIndexError,
 } from "../errors.js";
 import { createHash } from "crypto";
 
