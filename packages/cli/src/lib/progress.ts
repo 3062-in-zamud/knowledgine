@@ -37,6 +37,19 @@ export interface Step {
   reason?: string;
 }
 
+export interface SummaryEntry {
+  label: string;
+  value: string | number;
+}
+
+export function createSummaryReport(title: string, entries: SummaryEntry[]): string {
+  const maxLabelLen = entries.length > 0 ? Math.max(...entries.map((e) => e.label.length)) : 0;
+  const header = `── ${title} ${"─".repeat(Math.max(0, 36 - title.length - 4))}`;
+  const footer = "─".repeat(header.length);
+  const lines = entries.map((e) => `  ${e.label.padEnd(maxLabelLen)}  ${e.value}`);
+  return [header, ...lines, footer].join("\n");
+}
+
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;

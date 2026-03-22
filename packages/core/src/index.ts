@@ -93,7 +93,16 @@ import { migration005b } from "./storage/migrations/005b_bitemporal.js";
 import { migration005c } from "./storage/migrations/005c_provenance.js";
 import { migration006 } from "./storage/migrations/006_extraction_feedback.js";
 import type { Migration } from "./storage/migrator.js";
-export const ALL_MIGRATIONS: Migration[] = [migration001, migration002, migration003, migration004, migration005a, migration006, migration005b, migration005c];
+export const ALL_MIGRATIONS: Migration[] = [
+  migration001,
+  migration002,
+  migration003,
+  migration004,
+  migration005a,
+  migration006,
+  migration005b,
+  migration005c,
+];
 
 // Provenance
 export { ProvenanceRepository } from "./provenance/provenance-repository.js";
@@ -113,7 +122,7 @@ export type { InferredRelation } from "./graph/relation-inferrer.js";
 // Embedding
 export type { EmbeddingProvider } from "./embedding/embedding-provider.js";
 export { OnnxEmbeddingProvider } from "./embedding/onnx-embedding-provider.js";
-export { ModelManager } from "./embedding/model-manager.js";
+export { ModelManager, DEFAULT_MODEL_NAME } from "./embedding/model-manager.js";
 export { downloadModel, MODEL_FILES } from "./embedding/model-downloader.js";
 export type { DownloadProgress, DownloadOptions, ModelFile } from "./embedding/model-downloader.js";
 

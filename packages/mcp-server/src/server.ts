@@ -41,7 +41,13 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           limit: input.limit ?? 20,
           mode: input.mode ?? "keyword",
         });
-        return formatToolResult(result);
+        const warningMsg = result.results
+          ?.find((r) => r.matchReason?.some((m) => m.startsWith("Warning:")))
+          ?.matchReason?.find((m) => m.startsWith("Warning:"));
+        return formatToolResult({
+          ...result,
+          ...(warningMsg ? { warning: warningMsg } : {}),
+        });
       } catch (error) {
         return formatToolError(error instanceof Error ? error.message : String(error));
       }

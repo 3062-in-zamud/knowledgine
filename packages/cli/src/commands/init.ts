@@ -11,11 +11,17 @@ import {
   ALL_MIGRATIONS,
   OnnxEmbeddingProvider,
   ModelManager,
+  DEFAULT_MODEL_NAME,
   downloadModel,
 } from "@knowledgine/core";
 import { IngestEngine, PluginRegistry, MarkdownPlugin } from "@knowledgine/ingest";
 import { postIngestProcessing } from "../lib/entity-extractor.js";
-import { createProgress, createStepProgress } from "../lib/progress.js";
+import {
+  createProgress,
+  createStepProgress,
+  createSummaryReport,
+  formatDuration,
+} from "../lib/progress.js";
 import { copyDemoFixtures } from "../lib/demo-manager.js";
 import { getDemoNotesPath } from "./demo.js";
 
@@ -94,6 +100,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 export async function initCommand(options: InitOptions): Promise<void> {
+  const initStartTime = Date.now();
   let rootPath: string;
 
   if (options.demo) {
@@ -139,10 +146,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
     ) {
       const freeDisk = await getFreeDiskBytes(resolve(rootPath, ".."));
       const estimatedNeeded = estimateMarkdownSize(rootPath) * DISK_MULTIPLIER_FTS5;
-      stepProgress.failStep(
-        "Creating .knowledgine directory",
-        "Insufficient disk space",
-      );
+      stepProgress.failStep("Creating .knowledgine directory", "Insufficient disk space");
       console.error("");
       console.error("Error: Disk is full. Cannot create the knowledge base.");
       console.error("");
@@ -156,14 +160,10 @@ export async function initCommand(options: InitOptions): Promise<void> {
         );
       }
       if (estimatedNeeded > 0) {
-        console.error(
-          `  Estimated needed: ~${(estimatedNeeded / (1024 * 1024)).toFixed(1)} MB`,
-        );
+        console.error(`  Estimated needed: ~${(estimatedNeeded / (1024 * 1024)).toFixed(1)} MB`);
       }
       if (freeDisk < Infinity) {
-        console.error(
-          `  Available:        ~${(freeDisk / (1024 * 1024)).toFixed(1)} MB`,
-        );
+        console.error(`  Available:        ~${(freeDisk / (1024 * 1024)).toFixed(1)} MB`);
       }
       console.error("");
       console.error("Free up disk space and re-run:");
@@ -191,7 +191,10 @@ export async function initCommand(options: InitOptions): Promise<void> {
       await loadSqliteVecExtension(db);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      stepProgress.failStep("Initializing database", `sqlite-vec extension unavailable: ${message}`);
+      stepProgress.failStep(
+        "Initializing database",
+        `sqlite-vec extension unavailable: ${message}`,
+      );
       stepProgress.warn("Falling back to FTS5-only mode (no vector search)");
       // Continue without semantic — we degrade gracefully
       config.embedding.enabled = false;
@@ -228,10 +231,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
   stepProgress.completeStep("Indexing markdown files");
 
   // Entity extraction (post-ingest batch)
-  const postSummary = await postIngestProcessing(
-    repository,
-    graphRepository,
-  );
+  const postSummary = await postIngestProcessing(repository, graphRepository);
 
   // ---------------------------------------------------------------------------
   // Step 4 & 5 (semantic only): Download model + generate embeddings
@@ -284,8 +284,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
       }
 
       if (!downloadSucceeded) {
-        const message =
-          lastError instanceof Error ? lastError.message : "unknown error";
+        const message = lastError instanceof Error ? lastError.message : "unknown error";
         stepProgress.failStep("Downloading embedding model", message);
         console.error("");
         console.error("Semantic search unavailable. Text search (FTS5) works without embeddings.");
@@ -315,7 +314,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
     // Step 5: Generate embeddings
     stepProgress.startStep("Generating embeddings");
     if (modelManager.isModelAvailable()) {
-      const embeddingProvider = new OnnxEmbeddingProvider(undefined, modelManager);
+      const embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
       const notesWithout = repository.getNotesWithoutEmbeddings();
 
       if (notesWithout.length > 0) {
@@ -355,19 +354,28 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const notesWithoutEmb = repository.getNotesWithoutEmbeddings().length;
   const embeddingsGenerated = stats.totalNotes - notesWithoutEmb;
 
-  console.error("");
-  console.error("knowledgine initialized successfully.");
-  console.error(`  Notes:      ${stats.totalNotes} indexed`);
-  console.error(`  Patterns:   ${stats.totalPatterns} extracted`);
-  console.error(`  Entities:   ${postSummary.totalEntities} extracted`);
-  if (enableSemantic && config.embedding.enabled) {
-    console.error(
-      `  Embeddings: ${embeddingsGenerated > 0 ? `${embeddingsGenerated} generated` : "none"}`,
-    );
-  } else {
-    console.error("  Search:     FTS5 full-text search (default)");
-    console.error("  Hint:       Run 'knowledgine upgrade --semantic' to enable semantic search");
-  }
+  const elapsed = formatDuration(Date.now() - initStartTime);
+  const summaryEntries = [
+    { label: "Notes:", value: `${stats.totalNotes} indexed` },
+    { label: "Patterns:", value: `${stats.totalPatterns} extracted` },
+    { label: "Entities:", value: `${postSummary.totalEntities} extracted` },
+    ...(enableSemantic && config.embedding.enabled
+      ? [
+          {
+            label: "Embeddings:",
+            value: embeddingsGenerated > 0 ? `${embeddingsGenerated} generated` : "none",
+          },
+        ]
+      : [
+          { label: "Search:", value: "FTS5 full-text search (default)" },
+          {
+            label: "Hint:",
+            value: "Run 'knowledgine upgrade --semantic' to enable semantic search",
+          },
+        ]),
+    { label: "Duration:", value: elapsed },
+  ];
+  console.error("\n" + createSummaryReport("knowledgine init", summaryEntries));
   console.error("");
   if (options.demo) {
     console.error("Demo ready! Try:");

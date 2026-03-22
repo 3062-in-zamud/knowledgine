@@ -3,13 +3,17 @@ import { existsSync } from "fs";
 import {
   loadConfig,
   createDatabase,
+  loadSqliteVecExtension,
   Migrator,
   KnowledgeRepository,
-  KnowledgeSearcher,
   GraphRepository,
   KnowledgeService,
   ALL_MIGRATIONS,
+  OnnxEmbeddingProvider,
+  ModelManager,
+  DEFAULT_MODEL_NAME,
 } from "@knowledgine/core";
+import type { EmbeddingProvider } from "@knowledgine/core";
 import { getDemoNotesPath } from "./demo.js";
 import {
   formatSearchResults as formatToolSearchResults,
@@ -27,10 +31,7 @@ export interface SearchCommandOptions {
   path?: string;
 }
 
-export async function searchCommand(
-  query: string,
-  options: SearchCommandOptions,
-): Promise<void> {
+export async function searchCommand(query: string, options: SearchCommandOptions): Promise<void> {
   const rootPath = options.demo
     ? getDemoNotesPath()
     : options.path
@@ -52,6 +53,9 @@ export async function searchCommand(
   const db = createDatabase(config.dbPath);
 
   try {
+    if (config.embedding?.enabled) {
+      await loadSqliteVecExtension(db);
+    }
     new Migrator(db, ALL_MIGRATIONS).migrate();
 
     const repository = new KnowledgeRepository(db);
@@ -88,9 +92,30 @@ export async function searchCommand(
       return;
     }
 
+    // Initialize embedding provider if semantic is enabled and requested
+    let embeddingProvider: EmbeddingProvider | undefined;
+    if (mode !== "keyword" && config.embedding?.enabled) {
+      const modelManager = new ModelManager();
+      if (modelManager.isModelAvailable()) {
+        embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
+      }
+    }
+
     // 通常の検索モード
-    const service = new KnowledgeService({ repository, rootPath, graphRepository });
+    const service = new KnowledgeService({
+      repository,
+      rootPath,
+      graphRepository,
+      embeddingProvider,
+    });
     const result = await service.search({ query, limit, mode });
+
+    const warnings = result.results.flatMap((r) =>
+      r.matchReason.filter((m) => m.startsWith("Warning:")),
+    );
+    if (warnings.length > 0) {
+      console.error(`\n⚠ ${warnings[0]}\n`);
+    }
 
     if (format === "json") {
       console.log(JSON.stringify({ ok: true, command: "search", result }));

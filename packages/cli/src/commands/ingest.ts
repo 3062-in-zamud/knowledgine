@@ -10,7 +10,7 @@ import {
 } from "@knowledgine/core";
 import { IngestEngine } from "@knowledgine/ingest";
 import { createDefaultRegistry, initializePlugins } from "../lib/plugin-loader.js";
-import { createProgress, formatDuration } from "../lib/progress.js";
+import { createProgress, formatDuration, createSummaryReport } from "../lib/progress.js";
 
 export interface IngestOptions {
   source?: string;
@@ -55,7 +55,10 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
     if (!registry.has(options.source)) {
       console.error(`Error: Plugin "${options.source}" is not registered.`);
       console.error(
-        `Available plugins: ${registry.list().map((p) => p.manifest.id).join(", ")}`,
+        `Available plugins: ${registry
+          .list()
+          .map((p) => p.manifest.id)
+          .join(", ")}`,
       );
       process.exitCode = 1;
       db.close();
@@ -64,9 +67,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
 
     const initResult = initResults.get(options.source);
     if (initResult && !initResult.ok) {
-      console.error(
-        `Error: Plugin "${options.source}" failed to initialize: ${initResult.error}`,
-      );
+      console.error(`Error: Plugin "${options.source}" failed to initialize: ${initResult.error}`);
       process.exitCode = 1;
       db.close();
       return;
@@ -113,6 +114,8 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       const plugins = registry.list();
       const progress = createProgress(plugins.length, "Ingesting");
       let completed = 0;
+      let totalProcessed = 0;
+      let totalErrors = 0;
 
       for (const plugin of plugins) {
         const initResult = initResults.get(plugin.manifest.id);
@@ -130,12 +133,15 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
             full: options.full,
           });
           completed++;
+          totalProcessed += summary.processed;
+          totalErrors += summary.errors;
           progress.update(completed, plugin.manifest.id);
           console.error(
             `  ${plugin.manifest.id}: ${summary.processed} events (${summary.errors} errors, ${formatDuration(summary.elapsedMs)})`,
           );
         } catch (error) {
           completed++;
+          totalErrors++;
           progress.update(completed, plugin.manifest.id);
           console.error(
             `  ${plugin.manifest.id}: failed - ${error instanceof Error ? error.message : String(error)}`,
@@ -144,22 +150,35 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       }
 
       progress.finish();
+      const elapsed = formatDuration(Date.now() - startTime);
+      const report = createSummaryReport("knowledgine ingest", [
+        { label: "Plugins:", value: `${plugins.length} run` },
+        { label: "Events:", value: `${totalProcessed} processed` },
+        { label: "Errors:", value: totalErrors },
+        { label: "Duration:", value: elapsed },
+      ]);
+      console.error("\n" + report);
     } else {
       const summary = await engine.ingest(options.source!, sourcePath, {
         full: options.full,
       });
-      console.error(
-        `Ingest complete (${formatDuration(summary.elapsedMs)}): ${summary.processed} events, ${summary.errors} errors${summary.deleted > 0 ? `, ${summary.deleted} stale notes removed` : ""}`,
-      );
+      const elapsed = formatDuration(Date.now() - startTime);
+      const entries = [
+        { label: "Source:", value: options.source! },
+        { label: "Events:", value: `${summary.processed} processed` },
+        { label: "Errors:", value: summary.errors },
+        ...(summary.deleted > 0
+          ? [{ label: "Removed:", value: `${summary.deleted} stale notes` }]
+          : []),
+        { label: "Duration:", value: elapsed },
+      ];
+      const report = createSummaryReport("knowledgine ingest", entries);
+      console.error("\n" + report);
     }
   } catch (error) {
-    console.error(
-      `Ingest failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    console.error(`Ingest failed: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
   } finally {
-    const elapsed = formatDuration(Date.now() - startTime);
-    console.error(`Total elapsed: ${elapsed}`);
     db.close();
   }
 }

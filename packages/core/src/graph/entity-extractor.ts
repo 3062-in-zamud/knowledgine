@@ -1,5 +1,6 @@
 import type { EntityType } from "../types.js";
 import type { ExtractionRules } from "../feedback/feedback-learner.js";
+import { CodeBlockDetector } from "../utils/code-block-detector.js";
 
 export interface ExtractedEntity {
   name: string;
@@ -57,6 +58,17 @@ const STOP_LIST = new Set([
   "catch",
   "finally",
   "try",
+  "div",
+  "span",
+  "input",
+  "form",
+  "type",
+  "style",
+  "script",
+  "link",
+  "meta",
+  "head",
+  "body",
 ]);
 
 /**
@@ -65,6 +77,33 @@ const STOP_LIST = new Set([
 export class EntityExtractor {
   private rules?: ExtractionRules;
 
+  private static readonly MIME_PREFIXES = new Set([
+    "image",
+    "text",
+    "application",
+    "audio",
+    "video",
+    "multipart",
+    "font",
+    "model",
+    "message",
+  ]);
+
+  private static readonly PATH_SEGMENTS = new Set([
+    "node_modules",
+    "src",
+    "lib",
+    "dist",
+    "bin",
+    "test",
+    "tests",
+    "docs",
+    "config",
+    "public",
+    "assets",
+    "static",
+  ]);
+
   constructor(rules?: ExtractionRules) {
     this.rules = rules;
   }
@@ -72,13 +111,19 @@ export class EntityExtractor {
   extract(content: string, frontmatter: Record<string, unknown> = {}): ExtractedEntity[] {
     const results: ExtractedEntity[] = [];
 
+    const detector = new CodeBlockDetector();
+    const codeBlocks = detector.detectCodeBlocks(content);
+    const lines = content.split("\n");
+    const filtered = detector.filterNonCodeLines(lines, codeBlocks);
+    const cleanContent = filtered.map((l) => l.line).join("\n");
+
     results.push(...this.extractFromFrontmatterTags(frontmatter));
     results.push(...this.extractFromFrontmatterFields(frontmatter));
-    results.push(...this.extractImports(content));
-    results.push(...this.extractMarkdownLinks(content));
-    results.push(...this.extractInlineCode(content));
-    results.push(...this.extractMentions(content));
-    results.push(...this.extractOrgRepos(content));
+    results.push(...this.extractImports(cleanContent));
+    results.push(...this.extractMarkdownLinks(cleanContent));
+    results.push(...this.extractInlineCode(cleanContent));
+    results.push(...this.extractMentions(cleanContent));
+    results.push(...this.extractOrgRepos(cleanContent));
 
     let deduped = this.deduplicate(results);
 
@@ -93,9 +138,7 @@ export class EntityExtractor {
     const rules = this.rules!;
 
     // 1. Filter out blacklisted entities
-    let filtered = entities.filter(
-      (e) => !rules.entityBlacklist.includes(e.name),
-    );
+    let filtered = entities.filter((e) => !rules.entityBlacklist.includes(e.name));
 
     // 2. Apply type overrides
     filtered = filtered.map((e) => {
@@ -111,9 +154,7 @@ export class EntityExtractor {
     // 3. Add whitelisted entities (if not already present)
     for (const wl of rules.entityWhitelist) {
       const key = `${wl.type}:${wl.name}`;
-      const exists = filtered.some(
-        (e) => `${e.entityType}:${e.name}` === key,
-      );
+      const exists = filtered.some((e) => `${e.entityType}:${e.name}` === key);
       if (!exists) {
         filtered.push({
           name: wl.name,
@@ -194,8 +235,8 @@ export class EntityExtractor {
 
   private extractMarkdownLinks(content: string): ExtractedEntity[] {
     const results: ExtractedEntity[] = [];
-    // [text](url) — internal links might be entities
-    const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
+    // [text](url) — internal links might be entities (exclude image syntax ![ )
+    const linkRe = /(?<!!)\[([^\]]+)\]\(([^)]+)\)/g;
     let m: RegExpExecArray | null;
     while ((m = linkRe.exec(content)) !== null) {
       const text = m[1].trim();
@@ -246,9 +287,13 @@ export class EntityExtractor {
     const orgRepoRe = /\b([a-z][\w-]{1,30})\/([a-z][\w-]{1,30})\b/g;
     let m: RegExpExecArray | null;
     while ((m = orgRepoRe.exec(content)) !== null) {
-      const fullName = `${m[1]}/${m[2]}`.toLowerCase();
-      if (!this.isStopWord(m[1]) && !this.isStopWord(m[2])) {
-        results.push({ name: fullName, entityType: "project", sourceType: "frontmatter" });
+      const org = m[1].toLowerCase();
+      const repo = m[2].toLowerCase();
+      if (EntityExtractor.MIME_PREFIXES.has(org)) continue;
+      if (EntityExtractor.PATH_SEGMENTS.has(org)) continue;
+      const fullName = `${org}/${repo}`;
+      if (!this.isStopWord(org) && !this.isStopWord(repo)) {
+        results.push({ name: fullName, entityType: "project", sourceType: "code" });
       }
     }
     return results;

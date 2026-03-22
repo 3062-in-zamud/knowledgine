@@ -1,10 +1,6 @@
 import type Database from "better-sqlite3";
 import type { KnowledgeData, ExtractedPattern } from "../types.js";
-import {
-  ValidationError,
-  DatabaseError,
-  KnowledgeNotFoundError,
-} from "../errors.js";
+import { ValidationError, DatabaseError, KnowledgeNotFoundError } from "../errors.js";
 import { createHash } from "crypto";
 
 export interface KnowledgeNote {
@@ -403,9 +399,13 @@ export class KnowledgeRepository {
       // note_embeddings_vec (vec0) が存在する場合は手動で同期
       // vec0 は ON CONFLICT をサポートしないため DELETE + INSERT を使う
       try {
-        this.db.prepare("DELETE FROM note_embeddings_vec WHERE note_id = ?").run(noteId);
         this.db
-          .prepare("INSERT INTO note_embeddings_vec(note_id, embedding) VALUES (?, ?)")
+          .prepare("DELETE FROM note_embeddings_vec WHERE note_id = CAST(? AS INTEGER)")
+          .run(noteId);
+        this.db
+          .prepare(
+            "INSERT INTO note_embeddings_vec(note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
+          )
           .run(noteId, embBuf);
       } catch {
         // note_embeddings_vec が存在しない場合は無視（graceful degradation）
@@ -495,6 +495,16 @@ export class KnowledgeRepository {
   }
 
   /**
+   * 指定プレフィックスで始まる file_path を持つノートを取得する
+   */
+  getNotesWithPrefix(prefix: string, limit: number = 100): KnowledgeNote[] {
+    const stmt = this.db.prepare(
+      "SELECT * FROM knowledge_notes WHERE file_path LIKE ? ORDER BY created_at DESC LIMIT ?",
+    );
+    return stmt.all(`${prefix}%`, limit) as KnowledgeNote[];
+  }
+
+  /**
    * 全ノートを取得する
    */
   getAllNotes(): KnowledgeNote[] {
@@ -507,9 +517,7 @@ export class KnowledgeRepository {
    * frontmatter_json 内の source_plugin フィールドで絞り込む
    */
   getNotesBySourcePlugin(pluginId: string): KnowledgeNote[] {
-    const stmt = this.db.prepare(
-      `SELECT * FROM knowledge_notes WHERE frontmatter_json LIKE ?`,
-    );
+    const stmt = this.db.prepare(`SELECT * FROM knowledge_notes WHERE frontmatter_json LIKE ?`);
     return stmt.all(`%"source_plugin":"${pluginId}"%`) as KnowledgeNote[];
   }
 
@@ -519,9 +527,7 @@ export class KnowledgeRepository {
   deleteNotesByIds(ids: number[]): number {
     if (ids.length === 0) return 0;
     const placeholders = ids.map(() => "?").join(",");
-    const stmt = this.db.prepare(
-      `DELETE FROM knowledge_notes WHERE id IN (${placeholders})`,
-    );
+    const stmt = this.db.prepare(`DELETE FROM knowledge_notes WHERE id IN (${placeholders})`);
     const info = stmt.run(...ids);
     return info.changes;
   }

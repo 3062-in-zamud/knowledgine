@@ -1,5 +1,5 @@
 import { readdir, stat, realpath } from "fs/promises";
-import { join, relative, basename, resolve, dirname } from "path";
+import { join, relative, basename } from "path";
 import { existsSync } from "fs";
 import { FileProcessor } from "@knowledgine/core";
 import type {
@@ -13,10 +13,7 @@ import type {
 } from "../../types.js";
 import { sanitizeContent } from "../../normalizer.js";
 import { parseWikiLinks, resolveWikiLinkPath } from "./wikilink-parser.js";
-import {
-  parseObsidianFrontmatter,
-  extractInlineTags,
-} from "./frontmatter-parser.js";
+import { parseObsidianFrontmatter, extractInlineTags } from "./frontmatter-parser.js";
 
 export class ObsidianPlugin implements IngestPlugin {
   readonly manifest: PluginManifest = {
@@ -91,7 +88,7 @@ export class ObsidianPlugin implements IngestPlugin {
   private async processFile(
     filePath: string,
     vaultPath: string,
-    vaultName: string,
+    _vaultName: string,
   ): Promise<NormalizedEvent | null> {
     try {
       const processed = await this.fileProcessor.processFile(filePath);
@@ -112,15 +109,8 @@ export class ObsidianPlugin implements IngestPlugin {
       // Wikilink解決
       const relatedPaths: string[] = [];
       for (const link of wikilinks) {
-        if (
-          !link.isEmbed ||
-          !link.target.match(/\.(png|jpg|jpeg|gif|svg|webp|pdf)$/i)
-        ) {
-          const resolved = resolveWikiLinkPath(
-            link.target,
-            vaultPath,
-            filePath,
-          );
+        if (!link.isEmbed || !link.target.match(/\.(png|jpg|jpeg|gif|svg|webp|pdf)$/i)) {
+          const resolved = resolveWikiLinkPath(link.target, vaultPath, filePath);
           if (resolved) {
             relatedPaths.push(relative(vaultPath, resolved));
           }
@@ -160,18 +150,9 @@ export class ObsidianPlugin implements IngestPlugin {
     return results;
   }
 
-  private async walkDir(
-    dir: string,
-    vaultRoot: string,
-    results: string[],
-  ): Promise<void> {
+  private async walkDir(dir: string, vaultRoot: string, results: string[]): Promise<void> {
     const entries = await readdir(dir, { withFileTypes: true });
-    const SKIP_DIRS = new Set([
-      ".obsidian",
-      "node_modules",
-      ".git",
-      ".trash",
-    ]);
+    const SKIP_DIRS = new Set([".obsidian", "node_modules", ".git", ".trash"]);
 
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);

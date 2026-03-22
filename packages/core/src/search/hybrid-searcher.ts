@@ -36,10 +36,10 @@ export class HybridSearcher {
       }
     }
 
-    // ベクトルスコアマップ (1 - distance)
+    // ベクトルスコアマップ (distance → 0-1 score)
     const vecMap = new Map<number, number>();
     for (const { note_id, distance } of vecResults) {
-      vecMap.set(note_id, 1 - distance);
+      vecMap.set(note_id, 1 / (1 + distance));
     }
 
     // 全ノートIDを統合

@@ -121,4 +121,75 @@ describe("setup command", () => {
     expect(output).toContain("Cursor");
     expect(output).toContain('"knowledgine"');
   });
+
+  it("KNOW-295: dry-run output should only show knowledgine entry, not full merged config", async () => {
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Write a cursor config with another MCP server containing a secret to a temp path.
+    // We use the cursor target because the config path (~/.cursor/mcp.json) is writable
+    // and predictable. We write a temp file and arrange cleanup.
+    const { homedir } = await import("os");
+    const { join: pathJoin } = await import("path");
+    const { mkdirSync: mkd, writeFileSync: wfs, existsSync: exs, rmSync: rms } = await import("fs");
+
+    const cursorConfigPath = pathJoin(homedir(), ".cursor", "mcp.json");
+    const cursorConfigDir = pathJoin(homedir(), ".cursor");
+    const backupPath = cursorConfigPath + ".know295test.bak";
+
+    const existingConfigWithSecret = {
+      mcpServers: {
+        "some-other-tool": {
+          command: "npx",
+          args: ["-y", "some-other-tool"],
+          env: { API_KEY: "super-secret-api-key-12345" },
+        },
+      },
+    };
+
+    // Backup existing cursor config if present
+    const hadExisting = exs(cursorConfigPath);
+    if (hadExisting) {
+      const { copyFileSync } = await import("fs");
+      copyFileSync(cursorConfigPath, backupPath);
+    }
+
+    // Ensure .cursor dir and write test config
+    mkd(cursorConfigDir, { recursive: true });
+    wfs(cursorConfigPath, JSON.stringify(existingConfigWithSecret), "utf-8");
+
+    try {
+      await setupCommand({ target: "cursor", path: testDir });
+
+      const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
+      // The knowledgine entry should be present in output
+      expect(output).toContain('"knowledgine"');
+      // The secret value must NOT appear in the dry-run output
+      expect(output).not.toContain("super-secret-api-key-12345");
+      // Output should indicate that other servers are preserved
+      expect(output).toContain("other MCP server(s) will be preserved");
+    } finally {
+      // Restore original state
+      if (hadExisting) {
+        const { copyFileSync } = await import("fs");
+        copyFileSync(backupPath, cursorConfigPath);
+        rms(backupPath, { force: true });
+      } else {
+        rms(cursorConfigPath, { force: true });
+      }
+    }
+  });
+
+  it("KNOW-296: claude-code target uses correct config path", async () => {
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { homedir } = await import("os");
+    const { join } = await import("path");
+
+    await setupCommand({ target: "claude-code", path: testDir });
+
+    const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
+    const expectedPath = join(homedir(), ".claude", "mcp.json");
+    expect(output).toContain(expectedPath);
+    expect(output).toContain("Claude Code");
+    expect(output).toContain('"knowledgine"');
+  });
 });

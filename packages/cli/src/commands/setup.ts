@@ -22,11 +22,21 @@ interface McpConfig {
 function getClaudeDesktopConfigPath(): string {
   switch (process.platform) {
     case "darwin":
-      return join(homedir(), "Library", "Application Support", "Claude", "claude_desktop_config.json");
+      return join(
+        homedir(),
+        "Library",
+        "Application Support",
+        "Claude",
+        "claude_desktop_config.json",
+      );
     case "linux":
       return join(homedir(), ".config", "claude", "claude_desktop_config.json");
     case "win32":
-      return join(process.env["APPDATA"] ?? join(homedir(), "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
+      return join(
+        process.env["APPDATA"] ?? join(homedir(), "AppData", "Roaming"),
+        "Claude",
+        "claude_desktop_config.json",
+      );
     default:
       return join(homedir(), ".config", "claude", "claude_desktop_config.json");
   }
@@ -36,14 +46,20 @@ function getCursorConfigPath(): string {
   return join(homedir(), ".cursor", "mcp.json");
 }
 
+function getClaudeCodeConfigPath(): string {
+  return join(homedir(), ".claude", "mcp.json");
+}
+
 function getConfigPath(target: string): string {
   switch (target) {
     case "claude-desktop":
       return getClaudeDesktopConfigPath();
     case "cursor":
       return getCursorConfigPath();
+    case "claude-code":
+      return getClaudeCodeConfigPath();
     default:
-      throw new Error(`Unknown target: ${target}. Supported: claude-desktop, cursor`);
+      throw new Error(`Unknown target: ${target}. Supported: claude-desktop, cursor, claude-code`);
   }
 }
 
@@ -53,6 +69,8 @@ function getTargetLabel(target: string): string {
       return "Claude Desktop";
     case "cursor":
       return "Cursor";
+    case "claude-code":
+      return "Claude Code";
     default:
       return target;
   }
@@ -75,7 +93,7 @@ function readExistingConfig(configPath: string): McpConfig {
   } catch {
     throw new Error(
       `Failed to parse existing config: ${configPath}\n` +
-      `The file contains invalid JSON. Fix it manually or remove it before running setup.`
+        `The file contains invalid JSON. Fix it manually or remove it before running setup.`,
     );
   }
 }
@@ -109,6 +127,7 @@ async function promptTarget(io: SetupIO): Promise<string> {
   const targets = [
     { value: "claude-desktop", label: "Claude Desktop" },
     { value: "cursor", label: "Cursor" },
+    { value: "claude-code", label: "Claude Code" },
   ];
 
   return new Promise<string>((resolvePrompt, reject) => {
@@ -121,7 +140,7 @@ async function promptTarget(io: SetupIO): Promise<string> {
     for (let i = 0; i < targets.length; i++) {
       io.output.write(`  ${i + 1}) ${targets[i].label}\n`);
     }
-    rl.question("Enter number (1-2): ", (answer) => {
+    rl.question(`Enter number (1-${targets.length}): `, (answer) => {
       rl.close();
       const idx = parseInt(answer, 10) - 1;
       if (idx >= 0 && idx < targets.length) {
@@ -133,10 +152,7 @@ async function promptTarget(io: SetupIO): Promise<string> {
   });
 }
 
-export async function setupCommand(
-  options: SetupOptions,
-  io?: SetupIO,
-): Promise<void> {
+export async function setupCommand(options: SetupOptions, io?: SetupIO): Promise<void> {
   const rootPath = resolve(options.path ?? process.cwd());
   const setupIO = io ?? getDefaultIO();
 
@@ -174,13 +190,18 @@ export async function setupCommand(
     return;
   }
 
-  const mergedConfig = mergeConfig(existingConfig, rootPath);
-  const configJson = JSON.stringify(mergedConfig, null, 2);
+  const knowledgineConfig = buildMcpConfig(rootPath);
+  const otherServerCount = Object.keys(existingConfig.mcpServers ?? {}).filter(
+    (k) => k !== "knowledgine",
+  ).length;
 
   console.error(`\nMCP configuration for ${targetLabel}:`);
   console.error(`  Config: ${configPath}`);
   console.error("");
-  console.error(configJson);
+  console.error(JSON.stringify({ mcpServers: { knowledgine: knowledgineConfig } }, null, 2));
+  if (otherServerCount > 0) {
+    console.error(`\n  (${otherServerCount} other MCP server(s) will be preserved)`);
+  }
   console.error("");
 
   if (!shouldWrite) {
@@ -190,6 +211,9 @@ export async function setupCommand(
     console.error("Run 'knowledgine status' to verify your setup.");
     return;
   }
+
+  const mergedConfig = mergeConfig(existingConfig, rootPath);
+  const configJson = JSON.stringify(mergedConfig, null, 2);
 
   // Write config
   const configDir = resolve(configPath, "..");

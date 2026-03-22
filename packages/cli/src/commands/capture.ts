@@ -29,7 +29,25 @@ async function readStdin(): Promise<string> {
   });
 }
 
+function initDb(rootPath: string) {
+  const config = loadConfig(rootPath);
+  const db = createDatabase(config.dbPath);
+  new Migrator(db, ALL_MIGRATIONS).migrate();
+  const repository = new KnowledgeRepository(db);
+  return { db, repository };
+}
+
+/**
+ * @deprecated Use captureAddCommand instead
+ */
 export async function captureCommand(
+  text: string | undefined,
+  options: CaptureCommandOptions,
+): Promise<void> {
+  return captureAddCommand(text, options);
+}
+
+export async function captureAddCommand(
   text: string | undefined,
   options: CaptureCommandOptions,
 ): Promise<void> {
@@ -95,7 +113,12 @@ export async function captureCommand(
 
   // 3. タイトルとタグ
   const title = options.title || content.slice(0, 50).replace(/\n/g, " ").trim();
-  const tags = options.tags ? options.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
+  const tags = options.tags
+    ? options.tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : [];
 
   // 4. NormalizedEvent構築
   const event: NormalizedEvent = {
@@ -112,11 +135,8 @@ export async function captureCommand(
   };
 
   // 5. DB書き込み
-  const config = loadConfig(rootPath);
-  const db = createDatabase(config.dbPath);
+  const { db, repository } = initDb(rootPath);
   try {
-    new Migrator(db, ALL_MIGRATIONS).migrate();
-    const repository = new KnowledgeRepository(db);
     const writer = new EventWriter(db, repository);
     const result = writer.writeEvent(event);
 
@@ -142,6 +162,111 @@ export async function captureCommand(
         console.error(`  Tags:  ${tags.join(", ")}`);
       }
       console.error(`  Source: ${sourceType} (manual)`);
+    }
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  } finally {
+    db.close();
+  }
+}
+
+export interface CaptureListOptions {
+  path?: string;
+  format?: string;
+}
+
+export async function captureListCommand(options: CaptureListOptions): Promise<void> {
+  const rootPath = options.path ? resolve(options.path) : resolve(process.cwd());
+  const knowledgineDir = resolve(rootPath, ".knowledgine");
+  if (!existsSync(knowledgineDir)) {
+    console.error("Error: Knowledge base not initialized.\n  Run: knowledgine init --path <dir>");
+    process.exitCode = 1;
+    return;
+  }
+
+  const { db, repository } = initDb(rootPath);
+  try {
+    const notes = repository.getNotesWithPrefix("capture://");
+    const format = options.format ?? "plain";
+
+    if (format === "json") {
+      console.log(
+        JSON.stringify({
+          ok: true,
+          command: "capture list",
+          result: notes.map((n) => ({
+            id: n.id,
+            title: n.title,
+            filePath: n.file_path,
+            createdAt: n.created_at,
+          })),
+        }),
+      );
+    } else {
+      if (notes.length === 0) {
+        console.error("No captured notes found.");
+        return;
+      }
+      console.error(`Found ${notes.length} captured note(s):\n`);
+      for (const note of notes) {
+        console.error(`  [#${note.id}] ${note.title}`);
+        console.error(`         source: ${note.file_path}`);
+        console.error(`         created: ${note.created_at}`);
+        console.error();
+      }
+    }
+  } finally {
+    db.close();
+  }
+}
+
+export interface CaptureDeleteOptions {
+  path?: string;
+}
+
+export async function captureDeleteCommand(
+  idStr: string,
+  options: CaptureDeleteOptions,
+): Promise<void> {
+  const rootPath = options.path ? resolve(options.path) : resolve(process.cwd());
+  const knowledgineDir = resolve(rootPath, ".knowledgine");
+  if (!existsSync(knowledgineDir)) {
+    console.error("Error: Knowledge base not initialized.\n  Run: knowledgine init --path <dir>");
+    process.exitCode = 1;
+    return;
+  }
+
+  const id = parseInt(idStr, 10);
+  if (isNaN(id) || id <= 0) {
+    console.error(`Error: Invalid ID: ${idStr}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const { db, repository } = initDb(rootPath);
+  try {
+    const note = repository.getNoteById(id);
+    if (!note) {
+      console.error(`Error: Note #${id} not found.`);
+      process.exitCode = 1;
+      return;
+    }
+
+    if (!note.file_path.startsWith("capture://")) {
+      console.error(
+        `Error: Note #${id} is not a captured note (file_path: ${note.file_path}). Only capture:// notes can be deleted with this command.`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    const deleted = repository.deleteNoteById(id);
+    if (deleted) {
+      console.error(`Deleted captured note #${id}: ${note.title}`);
+    } else {
+      console.error(`Error: Failed to delete note #${id}.`);
+      process.exitCode = 1;
     }
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);

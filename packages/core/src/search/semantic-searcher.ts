@@ -26,8 +26,9 @@ export class SemanticSearcher {
       const note = this.repository.getNoteById(note_id);
       if (!note) continue;
 
-      // コサイン距離 (0=同じ, 2=真逆) → スコア (1=同じ, -1=真逆)
-      const score = 1 - distance;
+      // sqlite-vec distance (0=identical, higher=less similar)
+      // Normalize to 0-1 score where 1=most similar
+      const score = Math.max(0, 1 / (1 + distance));
 
       results.push({
         note,

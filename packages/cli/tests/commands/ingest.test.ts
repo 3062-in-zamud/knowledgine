@@ -27,9 +27,7 @@ describe("ingest command", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await ingestCommand({ path: testDir });
     expect(process.exitCode).toBe(1);
-    expect(errorSpy).toHaveBeenCalledWith(
-      "Error: Specify --source <pluginId> or --all",
-    );
+    expect(errorSpy).toHaveBeenCalledWith("Error: Specify --source <pluginId> or --all");
     errorSpy.mockRestore();
     process.exitCode = undefined;
   });
@@ -38,9 +36,7 @@ describe("ingest command", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await ingestCommand({ source: "git-history", all: true, path: testDir });
     expect(process.exitCode).toBe(1);
-    expect(errorSpy).toHaveBeenCalledWith(
-      "Error: --source and --all cannot be used together",
-    );
+    expect(errorSpy).toHaveBeenCalledWith("Error: --source and --all cannot be used together");
     errorSpy.mockRestore();
     process.exitCode = undefined;
   });
@@ -63,9 +59,7 @@ describe("ingest command", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await ingestCommand({ source: "markdown", path: testDir });
     expect(process.exitCode).toBeUndefined();
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Ingest complete"),
-    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("knowledgine ingest"));
     errorSpy.mockRestore();
   });
 
@@ -103,9 +97,7 @@ describe("ingest command", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await ingestCommand({ source: "git-history", path: testDir });
     expect(process.exitCode).toBeUndefined();
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Ingest complete"),
-    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("knowledgine ingest"));
     errorSpy.mockRestore();
   });
 });

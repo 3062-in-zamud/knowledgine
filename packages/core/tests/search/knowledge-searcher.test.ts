@@ -45,7 +45,7 @@ describe("KnowledgeSearcher", () => {
       // No provider → falls back to keyword with results
       expect(results.length).toBeGreaterThan(0);
       expect(results[0].matchReason).toContain(
-        "Note: Fell back to keyword search (semantic search not configured)",
+        "Warning: semantic search is not available. Showing keyword results instead. Run 'knowledgine upgrade --semantic' to enable.",
       );
       // Should still include keyword match reason
       expect(results[0].matchReason).toContain('キーワード一致: "TypeScript"');
@@ -74,7 +74,7 @@ describe("KnowledgeSearcher", () => {
       const results = await searcher.search({ query: "TypeScript", mode: "hybrid" });
       expect(results.length).toBeGreaterThan(0);
       expect(results[0].matchReason).toContain(
-        "Note: Fell back to keyword search (semantic search not configured)",
+        "Warning: hybrid search is not available. Showing keyword results instead. Run 'knowledgine upgrade --semantic' to enable.",
       );
     });
 
@@ -82,7 +82,7 @@ describe("KnowledgeSearcher", () => {
       const results = await searcher.search({ query: "TypeScript", mode: "keyword" });
       expect(results.length).toBeGreaterThan(0);
       expect(results[0].matchReason).not.toContain(
-        "Note: Fell back to keyword search (semantic search not configured)",
+        "Warning: keyword search is not available. Showing keyword results instead. Run 'knowledgine upgrade --semantic' to enable.",
       );
     });
   });

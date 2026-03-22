@@ -35,17 +35,33 @@ export interface ModelFile {
   dest: string;
 }
 
+const HF_BASE = "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main";
+
+/**
+ * Select the best quantized ONNX model for the current platform.
+ * HuggingFace removed the generic `model_quantized.onnx` and now ships
+ * architecture-specific variants.
+ */
+function selectOnnxModel(): string {
+  const arch = process.arch; // "arm64" | "x64" | ...
+  if (arch === "arm64") {
+    return `${HF_BASE}/onnx/model_qint8_arm64.onnx`;
+  }
+  // x64: prefer AVX2 quantized (widely supported on modern x86_64)
+  return `${HF_BASE}/onnx/model_quint8_avx2.onnx`;
+}
+
 export const MODEL_FILES: ModelFile[] = [
   {
-    url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/tokenizer.json",
+    url: `${HF_BASE}/tokenizer.json`,
     dest: "tokenizer.json",
   },
   {
-    url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/config.json",
+    url: `${HF_BASE}/config.json`,
     dest: "config.json",
   },
   {
-    url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model_quantized.onnx",
+    url: selectOnnxModel(),
     dest: "model.onnx",
   },
 ];
@@ -90,25 +106,25 @@ function downloadFile(
 
     const getFunc = url.startsWith("http://") ? httpGet : httpsGet;
 
-    const timer = setTimeout(() => {
-      aborted = true;
-      req.destroy();
-      cleanup();
-      reject(new Error(`Download timeout (${timeoutMs}ms) for ${fileName}`));
-    }, timeoutMs);
-
     const req = getFunc(url, (response) => {
       if (aborted) return;
 
       // Handle redirects (301, 302, 307, 308)
-      if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307 || response.statusCode === 308) {
+      if (
+        response.statusCode === 301 ||
+        response.statusCode === 302 ||
+        response.statusCode === 307 ||
+        response.statusCode === 308
+      ) {
         clearTimeout(timer);
         process.removeListener("SIGINT", onSigint);
-        const location = response.headers.location;
-        if (!location) {
+        const rawLocation = response.headers.location;
+        if (!rawLocation) {
           reject(new Error(`Redirect without location header for ${url}`));
           return;
         }
+        // Handle relative redirect URLs by resolving against the original URL
+        const location = rawLocation.startsWith("/") ? new URL(rawLocation, url).href : rawLocation;
         downloadFile(location, destPath, options, fileName, redirectCount + 1)
           .then(resolve)
           .catch(reject);
@@ -159,6 +175,13 @@ function downloadFile(
           reject(err);
         });
     });
+
+    const timer = setTimeout(() => {
+      aborted = true;
+      req.destroy();
+      cleanup();
+      reject(new Error(`Download timeout (${timeoutMs}ms) for ${fileName}`));
+    }, timeoutMs);
 
     req.on("error", (err) => {
       clearTimeout(timer);

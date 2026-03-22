@@ -49,10 +49,10 @@ export class KnowledgeSearcher {
     }
 
     // Fall back to keyword search when semantic/hybrid requested but provider unavailable
-    const fellBack = mode !== "keyword" && (
-      (mode === "semantic" && !this.semanticSearcher) ||
-      (mode === "hybrid" && !this.hybridSearcher)
-    );
+    const fellBack =
+      mode !== "keyword" &&
+      ((mode === "semantic" && !this.semanticSearcher) ||
+        (mode === "hybrid" && !this.hybridSearcher));
 
     // keyword mode (デフォルト) — FTS5
     const rows = this.repository.searchNotesWithRank(query, limit);
@@ -72,7 +72,9 @@ export class KnowledgeSearcher {
       const score = 1 - normalized;
       const reasons: string[] = [`キーワード一致: "${query}"`];
       if (fellBack) {
-        reasons.push("Note: Fell back to keyword search (semantic search not configured)");
+        reasons.push(
+          `Warning: ${mode} search is not available. Showing keyword results instead. Run 'knowledgine upgrade --semantic' to enable.`,
+        );
       }
       return {
         note,

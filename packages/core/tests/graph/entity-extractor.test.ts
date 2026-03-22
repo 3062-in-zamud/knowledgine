@@ -109,4 +109,44 @@ import { useState } from 'react';
       expect(result.some((e) => e.name === "useeffect")).toBe(false);
     });
   });
+
+  describe("code block exclusion", () => {
+    it("should ignore import statements inside code blocks", () => {
+      const content = "Some text\n```typescript\nimport React from 'react';\n```\nMore text";
+      const result = extractor.extract(content);
+      expect(result.some((e) => e.name === "react")).toBe(false);
+    });
+  });
+
+  describe("MIME type filtering in extractOrgRepos", () => {
+    it("should not extract image/png as org/repo", () => {
+      const content = "Content-Type: image/png and text/html are MIME types";
+      const result = extractor.extract(content);
+      expect(result.some((e) => e.name === "image/png")).toBe(false);
+      expect(result.some((e) => e.name === "text/html")).toBe(false);
+    });
+
+    it("should not extract node_modules/package as org/repo", () => {
+      const content = "See node_modules/lodash for the implementation";
+      const result = extractor.extract(content);
+      expect(result.some((e) => e.name === "node_modules/lodash")).toBe(false);
+    });
+  });
+
+  describe("Markdown image exclusion", () => {
+    it("should not extract image syntax as link entity", () => {
+      const content = "![badge](https://example.com/badge.svg)";
+      const result = extractor.extract(content);
+      expect(result.some((e) => e.name === "badge")).toBe(false);
+    });
+  });
+
+  describe("extractOrgRepos sourceType", () => {
+    it("should have sourceType 'code' for org/repo entities", () => {
+      const content = "Check out facebook/react for more details";
+      const entities = extractor.extract(content);
+      const orgRepo = entities.find((e) => e.name === "facebook/react");
+      expect(orgRepo?.sourceType).toBe("code");
+    });
+  });
 });

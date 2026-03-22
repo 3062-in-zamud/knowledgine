@@ -1,13 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, cp, rm, utimes, stat } from "fs/promises";
+import { mkdtemp, cp, rm, utimes } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { ObsidianPlugin } from "../../../src/plugins/obsidian/index.js";
 
-const FIXTURE_PATH = join(
-  __dirname,
-  "../../fixtures/obsidian-vault",
-);
+const FIXTURE_PATH = join(__dirname, "../../fixtures/obsidian-vault");
 
 describe("ObsidianPlugin", () => {
   let plugin: ObsidianPlugin;

@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
-import { createDatabase, Migrator, KnowledgeRepository, ALL_MIGRATIONS } from "@knowledgine/core";
+import { createDatabase, Migrator, ALL_MIGRATIONS } from "@knowledgine/core";
 import { captureCommand } from "../../src/commands/capture.js";
 
 describe("capture command", () => {

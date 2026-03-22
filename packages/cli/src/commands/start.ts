@@ -14,6 +14,7 @@ import {
   ALL_MIGRATIONS,
   OnnxEmbeddingProvider,
   ModelManager,
+  DEFAULT_MODEL_NAME,
 } from "@knowledgine/core";
 import { createKnowledgineMcpServer, StdioServerTransport } from "@knowledgine/mcp-server";
 import { indexFile } from "../lib/indexer.js";
@@ -65,7 +66,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
   if (config.embedding.enabled) {
     const modelManager = new ModelManager();
     if (modelManager.isModelAvailable()) {
-      embeddingProvider = new OnnxEmbeddingProvider(undefined, modelManager);
+      embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
     } else {
       // Warn if notes exist but no embeddings
       const notesWithout = repository.getNotesWithoutEmbeddings();
@@ -98,9 +99,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
   let ingestRegistry: import("@knowledgine/ingest").PluginRegistry | undefined;
 
   if (options.ingest) {
-    const { createDefaultRegistry, initializePlugins } = await import(
-      "../lib/plugin-loader.js"
-    );
+    const { createDefaultRegistry, initializePlugins } = await import("../lib/plugin-loader.js");
     const { IngestEngine } = await import("@knowledgine/ingest");
     const { IngestWatcher } = await import("../lib/ingest-watcher.js");
 
@@ -110,9 +109,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     // Warn about failed plugins but continue
     for (const [pluginId, result] of initResults) {
       if (!result.ok) {
-        console.error(
-          `Warning: Plugin "${pluginId}" failed to initialize: ${result.error}`,
-        );
+        console.error(`Warning: Plugin "${pluginId}" failed to initialize: ${result.error}`);
       }
     }
 
@@ -124,9 +121,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
       onComplete: (summaries) => {
         const total = summaries.reduce((acc, s) => acc + s.processed, 0);
         const errors = summaries.reduce((acc, s) => acc + s.errors, 0);
-        console.error(
-          `Ingest complete: ${total} events processed, ${errors} errors`,
-        );
+        console.error(`Ingest complete: ${total} events processed, ${errors} errors`);
       },
       onError: (pluginId, error) => {
         console.error(`Ingest error (${pluginId}): ${error.message}`);
