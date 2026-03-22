@@ -8,4 +8,5 @@ coverage/
 .DS_Store
 .claude/
 **/CLAUDE.md
+!/CLAUDE.md
 *.onnx
