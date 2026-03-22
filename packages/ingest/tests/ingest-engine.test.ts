@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import Database from "better-sqlite3";
-import {
-  Migrator,
-  KnowledgeRepository,
-  ALL_MIGRATIONS,
-} from "@knowledgine/core";
+import { Migrator, KnowledgeRepository, ALL_MIGRATIONS } from "@knowledgine/core";
 import { PluginRegistry } from "../src/plugin-registry.js";
 import { IngestEngine } from "../src/ingest-engine.js";
 import { CursorStore } from "../src/cursor-store.js";
@@ -59,7 +55,9 @@ describe("IngestEngine", () => {
 
   describe("ingest", () => {
     it("プラグインが見つからない場合エラーをスロー", async () => {
-      await expect(engine.ingest("nonexistent", "/path")).rejects.toThrow("Plugin not found: nonexistent");
+      await expect(engine.ingest("nonexistent", "/path")).rejects.toThrow(
+        "Plugin not found: nonexistent",
+      );
     });
 
     it("full=trueでingestAllを使用する", async () => {

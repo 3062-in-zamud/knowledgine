@@ -94,9 +94,7 @@ export class IngestEngine {
    */
   private cleanupStaleNotes(pluginId: string, currentPaths: Set<string>): number {
     const existingNotes = this.repository.getNotesBySourcePlugin(pluginId);
-    const staleIds = existingNotes
-      .filter((n) => !currentPaths.has(n.file_path))
-      .map((n) => n.id);
+    const staleIds = existingNotes.filter((n) => !currentPaths.has(n.file_path)).map((n) => n.id);
     if (staleIds.length > 0) {
       return this.repository.deleteNotesByIds(staleIds);
     }

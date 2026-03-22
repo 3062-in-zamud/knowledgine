@@ -6,14 +6,18 @@ tags:
 author: demo-user
 project: infrastructure
 ---
+
 # CI/CD Pipeline Setup and Debugging
 
 ## Problem
+
 The CI pipeline was taking 25 minutes per push, blocking the
 development workflow. Flaky tests caused unnecessary re-runs.
 
 ## Investigation
+
 Analyzed GitHub Actions run logs:
+
 - Dependency install: 4 minutes (no caching)
 - Build: 3 minutes
 - Tests: 15 minutes (sequential, with 3 flaky tests)
@@ -59,6 +63,7 @@ jobs:
 ```
 
 ### Flaky Test Fix
+
 ```typescript
 // Before: timing-dependent test
 it("should debounce input", async () => {
@@ -78,11 +83,13 @@ it("should debounce input", () => {
 ```
 
 ## Results
+
 - Pipeline time: 25 min → 8 min (68% reduction)
 - Flaky test rate: 15% → 0%
 - Developer satisfaction significantly improved
 
 ## Learnings
+
 - Cache dependencies aggressively in CI
 - Run lint and tests in parallel jobs
 - Flaky tests erode trust — fix them immediately

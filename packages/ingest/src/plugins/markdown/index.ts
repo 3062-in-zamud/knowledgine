@@ -20,9 +20,7 @@ export class MarkdownPlugin implements IngestPlugin {
     priority: 0,
   };
 
-  readonly triggers: TriggerConfig[] = [
-    { type: "file_watcher", paths: ["**/*.md"] },
-  ];
+  readonly triggers: TriggerConfig[] = [{ type: "file_watcher", paths: ["**/*.md"] }];
 
   private fileProcessor = new FileProcessor();
 
@@ -40,7 +38,7 @@ export class MarkdownPlugin implements IngestPlugin {
 
   async *ingestIncremental(
     sourcePath: SourceURI,
-    checkpoint: string
+    checkpoint: string,
   ): AsyncGenerator<NormalizedEvent> {
     const sinceDate = new Date(checkpoint);
     const mdFiles = await this.findMarkdownFiles(sourcePath);
@@ -61,16 +59,10 @@ export class MarkdownPlugin implements IngestPlugin {
     // no-op
   }
 
-  private async processFile(
-    filePath: string,
-    basePath: string
-  ): Promise<NormalizedEvent | null> {
+  private async processFile(filePath: string, basePath: string): Promise<NormalizedEvent | null> {
     try {
       const processed = await this.fileProcessor.processFile(filePath);
-      const title = this.fileProcessor.extractTitle(
-        processed.content,
-        filePath
-      );
+      const title = this.fileProcessor.extractTitle(processed.content, filePath);
       const relativePath = relative(basePath, filePath);
       const fileStat = await stat(filePath);
 

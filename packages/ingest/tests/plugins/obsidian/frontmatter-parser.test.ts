@@ -95,12 +95,7 @@ describe("extractInlineTags", () => {
   });
 
   it("excludes tags in code blocks", () => {
-    const content = [
-      "Real #visible-tag here.",
-      "```",
-      "#hidden-tag",
-      "```",
-    ].join("\n");
+    const content = ["Real #visible-tag here.", "```", "#hidden-tag", "```"].join("\n");
     const tags = extractInlineTags(content);
     expect(tags).toContain("visible-tag");
     expect(tags).not.toContain("hidden-tag");

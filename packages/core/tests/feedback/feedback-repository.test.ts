@@ -98,7 +98,12 @@ describe("FeedbackRepository", () => {
   describe("list", () => {
     it("should return all records when no filter", () => {
       repo.create({ entityName: "a", errorType: "false_positive" });
-      repo.create({ entityName: "b", errorType: "wrong_type", entityType: "tool", correctType: "technology" });
+      repo.create({
+        entityName: "b",
+        errorType: "wrong_type",
+        entityType: "tool",
+        correctType: "technology",
+      });
       repo.create({ entityName: "c", errorType: "missed_entity" });
 
       const records = repo.list();
@@ -107,7 +112,12 @@ describe("FeedbackRepository", () => {
 
     it("should filter by status", () => {
       repo.create({ entityName: "a", errorType: "false_positive" });
-      const b = repo.create({ entityName: "b", errorType: "wrong_type", entityType: "tool", correctType: "technology" });
+      const b = repo.create({
+        entityName: "b",
+        errorType: "wrong_type",
+        entityType: "tool",
+        correctType: "technology",
+      });
       repo.updateStatus(b.id, "applied");
 
       const pending = repo.list({ status: "pending" });
@@ -178,7 +188,12 @@ describe("FeedbackRepository", () => {
   describe("getStats", () => {
     it("should return correct stats", () => {
       repo.create({ entityName: "a", errorType: "false_positive" });
-      repo.create({ entityName: "b", errorType: "wrong_type", entityType: "tool", correctType: "technology" });
+      repo.create({
+        entityName: "b",
+        errorType: "wrong_type",
+        entityType: "tool",
+        correctType: "technology",
+      });
       const c = repo.create({ entityName: "c", errorType: "missed_entity" });
       repo.updateStatus(c.id, "applied");
 

@@ -29,11 +29,21 @@ function formatBytes(bytes: number): string {
 function getClaudeDesktopConfigPath(): string {
   switch (process.platform) {
     case "darwin":
-      return join(homedir(), "Library", "Application Support", "Claude", "claude_desktop_config.json");
+      return join(
+        homedir(),
+        "Library",
+        "Application Support",
+        "Claude",
+        "claude_desktop_config.json",
+      );
     case "linux":
       return join(homedir(), ".config", "claude", "claude_desktop_config.json");
     case "win32":
-      return join(process.env["APPDATA"] ?? join(homedir(), "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
+      return join(
+        process.env["APPDATA"] ?? join(homedir(), "AppData", "Roaming"),
+        "Claude",
+        "claude_desktop_config.json",
+      );
     default:
       return join(homedir(), ".config", "claude", "claude_desktop_config.json");
   }
@@ -88,7 +98,9 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
     db.close();
   } catch (error) {
-    console.error(`  Error reading database: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `  Error reading database: ${error instanceof Error ? error.message : String(error)}`,
+    );
     console.error("");
     return;
   }

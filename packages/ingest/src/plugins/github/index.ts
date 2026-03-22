@@ -82,7 +82,10 @@ export class GitHubPlugin implements IngestPlugin {
     }
   }
 
-  async *ingestIncremental(sourceUri: SourceURI, checkpoint: string): AsyncGenerator<NormalizedEvent> {
+  async *ingestIncremental(
+    sourceUri: SourceURI,
+    checkpoint: string,
+  ): AsyncGenerator<NormalizedEvent> {
     const { owner, repo } = parseGitHubSourceUri(sourceUri);
 
     // checkpoint を1分前にオフセット（GitHub検索APIの分単位精度対応）

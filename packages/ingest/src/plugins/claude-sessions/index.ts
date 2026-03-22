@@ -44,7 +44,7 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
 
   async *ingestIncremental(
     sourcePath: SourceURI,
-    checkpoint: string
+    checkpoint: string,
   ): AsyncGenerator<NormalizedEvent> {
     const sinceDate = new Date(checkpoint);
     const jsonlFiles = await this.findJsonlFiles(sourcePath);
@@ -74,9 +74,7 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
    * Instead of yielding one event per message, we consolidate the entire
    * session into one note for better search quality and performance.
    */
-  private async processFileToSummary(
-    filePath: string
-  ): Promise<NormalizedEvent | null> {
+  private async processFileToSummary(filePath: string): Promise<NormalizedEvent | null> {
     const sessionId = basename(filePath, ".jsonl");
     const projectName = basename(dirname(filePath));
 
@@ -111,7 +109,7 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
     // Build a summary content from user messages (most relevant for search)
     const userMessages = allMessages
       .filter((m) => m.type === "user")
-      .map((m) => m.content.slice(0, 500))  // Truncate long messages
+      .map((m) => m.content.slice(0, 500)) // Truncate long messages
       .join("\n\n---\n\n");
 
     const summaryContent = [

@@ -16,17 +16,15 @@ describe("migration006: extraction_feedback", () => {
   describe("extraction_feedback table", () => {
     it("should create extraction_feedback table", () => {
       const result = ctx.db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='extraction_feedback'",
-        )
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='extraction_feedback'")
         .get();
       expect(result).toBeDefined();
     });
 
     it("should have correct columns", () => {
-      const cols = ctx.db
-        .prepare("PRAGMA table_info(extraction_feedback)")
-        .all() as Array<{ name: string }>;
+      const cols = ctx.db.prepare("PRAGMA table_info(extraction_feedback)").all() as Array<{
+        name: string;
+      }>;
       const colNames = cols.map((c) => c.name);
       expect(colNames).toContain("id");
       expect(colNames).toContain("entity_name");

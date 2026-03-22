@@ -16,7 +16,12 @@ import {
   formatStats,
   formatEntities,
 } from "../../src/lib/formatter.js";
-import type { SearchKnowledgeResult, FindRelatedResult, StatsResult, SearchEntitiesResult } from "@knowledgine/core";
+import type {
+  SearchKnowledgeResult,
+  FindRelatedResult,
+  StatsResult,
+  SearchEntitiesResult,
+} from "@knowledgine/core";
 
 describe("tool command", () => {
   let testDir: string;
@@ -65,10 +70,7 @@ describe("tool command", () => {
     });
     db.close();
     // Create .knowledginerc so loadConfig works
-    writeFileSync(
-      join(testDir, ".knowledginerc"),
-      JSON.stringify({ rootPath: testDir }),
-    );
+    writeFileSync(join(testDir, ".knowledginerc"), JSON.stringify({ rootPath: testDir }));
   }
 
   // ── tool search ──────────────────────────────────────────────
@@ -221,7 +223,7 @@ describe("formatter", () => {
       noteId: 2,
       filePath: "react-hooks.md",
       title: "React Hooks",
-      score: 0.80,
+      score: 0.8,
       matchReason: ["keyword match"],
       createdAt: "2024-01-01T00:00:00.000Z",
     },
@@ -230,7 +232,13 @@ describe("formatter", () => {
   const sampleRelatedResult: FindRelatedResult = {
     noteId: 1,
     relatedNotes: [
-      { noteId: 2, filePath: "react-hooks.md", title: "React Hooks", score: 0.7, reasons: ["common tag"] },
+      {
+        noteId: 2,
+        filePath: "react-hooks.md",
+        title: "React Hooks",
+        score: 0.7,
+        reasons: ["common tag"],
+      },
     ],
     problemSolutionPairs: [],
     graphRelations: [],
@@ -250,7 +258,13 @@ describe("formatter", () => {
     query: "TypeScript",
     totalResults: 1,
     entities: [
-      { id: 1, name: "typescript", entityType: "technology", description: "TS language", createdAt: "2024-01-01" },
+      {
+        id: 1,
+        name: "typescript",
+        entityType: "technology",
+        description: "TS language",
+        createdAt: "2024-01-01",
+      },
     ],
   };
 
@@ -344,7 +358,11 @@ describe("formatter", () => {
     });
 
     it("should return empty string for empty entities in table mode", () => {
-      const emptyResult: SearchEntitiesResult = { ...sampleEntities, entities: [], totalResults: 0 };
+      const emptyResult: SearchEntitiesResult = {
+        ...sampleEntities,
+        entities: [],
+        totalResults: 0,
+      };
       const output = formatEntities(emptyResult, "table");
       expect(output).toBe("");
     });

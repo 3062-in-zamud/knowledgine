@@ -28,9 +28,7 @@ export class PluginRegistry {
   }
 
   listByPriority(): IngestPlugin[] {
-    return this.list().sort(
-      (a, b) => b.manifest.priority - a.manifest.priority
-    );
+    return this.list().sort((a, b) => b.manifest.priority - a.manifest.priority);
   }
 
   has(id: string): boolean {

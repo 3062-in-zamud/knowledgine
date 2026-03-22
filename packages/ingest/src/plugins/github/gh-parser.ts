@@ -137,7 +137,11 @@ export function prToNormalizedEvent(pr: ParsedPR, owner: string, repo: string): 
   };
 }
 
-export function issueToNormalizedEvent(issue: ParsedIssue, owner: string, repo: string): NormalizedEvent {
+export function issueToNormalizedEvent(
+  issue: ParsedIssue,
+  owner: string,
+  repo: string,
+): NormalizedEvent {
   const content = sanitizeContent(truncateContent(issue.body));
   return {
     sourceUri: `github://${owner}/${repo}/issues/${issue.number}`,

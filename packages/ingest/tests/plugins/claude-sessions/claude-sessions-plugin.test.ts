@@ -9,7 +9,7 @@ function makeEntry(
   uuid: string,
   content: string,
   timestamp = "2024-01-01T00:00:00.000Z",
-  extra: Record<string, unknown> = {}
+  extra: Record<string, unknown> = {},
 ): string {
   return JSON.stringify({
     type,
@@ -178,7 +178,7 @@ describe("ClaudeSessionsPlugin", () => {
       const oldFilePath = join(projDir, "old-session.jsonl");
       await writeFile(
         oldFilePath,
-        makeEntry("user", "uuid-old", "Old message", "2023-01-01T00:00:00.000Z")
+        makeEntry("user", "uuid-old", "Old message", "2023-01-01T00:00:00.000Z"),
       );
       // 過去に設定
       const oldTime = new Date("2023-06-01T00:00:00.000Z");
@@ -188,7 +188,7 @@ describe("ClaudeSessionsPlugin", () => {
       const newFilePath = join(projDir, "new-session.jsonl");
       await writeFile(
         newFilePath,
-        makeEntry("user", "uuid-new", "New message", "2024-01-01T00:00:00.000Z")
+        makeEntry("user", "uuid-new", "New message", "2024-01-01T00:00:00.000Z"),
       );
 
       // checkpoint: 2024年初め（新しいファイルのみ通る）
@@ -199,9 +199,7 @@ describe("ClaudeSessionsPlugin", () => {
         events.push(event);
       }
 
-      const sessionIds = events
-        .filter((e) => e.eventType === "session")
-        .map((e) => e.sourceUri);
+      const sessionIds = events.filter((e) => e.eventType === "session").map((e) => e.sourceUri);
 
       expect(sessionIds.some((u) => u.includes("new-session"))).toBe(true);
       expect(sessionIds.some((u) => u.includes("old-session"))).toBe(false);
@@ -212,7 +210,7 @@ describe("ClaudeSessionsPlugin", () => {
       await mkdir(projDir, { recursive: true });
       await writeFile(
         join(projDir, "session.jsonl"),
-        makeEntry("user", "uuid-1", "Message", "2024-01-01T00:00:00.000Z")
+        makeEntry("user", "uuid-1", "Message", "2024-01-01T00:00:00.000Z"),
       );
 
       // 未来日時checkpoint

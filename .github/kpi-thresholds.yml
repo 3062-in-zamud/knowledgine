@@ -10,7 +10,6 @@
 # Set `enabled: false` to temporarily silence an alert without deleting it.
 
 thresholds:
-
   # --- npm download metrics ---------------------------------------------------
 
   npm_weekly_downloads:

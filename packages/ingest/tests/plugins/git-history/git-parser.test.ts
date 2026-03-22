@@ -18,7 +18,7 @@ async function git(args: string[], cwd: string): Promise<string> {
   const { stdout } = await execFileAsync(
     "git",
     ["-c", "user.email=test@test.com", "-c", "user.name=Test", ...args],
-    { cwd }
+    { cwd },
   );
   return stdout.trim();
 }
@@ -336,7 +336,7 @@ describe("validateCheckpoint", () => {
 
   it("should throw for SHA1 with uppercase letters", () => {
     expect(() => validateCheckpoint("ABC1234567890123456789012345678901234ABCD")).toThrow(
-      "Invalid checkpoint format"
+      "Invalid checkpoint format",
     );
   });
 

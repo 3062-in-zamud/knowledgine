@@ -8,7 +8,7 @@ const SHA1_REGEX = /^[0-9a-f]{40}$/;
 
 export async function execGit(
   args: string[],
-  options: { cwd: string; maxBuffer?: number; timeout?: number }
+  options: { cwd: string; maxBuffer?: number; timeout?: number },
 ): Promise<string> {
   const { stdout } = await execFileAsync("git", args, {
     cwd: options.cwd,
@@ -59,7 +59,10 @@ export function parseGitLog(raw: string): ParsedCommit[] {
     if (bodySepIdx === -1) continue;
 
     const headerPart = afterRecSep.slice(0, bodySepIdx).trimEnd();
-    const bodyPart = afterRecSep.slice(bodySepIdx + "---BODY_SEP---".length).trimStart().trimEnd();
+    const bodyPart = afterRecSep
+      .slice(bodySepIdx + "---BODY_SEP---".length)
+      .trimStart()
+      .trimEnd();
 
     const lines = headerPart.split("\n");
     if (lines.length < 6) continue;
@@ -92,7 +95,7 @@ export function parseGitLog(raw: string): ParsedCommit[] {
 
 export async function getDiffsParallel(
   hashes: string[],
-  options: { cwd: string; concurrency?: number; maxDiffSize?: number }
+  options: { cwd: string; concurrency?: number; maxDiffSize?: number },
 ): Promise<Map<string, string>> {
   if (hashes.length === 0) return new Map();
 
@@ -107,14 +110,14 @@ export async function getDiffsParallel(
         try {
           const diff = await execGit(
             ["-c", "core.quotepath=false", "show", "--format=", "--diff-filter=ACDMRT", hash],
-            { cwd: options.cwd }
+            { cwd: options.cwd },
           );
           result.set(hash, truncateDiff(diff, maxDiffSize));
         } catch (err) {
           console.error(`Failed to get diff for commit ${hash}:`, err);
           result.set(hash, "");
         }
-      })
+      }),
     );
   }
 
@@ -143,7 +146,7 @@ export function commitToNormalizedEvent(
   commit: ParsedCommit,
   diff: string,
   repoPath: string,
-  currentBranch?: string
+  currentBranch?: string,
 ): NormalizedEvent {
   const metadata: NormalizedEvent["metadata"] = {
     sourcePlugin: "git-history",

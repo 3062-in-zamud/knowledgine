@@ -10,42 +10,52 @@ import { downloadModel, MODEL_FILES } from "../../src/embedding/model-downloader
 // We mock the actual HTTP calls to avoid network dependency in tests
 vi.mock("https", () => {
   return {
-    get: vi.fn((url: string, callback: (res: PassThrough & { statusCode: number; headers: Record<string, string> }) => void) => {
-      const response = new PassThrough() as PassThrough & { statusCode: number; headers: Record<string, string> };
+    get: vi.fn(
+      (
+        url: string,
+        callback: (
+          res: PassThrough & { statusCode: number; headers: Record<string, string> },
+        ) => void,
+      ) => {
+        const response = new PassThrough() as PassThrough & {
+          statusCode: number;
+          headers: Record<string, string>;
+        };
 
-      // Simulate redirect for HuggingFace CDN
-      if (url.includes("redirect-test")) {
-        response.statusCode = 302;
-        response.headers = { location: url.replace("redirect-test", "final") };
-        setTimeout(() => callback(response), 0);
+        // Simulate redirect for HuggingFace CDN
+        if (url.includes("redirect-test")) {
+          response.statusCode = 302;
+          response.headers = { location: url.replace("redirect-test", "final") };
+          setTimeout(() => callback(response), 0);
+          const req = new PassThrough();
+          (req as PassThrough & { destroy: ReturnType<typeof vi.fn> }).destroy = vi.fn();
+          return req;
+        }
+
+        // Simulate HTTP error
+        if (url.includes("error-test")) {
+          response.statusCode = 404;
+          response.headers = {};
+          setTimeout(() => callback(response), 0);
+          const req = new PassThrough();
+          (req as PassThrough & { destroy: ReturnType<typeof vi.fn> }).destroy = vi.fn();
+          return req;
+        }
+
+        // Simulate successful download
+        response.statusCode = 200;
+        response.headers = { "content-length": "100" };
+        setTimeout(() => {
+          callback(response);
+          response.write(Buffer.from("test-content-data"));
+          response.end();
+        }, 0);
+
         const req = new PassThrough();
         (req as PassThrough & { destroy: ReturnType<typeof vi.fn> }).destroy = vi.fn();
         return req;
-      }
-
-      // Simulate HTTP error
-      if (url.includes("error-test")) {
-        response.statusCode = 404;
-        response.headers = {};
-        setTimeout(() => callback(response), 0);
-        const req = new PassThrough();
-        (req as PassThrough & { destroy: ReturnType<typeof vi.fn> }).destroy = vi.fn();
-        return req;
-      }
-
-      // Simulate successful download
-      response.statusCode = 200;
-      response.headers = { "content-length": "100" };
-      setTimeout(() => {
-        callback(response);
-        response.write(Buffer.from("test-content-data"));
-        response.end();
-      }, 0);
-
-      const req = new PassThrough();
-      (req as PassThrough & { destroy: ReturnType<typeof vi.fn> }).destroy = vi.fn();
-      return req;
-    }),
+      },
+    ),
   };
 });
 

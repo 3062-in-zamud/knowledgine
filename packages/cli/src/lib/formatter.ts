@@ -22,8 +22,7 @@ export function formatSearchResults(
   const header = `${"Score".padEnd(7)}${"Title".padEnd(40)}FilePath`;
   const sep = "-".repeat(header.length);
   const rows = results.map(
-    (r) =>
-      `${r.score.toFixed(2).padEnd(7)}${r.title.slice(0, 38).padEnd(40)}${r.filePath}`,
+    (r) => `${r.score.toFixed(2).padEnd(7)}${r.title.slice(0, 38).padEnd(40)}${r.filePath}`,
   );
   return [header, sep, ...rows].join("\n");
 }
@@ -46,7 +45,9 @@ export function formatRelatedNotes(result: FindRelatedResult, format: OutputForm
     lines.push(header);
     lines.push("  " + "-".repeat(header.length - 2));
     for (const n of result.relatedNotes) {
-      lines.push(`  ${n.score.toFixed(2).padEnd(7)}${n.title.slice(0, 38).padEnd(40)}${n.filePath}`);
+      lines.push(
+        `  ${n.score.toFixed(2).padEnd(7)}${n.title.slice(0, 38).padEnd(40)}${n.filePath}`,
+      );
     }
   } else {
     lines.push("  (no related notes found)");
@@ -78,7 +79,9 @@ export function formatStats(stats: StatsResult, format: OutputFormat): string {
     `${"Embeddings Available".padEnd(30)}${stats.embeddingStatus.available}`,
   ];
   if (stats.embeddingStatus.notesWithoutEmbeddings !== null) {
-    lines.push(`${"Notes Without Embeddings".padEnd(30)}${stats.embeddingStatus.notesWithoutEmbeddings}`);
+    lines.push(
+      `${"Notes Without Embeddings".padEnd(30)}${stats.embeddingStatus.notesWithoutEmbeddings}`,
+    );
   }
   if (stats.graphStats) {
     lines.push(`${"Graph Entities".padEnd(30)}${stats.graphStats.totalEntities}`);

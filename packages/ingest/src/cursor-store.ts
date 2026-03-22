@@ -13,9 +13,10 @@ export class CursorStore {
 
   getCursor(pluginId: string, sourcePath: string): IngestCursorData | undefined {
     const row = this.db
-      .prepare<[string, string], CursorRow>(
-        "SELECT plugin_id, source_path, checkpoint, last_ingest_at FROM ingest_cursors WHERE plugin_id = ? AND source_path = ?",
-      )
+      .prepare<
+        [string, string],
+        CursorRow
+      >("SELECT plugin_id, source_path, checkpoint, last_ingest_at FROM ingest_cursors WHERE plugin_id = ? AND source_path = ?")
       .get(pluginId, sourcePath);
 
     if (!row) return undefined;
@@ -33,7 +34,12 @@ export class CursorStore {
       .prepare(
         "INSERT OR REPLACE INTO ingest_cursors (plugin_id, source_path, checkpoint, last_ingest_at) VALUES (?, ?, ?, ?)",
       )
-      .run(cursor.pluginId, cursor.sourcePath, cursor.checkpoint, cursor.lastIngestAt.toISOString());
+      .run(
+        cursor.pluginId,
+        cursor.sourcePath,
+        cursor.checkpoint,
+        cursor.lastIngestAt.toISOString(),
+      );
   }
 
   deleteCursor(pluginId: string, sourcePath: string): boolean {
@@ -45,7 +51,10 @@ export class CursorStore {
 
   listCursors(): IngestCursorData[] {
     const rows = this.db
-      .prepare<[], CursorRow>("SELECT plugin_id, source_path, checkpoint, last_ingest_at FROM ingest_cursors")
+      .prepare<
+        [],
+        CursorRow
+      >("SELECT plugin_id, source_path, checkpoint, last_ingest_at FROM ingest_cursors")
       .all();
 
     return rows.map((row) => ({

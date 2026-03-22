@@ -63,18 +63,14 @@ describe("migration005b: bitemporal", () => {
 
     it("should create active_relations VIEW", () => {
       const result = db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='view' AND name='active_relations'",
-        )
+        .prepare("SELECT name FROM sqlite_master WHERE type='view' AND name='active_relations'")
         .get();
       expect(result).toBeDefined();
     });
 
     it("should create active_observations VIEW", () => {
       const result = db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='view' AND name='active_observations'",
-        )
+        .prepare("SELECT name FROM sqlite_master WHERE type='view' AND name='active_observations'")
         .get();
       expect(result).toBeDefined();
     });
@@ -102,12 +98,16 @@ describe("migration005b: bitemporal", () => {
     beforeEach(() => {
       // Wave 2 で既存データを作成
       const now = "2024-01-01T00:00:00.000Z";
-      db.prepare(
-        `INSERT INTO entities (name, entity_type, created_at) VALUES (?, ?, ?)`,
-      ).run("entity-a", "technology", now);
-      db.prepare(
-        `INSERT INTO entities (name, entity_type, created_at) VALUES (?, ?, ?)`,
-      ).run("entity-b", "project", now);
+      db.prepare(`INSERT INTO entities (name, entity_type, created_at) VALUES (?, ?, ?)`).run(
+        "entity-a",
+        "technology",
+        now,
+      );
+      db.prepare(`INSERT INTO entities (name, entity_type, created_at) VALUES (?, ?, ?)`).run(
+        "entity-b",
+        "project",
+        now,
+      );
       const a = db.prepare("SELECT id FROM entities WHERE name='entity-a'").get() as { id: number };
       const b = db.prepare("SELECT id FROM entities WHERE name='entity-b'").get() as { id: number };
 
@@ -123,30 +123,34 @@ describe("migration005b: bitemporal", () => {
     });
 
     it("should set valid_from = created_at for existing relations", () => {
-      const row = db
-        .prepare("SELECT valid_from, created_at FROM relations LIMIT 1")
-        .get() as { valid_from: string; created_at: string };
+      const row = db.prepare("SELECT valid_from, created_at FROM relations LIMIT 1").get() as {
+        valid_from: string;
+        created_at: string;
+      };
       expect(row.valid_from).toBe(row.created_at);
     });
 
     it("should set recorded_at = created_at for existing relations", () => {
-      const row = db
-        .prepare("SELECT recorded_at, created_at FROM relations LIMIT 1")
-        .get() as { recorded_at: string; created_at: string };
+      const row = db.prepare("SELECT recorded_at, created_at FROM relations LIMIT 1").get() as {
+        recorded_at: string;
+        created_at: string;
+      };
       expect(row.recorded_at).toBe(row.created_at);
     });
 
     it("should set valid_from = created_at for existing observations", () => {
-      const row = db
-        .prepare("SELECT valid_from, created_at FROM observations LIMIT 1")
-        .get() as { valid_from: string; created_at: string };
+      const row = db.prepare("SELECT valid_from, created_at FROM observations LIMIT 1").get() as {
+        valid_from: string;
+        created_at: string;
+      };
       expect(row.valid_from).toBe(row.created_at);
     });
 
     it("should set recorded_at = created_at for existing observations", () => {
-      const row = db
-        .prepare("SELECT recorded_at, created_at FROM observations LIMIT 1")
-        .get() as { recorded_at: string; created_at: string };
+      const row = db.prepare("SELECT recorded_at, created_at FROM observations LIMIT 1").get() as {
+        recorded_at: string;
+        created_at: string;
+      };
       expect(row.recorded_at).toBe(row.created_at);
     });
 
@@ -172,16 +176,12 @@ describe("migration005b: bitemporal", () => {
 
       // VIEWが削除されている
       const activeRelView = db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='view' AND name='active_relations'",
-        )
+        .prepare("SELECT name FROM sqlite_master WHERE type='view' AND name='active_relations'")
         .get();
       expect(activeRelView).toBeUndefined();
 
       const activeObsView = db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='view' AND name='active_observations'",
-        )
+        .prepare("SELECT name FROM sqlite_master WHERE type='view' AND name='active_observations'")
         .get();
       expect(activeObsView).toBeUndefined();
 

@@ -122,12 +122,10 @@ describe("createStepProgress", () => {
 
   beforeEach(() => {
     output = "";
-    stderrWriteSpy = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation((chunk) => {
-        output += typeof chunk === "string" ? chunk : chunk.toString();
-        return true;
-      });
+    stderrWriteSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      output += typeof chunk === "string" ? chunk : chunk.toString();
+      return true;
+    });
   });
 
   afterEach(() => {

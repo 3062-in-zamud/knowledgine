@@ -1,11 +1,6 @@
 import { resolve } from "path";
 import { mkdirSync } from "fs";
-import {
-  defineConfig,
-  createDatabase,
-  Migrator,
-  ALL_MIGRATIONS,
-} from "@knowledgine/core";
+import { defineConfig, createDatabase, Migrator, ALL_MIGRATIONS } from "@knowledgine/core";
 import { CursorStore } from "@knowledgine/ingest";
 import { createDefaultRegistry } from "../lib/plugin-loader.js";
 
@@ -18,9 +13,7 @@ export async function pluginsListCommand(): Promise<void> {
 
   for (const plugin of plugins) {
     const { id, name, version, priority } = plugin.manifest;
-    console.error(
-      `${id.padEnd(20)}${name.padEnd(25)}${version.padEnd(10)}${priority}`,
-    );
+    console.error(`${id.padEnd(20)}${name.padEnd(25)}${version.padEnd(10)}${priority}`);
   }
 }
 
@@ -28,9 +21,7 @@ export interface PluginsStatusOptions {
   path?: string;
 }
 
-export async function pluginsStatusCommand(
-  options: PluginsStatusOptions,
-): Promise<void> {
+export async function pluginsStatusCommand(options: PluginsStatusOptions): Promise<void> {
   const rootPath = resolve(options.path ?? process.cwd());
 
   const knowledgineDir = resolve(rootPath, ".knowledgine");
@@ -54,10 +45,10 @@ export async function pluginsStatusCommand(
     const lastIngest = cursor
       ? cursor.lastIngestAt.toISOString().replace("T", " ").slice(0, 19)
       : "never";
-    const checkpoint = cursor ? cursor.checkpoint.slice(0, 20) + (cursor.checkpoint.length > 20 ? "..." : "") : "-";
-    console.error(
-      `${plugin.manifest.id.padEnd(20)}${lastIngest.padEnd(25)}${checkpoint}`,
-    );
+    const checkpoint = cursor
+      ? cursor.checkpoint.slice(0, 20) + (cursor.checkpoint.length > 20 ? "..." : "")
+      : "-";
+    console.error(`${plugin.manifest.id.padEnd(20)}${lastIngest.padEnd(25)}${checkpoint}`);
   }
 
   db.close();

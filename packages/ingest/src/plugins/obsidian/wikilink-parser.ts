@@ -29,18 +29,14 @@ export function parseWikiLinks(content: string): WikiLink[] {
     const inner = match[2];
 
     const pipeIdx = inner.indexOf("|");
-    const pathPart =
-      pipeIdx >= 0 ? inner.slice(0, pipeIdx).trim() : inner.trim();
-    const alias =
-      pipeIdx >= 0 ? inner.slice(pipeIdx + 1).trim() : undefined;
+    const pathPart = pipeIdx >= 0 ? inner.slice(0, pipeIdx).trim() : inner.trim();
+    const alias = pipeIdx >= 0 ? inner.slice(pipeIdx + 1).trim() : undefined;
 
     if (!pathPart) continue;
 
     const hashIdx = pathPart.indexOf("#");
-    const target =
-      hashIdx >= 0 ? pathPart.slice(0, hashIdx).trim() : pathPart;
-    const heading =
-      hashIdx >= 0 ? pathPart.slice(hashIdx + 1).trim() : undefined;
+    const target = hashIdx >= 0 ? pathPart.slice(0, hashIdx).trim() : pathPart;
+    const heading = hashIdx >= 0 ? pathPart.slice(hashIdx + 1).trim() : undefined;
 
     if (!target) continue;
 
@@ -72,8 +68,7 @@ export function resolveWikiLinkPath(
   if (!resolved.startsWith(vaultPath)) return null;
 
   if (existsSync(resolved)) return resolved;
-  if (!resolved.endsWith(".md") && existsSync(resolved + ".md"))
-    return resolved + ".md";
+  if (!resolved.endsWith(".md") && existsSync(resolved + ".md")) return resolved + ".md";
 
   return null;
 }

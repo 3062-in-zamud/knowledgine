@@ -3,10 +3,7 @@ import { mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
-import {
-  pluginsListCommand,
-  pluginsStatusCommand,
-} from "../../src/commands/plugins.js";
+import { pluginsListCommand, pluginsStatusCommand } from "../../src/commands/plugins.js";
 
 describe("plugins commands", () => {
   let testDir: string;

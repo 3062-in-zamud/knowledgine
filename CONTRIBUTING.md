@@ -101,12 +101,12 @@ knowledgine/
 
 ### Package Responsibilities
 
-| Package | npm Name | Description |
-|---------|----------|-------------|
-| `packages/core` | `@knowledgine/core` | Core knowledge extraction engine, graph storage, vector search, and embedding pipeline. The foundation that all other packages depend on. |
-| `packages/cli` | `@knowledgine/cli` | Command-line interface for indexing codebases, running the MCP server, and managing knowledge stores. |
-| `packages/mcp-server` | `@knowledgine/mcp-server` | Model Context Protocol server that exposes knowledge tools for use by AI coding assistants. |
-| `packages/ingest` | `@knowledgine/ingest` | Plugin-based ingestion engine for importing data from various sources (git history, editor sessions, etc.). |
+| Package               | npm Name                  | Description                                                                                                                               |
+| --------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core`       | `@knowledgine/core`       | Core knowledge extraction engine, graph storage, vector search, and embedding pipeline. The foundation that all other packages depend on. |
+| `packages/cli`        | `@knowledgine/cli`        | Command-line interface for indexing codebases, running the MCP server, and managing knowledge stores.                                     |
+| `packages/mcp-server` | `@knowledgine/mcp-server` | Model Context Protocol server that exposes knowledge tools for use by AI coding assistants.                                               |
+| `packages/ingest`     | `@knowledgine/ingest`     | Plugin-based ingestion engine for importing data from various sources (git history, editor sessions, etc.).                               |
 
 ### Dependency Graph
 
@@ -182,7 +182,7 @@ This project uses **ES Modules exclusively** (no CommonJS).
 
 - Keep functions small and focused.
 - Prefer immutable data structures.
-- Write self-documenting code; add comments only when the *why* is not obvious.
+- Write self-documenting code; add comments only when the _why_ is not obvious.
 - Use `async`/`await` over raw Promises.
 - Handle errors explicitly -- do not swallow exceptions silently.
 
@@ -219,17 +219,17 @@ pnpm test:coverage
 ### Example Test Structure
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { myFunction } from '../src/my-module.js';
+import { describe, it, expect } from "vitest";
+import { myFunction } from "../src/my-module.js";
 
-describe('myFunction', () => {
-  it('should return expected result for valid input', () => {
-    const result = myFunction('valid-input');
-    expect(result).toBe('expected-output');
+describe("myFunction", () => {
+  it("should return expected result for valid input", () => {
+    const result = myFunction("valid-input");
+    expect(result).toBe("expected-output");
   });
 
-  it('should throw on invalid input', () => {
-    expect(() => myFunction('')).toThrow('Input must not be empty');
+  it("should throw on invalid input", () => {
+    expect(() => myFunction("")).toThrow("Input must not be empty");
   });
 });
 ```
@@ -270,17 +270,17 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ### Types
 
-| Type | Purpose |
-|------|---------|
-| `feat` | A new feature |
-| `fix` | A bug fix |
-| `docs` | Documentation only changes |
-| `test` | Adding or updating tests |
+| Type       | Purpose                                                 |
+| ---------- | ------------------------------------------------------- |
+| `feat`     | A new feature                                           |
+| `fix`      | A bug fix                                               |
+| `docs`     | Documentation only changes                              |
+| `test`     | Adding or updating tests                                |
 | `refactor` | Code change that neither fixes a bug nor adds a feature |
-| `chore` | Maintenance tasks (deps, CI, tooling) |
-| `perf` | Performance improvement |
-| `ci` | CI/CD configuration changes |
-| `style` | Formatting, whitespace (no code logic change) |
+| `chore`    | Maintenance tasks (deps, CI, tooling)                   |
+| `perf`     | Performance improvement                                 |
+| `ci`       | CI/CD configuration changes                             |
+| `style`    | Formatting, whitespace (no code logic change)           |
 
 ### Scopes
 

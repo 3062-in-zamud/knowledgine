@@ -45,10 +45,9 @@ export class GitHistoryPlugin implements IngestPlugin {
 
     let raw: string;
     try {
-      raw = await execGit(
-        ["log", "--reverse", `--format=${getGitLogFormat()}`],
-        { cwd: sourcePath }
-      );
+      raw = await execGit(["log", "--reverse", `--format=${getGitLogFormat()}`], {
+        cwd: sourcePath,
+      });
     } catch (err: unknown) {
       // コミットが0件の場合、git logがエラーを返すケースがある（初期ブランチでコミットなし）
       const errObj = err as { stderr?: string; code?: number };
@@ -75,7 +74,7 @@ export class GitHistoryPlugin implements IngestPlugin {
 
   async *ingestIncremental(
     sourcePath: SourceURI,
-    checkpoint: string
+    checkpoint: string,
   ): AsyncGenerator<NormalizedEvent> {
     validateCheckpoint(checkpoint);
 
@@ -83,7 +82,7 @@ export class GitHistoryPlugin implements IngestPlugin {
 
     const raw = await execGit(
       ["log", "--reverse", `--format=${getGitLogFormat()}`, `${checkpoint}..HEAD`],
-      { cwd: sourcePath }
+      { cwd: sourcePath },
     );
 
     const commits = parseGitLog(raw);

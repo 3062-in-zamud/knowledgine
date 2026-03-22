@@ -8,11 +8,13 @@ description: |
 ---
 
 ## When to use
+
 - 過去に解決した問題の参照
 - 類似パターンの検索
 - 関連知識の発見
 
 ## Strategy
+
 - まず広くキーワード検索
 - 次に entity 検索で深掘り
 - --related で関連知識のネットワーク探索

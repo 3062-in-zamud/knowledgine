@@ -96,9 +96,9 @@ describe("migration005a: events_layer", () => {
     });
 
     it("should have correct columns in ingest_cursors", () => {
-      const cols = ctx.db
-        .prepare("PRAGMA table_info(ingest_cursors)")
-        .all() as Array<{ name: string }>;
+      const cols = ctx.db.prepare("PRAGMA table_info(ingest_cursors)").all() as Array<{
+        name: string;
+      }>;
       const colNames = cols.map((c) => c.name);
       expect(colNames).toContain("plugin_id");
       expect(colNames).toContain("source_path");
@@ -157,25 +157,25 @@ describe("migration005a: events_layer", () => {
 
   describe("knowledge_notes columns", () => {
     it("should have source_type column on knowledge_notes", () => {
-      const cols = ctx.db
-        .prepare("PRAGMA table_info(knowledge_notes)")
-        .all() as Array<{ name: string }>;
+      const cols = ctx.db.prepare("PRAGMA table_info(knowledge_notes)").all() as Array<{
+        name: string;
+      }>;
       const colNames = cols.map((c) => c.name);
       expect(colNames).toContain("source_type");
     });
 
     it("should have source_uri column on knowledge_notes", () => {
-      const cols = ctx.db
-        .prepare("PRAGMA table_info(knowledge_notes)")
-        .all() as Array<{ name: string }>;
+      const cols = ctx.db.prepare("PRAGMA table_info(knowledge_notes)").all() as Array<{
+        name: string;
+      }>;
       const colNames = cols.map((c) => c.name);
       expect(colNames).toContain("source_uri");
     });
 
     it("should have source_event_id column on knowledge_notes", () => {
-      const cols = ctx.db
-        .prepare("PRAGMA table_info(knowledge_notes)")
-        .all() as Array<{ name: string }>;
+      const cols = ctx.db.prepare("PRAGMA table_info(knowledge_notes)").all() as Array<{
+        name: string;
+      }>;
       const colNames = cols.map((c) => c.name);
       expect(colNames).toContain("source_event_id");
     });

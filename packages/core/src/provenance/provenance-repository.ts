@@ -150,14 +150,9 @@ export class ProvenanceRepository {
     return rows.map(rowToProvenance);
   }
 
-  getByActivity(
-    type: ProvenanceRecord["activityType"],
-    limit = 100,
-  ): ProvenanceRecord[] {
+  getByActivity(type: ProvenanceRecord["activityType"], limit = 100): ProvenanceRecord[] {
     const rows = this.db
-      .prepare(
-        "SELECT * FROM provenance WHERE activity_type = ? ORDER BY started_at DESC LIMIT ?",
-      )
+      .prepare("SELECT * FROM provenance WHERE activity_type = ? ORDER BY started_at DESC LIMIT ?")
       .all(type, limit) as ProvenanceRow[];
     return rows.map(rowToProvenance);
   }
@@ -184,9 +179,7 @@ export class ProvenanceRepository {
 
   getFileTimeline(filePath: string): FileTimelineEntry[] {
     const rows = this.db
-      .prepare(
-        "SELECT * FROM file_timeline WHERE file_path = ? ORDER BY occurred_at ASC",
-      )
+      .prepare("SELECT * FROM file_timeline WHERE file_path = ? ORDER BY occurred_at ASC")
       .all(filePath) as FileTimelineRow[];
     return rows.map(rowToFileTimeline);
   }

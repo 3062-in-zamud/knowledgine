@@ -69,7 +69,8 @@ describe("sanitizeContent", () => {
   });
 
   it("シークレットを含む長いテキストで他のコンテンツは保持", () => {
-    const content = "Normal text. api_key: sk-1234567890abcdefghij1234567890abcdef. More normal text.";
+    const content =
+      "Normal text. api_key: sk-1234567890abcdefghij1234567890abcdef. More normal text.";
     const result = sanitizeContent(content);
     expect(result).toContain("Normal text.");
     expect(result).toContain("More normal text.");

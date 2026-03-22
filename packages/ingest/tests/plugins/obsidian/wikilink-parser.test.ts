@@ -106,8 +106,7 @@ describe("parseWikiLinks", () => {
   });
 
   it("parses multiple links in one document", () => {
-    const content =
-      "See [[note-a]] and [[note-b|B]] plus ![[embed]] here.";
+    const content = "See [[note-a]] and [[note-b|B]] plus ![[embed]] here.";
     const links = parseWikiLinks(content);
     expect(links).toHaveLength(3);
   });
@@ -128,56 +127,32 @@ describe("resolveWikiLinkPath", () => {
   });
 
   it("resolves existing .md file", () => {
-    const result = resolveWikiLinkPath(
-      "existing.md",
-      tmpDir,
-      join(tmpDir, "current.md"),
-    );
+    const result = resolveWikiLinkPath("existing.md", tmpDir, join(tmpDir, "current.md"));
     expect(result).toBe(join(tmpDir, "existing.md"));
   });
 
   it("auto-appends .md extension", () => {
-    const result = resolveWikiLinkPath(
-      "existing",
-      tmpDir,
-      join(tmpDir, "current.md"),
-    );
+    const result = resolveWikiLinkPath("existing", tmpDir, join(tmpDir, "current.md"));
     expect(result).toBe(join(tmpDir, "existing.md"));
   });
 
   it("resolves nested file", () => {
-    const result = resolveWikiLinkPath(
-      "subdir/nested",
-      tmpDir,
-      join(tmpDir, "current.md"),
-    );
+    const result = resolveWikiLinkPath("subdir/nested", tmpDir, join(tmpDir, "current.md"));
     expect(result).toBe(join(tmpDir, "subdir", "nested.md"));
   });
 
   it("returns null for non-existent file", () => {
-    const result = resolveWikiLinkPath(
-      "nonexistent",
-      tmpDir,
-      join(tmpDir, "current.md"),
-    );
+    const result = resolveWikiLinkPath("nonexistent", tmpDir, join(tmpDir, "current.md"));
     expect(result).toBeNull();
   });
 
   it("rejects path traversal", () => {
-    const result = resolveWikiLinkPath(
-      "../outside",
-      tmpDir,
-      join(tmpDir, "current.md"),
-    );
+    const result = resolveWikiLinkPath("../outside", tmpDir, join(tmpDir, "current.md"));
     expect(result).toBeNull();
   });
 
   it("rejects paths outside vault", () => {
-    const result = resolveWikiLinkPath(
-      "/etc/passwd",
-      tmpDir,
-      join(tmpDir, "current.md"),
-    );
+    const result = resolveWikiLinkPath("/etc/passwd", tmpDir, join(tmpDir, "current.md"));
     expect(result).toBeNull();
   });
 });

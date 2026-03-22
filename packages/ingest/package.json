@@ -15,7 +15,9 @@
     "test": "vitest",
     "test:run": "vitest run"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=18"

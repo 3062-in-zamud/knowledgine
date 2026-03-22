@@ -101,9 +101,7 @@ describe("migration005c: provenance", () => {
 
       // VIEWとテーブルの存在確認
       const tables = db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type IN ('table','view') ORDER BY name",
-        )
+        .prepare("SELECT name FROM sqlite_master WHERE type IN ('table','view') ORDER BY name")
         .all();
       const names = (tables as Array<{ name: string }>).map((t) => t.name);
       expect(names).toContain("active_relations");
@@ -208,9 +206,30 @@ describe("ProvenanceRepository", () => {
   describe("getByAgent", () => {
     it("should retrieve records by agent", () => {
       const now = new Date().toISOString();
-      repo.record({ entityUri: "file://a.md", activityType: "ingest", agent: "agent-x", inputUris: [], outputUris: [], startedAt: now });
-      repo.record({ entityUri: "file://b.md", activityType: "ingest", agent: "agent-y", inputUris: [], outputUris: [], startedAt: now });
-      repo.record({ entityUri: "file://c.md", activityType: "ingest", agent: "agent-x", inputUris: [], outputUris: [], startedAt: now });
+      repo.record({
+        entityUri: "file://a.md",
+        activityType: "ingest",
+        agent: "agent-x",
+        inputUris: [],
+        outputUris: [],
+        startedAt: now,
+      });
+      repo.record({
+        entityUri: "file://b.md",
+        activityType: "ingest",
+        agent: "agent-y",
+        inputUris: [],
+        outputUris: [],
+        startedAt: now,
+      });
+      repo.record({
+        entityUri: "file://c.md",
+        activityType: "ingest",
+        agent: "agent-x",
+        inputUris: [],
+        outputUris: [],
+        startedAt: now,
+      });
 
       const records = repo.getByAgent("agent-x");
       expect(records.length).toBe(2);
@@ -220,7 +239,14 @@ describe("ProvenanceRepository", () => {
     it("should respect limit", () => {
       const now = new Date().toISOString();
       for (let i = 0; i < 5; i++) {
-        repo.record({ entityUri: `file://limit-${i}.md`, activityType: "ingest", agent: "limit-agent", inputUris: [], outputUris: [], startedAt: now });
+        repo.record({
+          entityUri: `file://limit-${i}.md`,
+          activityType: "ingest",
+          agent: "limit-agent",
+          inputUris: [],
+          outputUris: [],
+          startedAt: now,
+        });
       }
       const records = repo.getByAgent("limit-agent", 3);
       expect(records.length).toBeLessThanOrEqual(3);
@@ -234,8 +260,22 @@ describe("ProvenanceRepository", () => {
   describe("getByActivity", () => {
     it("should retrieve records by activity type", () => {
       const now = new Date().toISOString();
-      repo.record({ entityUri: "file://extract-1.md", activityType: "extract", agent: "ex-agent", inputUris: [], outputUris: [], startedAt: now });
-      repo.record({ entityUri: "file://ingest-1.md", activityType: "ingest", agent: "in-agent", inputUris: [], outputUris: [], startedAt: now });
+      repo.record({
+        entityUri: "file://extract-1.md",
+        activityType: "extract",
+        agent: "ex-agent",
+        inputUris: [],
+        outputUris: [],
+        startedAt: now,
+      });
+      repo.record({
+        entityUri: "file://ingest-1.md",
+        activityType: "ingest",
+        agent: "in-agent",
+        inputUris: [],
+        outputUris: [],
+        startedAt: now,
+      });
 
       const records = repo.getByActivity("extract");
       expect(records.length).toBeGreaterThanOrEqual(1);
@@ -245,7 +285,14 @@ describe("ProvenanceRepository", () => {
     it("should respect limit", () => {
       const now = new Date().toISOString();
       for (let i = 0; i < 5; i++) {
-        repo.record({ entityUri: `file://act-${i}.md`, activityType: "embed", agent: "embedder", inputUris: [], outputUris: [], startedAt: now });
+        repo.record({
+          entityUri: `file://act-${i}.md`,
+          activityType: "embed",
+          agent: "embedder",
+          inputUris: [],
+          outputUris: [],
+          startedAt: now,
+        });
       }
       const records = repo.getByActivity("embed", 2);
       expect(records.length).toBeLessThanOrEqual(2);
@@ -324,8 +371,16 @@ describe("ProvenanceRepository", () => {
 
     it("should return snapshots ordered by snapshot_at DESC", () => {
       repo.createSnapshot("2024-01-01T00:00:00", { noteCount: 10, eventCount: 5, entityCount: 3 });
-      repo.createSnapshot("2024-12-01T00:00:00", { noteCount: 100, eventCount: 50, entityCount: 30 });
-      repo.createSnapshot("2024-06-01T00:00:00", { noteCount: 50, eventCount: 25, entityCount: 15 });
+      repo.createSnapshot("2024-12-01T00:00:00", {
+        noteCount: 100,
+        eventCount: 50,
+        entityCount: 30,
+      });
+      repo.createSnapshot("2024-06-01T00:00:00", {
+        noteCount: 50,
+        eventCount: 25,
+        entityCount: 15,
+      });
 
       const snapshots = repo.getSnapshots();
       expect(snapshots[0].snapshotAt).toBe("2024-12-01T00:00:00");

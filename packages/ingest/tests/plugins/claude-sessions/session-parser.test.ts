@@ -42,10 +42,7 @@ describe("extractTextContent", () => {
   });
 
   it("should return empty string when all blocks are non-text (thinking only)", () => {
-    const content = [
-      { type: "thinking", text: "internal" },
-      { type: "tool_use" },
-    ];
+    const content = [{ type: "thinking", text: "internal" }, { type: "tool_use" }];
     expect(extractTextContent(content)).toBe("");
   });
 
@@ -168,9 +165,7 @@ describe("parseSessionFile", () => {
   });
 
   it("should skip entries where all content is thinking blocks", async () => {
-    const content = [
-      { type: "thinking", text: "let me think..." },
-    ];
+    const content = [{ type: "thinking", text: "let me think..." }];
     const line = JSON.stringify({
       type: "assistant",
       uuid: "uuid-4",

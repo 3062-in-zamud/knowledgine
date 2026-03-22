@@ -615,7 +615,15 @@ export class GraphRepository {
   getRelationHistory(
     fromEntityId: number,
     toEntityId: number,
-  ): Array<Relation & { id: number; validFrom: string | null; validTo: string | null; recordedAt: string | null; supersededAt: string | null }> {
+  ): Array<
+    Relation & {
+      id: number;
+      validFrom: string | null;
+      validTo: string | null;
+      recordedAt: string | null;
+      supersededAt: string | null;
+    }
+  > {
     const rows = this.db
       .prepare(
         `SELECT * FROM relations WHERE from_entity_id = ? AND to_entity_id = ? ORDER BY recorded_at DESC`,

@@ -180,7 +180,8 @@ export class KnowledgeService {
     }
 
     const relatedNotes = this.linkGenerator.findRelatedNotes(resolvedNoteId, limit);
-    const problemSolutionPairs = this.options.repository.getProblemSolutionPairsByNoteId(resolvedNoteId);
+    const problemSolutionPairs =
+      this.options.repository.getProblemSolutionPairsByNoteId(resolvedNoteId);
 
     let graphRelations: FindRelatedResult["graphRelations"] = [];
     if (this.options.graphRepository) {
@@ -189,12 +190,14 @@ export class KnowledgeService {
         entityId: entity.id!,
         name: entity.name,
         entityType: entity.entityType,
-        relatedEntities: this.options.graphRepository!.findRelatedEntities(entity.id!, maxHops).map((e) => ({
-          id: e.id!,
-          name: e.name,
-          entityType: e.entityType,
-          hops: e.hops,
-        })),
+        relatedEntities: this.options
+          .graphRepository!.findRelatedEntities(entity.id!, maxHops)
+          .map((e) => ({
+            id: e.id!,
+            name: e.name,
+            entityType: e.entityType,
+            hops: e.hops,
+          })),
       }));
     }
 

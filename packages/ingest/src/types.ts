@@ -38,11 +38,7 @@ export interface ManualTrigger {
   type: "manual";
 }
 
-export type TriggerConfig =
-  | FileWatcherTrigger
-  | GitHookTrigger
-  | ScheduledTrigger
-  | ManualTrigger;
+export type TriggerConfig = FileWatcherTrigger | GitHookTrigger | ScheduledTrigger | ManualTrigger;
 
 export interface PluginConfig {
   [key: string]: unknown;
@@ -99,10 +95,7 @@ export interface IngestPlugin {
 
   ingestAll(sourceUri: SourceURI): AsyncGenerator<NormalizedEvent>;
 
-  ingestIncremental(
-    sourceUri: SourceURI,
-    checkpoint: string
-  ): AsyncGenerator<NormalizedEvent>;
+  ingestIncremental(sourceUri: SourceURI, checkpoint: string): AsyncGenerator<NormalizedEvent>;
 
   getCurrentCheckpoint(sourceUri: SourceURI): Promise<string>;
 

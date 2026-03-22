@@ -56,14 +56,10 @@ export class FeedbackLearner {
 
       case "wrong_type":
         if (!feedback.entityType || !feedback.correctType) {
-          throw new Error(
-            "wrong_type feedback requires both entityType and correctType",
-          );
+          throw new Error("wrong_type feedback requires both entityType and correctType");
         }
         // Check for existing override for same entity name
-        const existingIdx = rules.typeOverrides.findIndex(
-          (o) => o.name === feedback.entityName,
-        );
+        const existingIdx = rules.typeOverrides.findIndex((o) => o.name === feedback.entityName);
         const override: TypeOverride = {
           name: feedback.entityName,
           fromType: feedback.entityType,

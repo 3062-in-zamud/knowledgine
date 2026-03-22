@@ -32,10 +32,7 @@ export class IngestWatcher {
       if (!this.running) break;
 
       try {
-        const summary = await this.engine.ingest(
-          plugin.manifest.id,
-          this.rootPath,
-        );
+        const summary = await this.engine.ingest(plugin.manifest.id, this.rootPath);
         summaries.push(summary);
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));

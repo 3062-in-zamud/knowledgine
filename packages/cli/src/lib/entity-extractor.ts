@@ -54,9 +54,7 @@ export async function postIngestProcessing(
 
   for (const note of notes) {
     try {
-      const frontmatter = note.frontmatter_json
-        ? JSON.parse(note.frontmatter_json)
-        : {};
+      const frontmatter = note.frontmatter_json ? JSON.parse(note.frontmatter_json) : {};
       const now = new Date().toISOString();
 
       // Pattern extraction
@@ -84,14 +82,8 @@ export async function postIngestProcessing(
       // Relation inference
       const inferredRelations = inferrer.infer(entityList, frontmatter);
       for (const rel of inferredRelations) {
-        const fromEntity = graphRepository.getEntityByName(
-          rel.fromName,
-          rel.fromType,
-        );
-        const toEntity = graphRepository.getEntityByName(
-          rel.toName,
-          rel.toType,
-        );
+        const fromEntity = graphRepository.getEntityByName(rel.fromName, rel.fromType);
+        const toEntity = graphRepository.getEntityByName(rel.toName, rel.toType);
         if (fromEntity?.id && toEntity?.id) {
           graphRepository.upsertRelation({
             fromEntityId: fromEntity.id,

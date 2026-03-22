@@ -21,7 +21,11 @@ describe("GraphRepository (bi-temporal)", () => {
   describe("regression: createRelation / getRelationsByEntityId", () => {
     it("should create relation and retrieve it via active_relations VIEW", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "react", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "react",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "my-app", entityType: "project", createdAt: now });
       graph.createRelation({
         fromEntityId: fromId,
@@ -39,7 +43,12 @@ describe("GraphRepository (bi-temporal)", () => {
       const now = new Date().toISOString();
       const a = graph.createEntity({ name: "entity-a", entityType: "technology", createdAt: now });
       const b = graph.createEntity({ name: "entity-b", entityType: "project", createdAt: now });
-      graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "uses", createdAt: now });
+      graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "uses",
+        createdAt: now,
+      });
 
       const related = graph.findRelatedEntities(a, 1);
       expect(related.some((e) => e.id === b)).toBe(true);
@@ -49,8 +58,18 @@ describe("GraphRepository (bi-temporal)", () => {
       const now = new Date().toISOString();
       const a = graph.createEntity({ name: "stat-a", entityType: "technology", createdAt: now });
       const b = graph.createEntity({ name: "stat-b", entityType: "project", createdAt: now });
-      graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "uses", createdAt: now });
-      graph.createObservation({ entityId: a, content: "obs", observationType: "fact", createdAt: now });
+      graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "uses",
+        createdAt: now,
+      });
+      graph.createObservation({
+        entityId: a,
+        content: "obs",
+        observationType: "fact",
+        createdAt: now,
+      });
 
       const stats = graph.getGraphStats();
       expect(stats.totalRelations).toBeGreaterThanOrEqual(1);
@@ -63,7 +82,11 @@ describe("GraphRepository (bi-temporal)", () => {
   describe("createRelation sets bi-temporal columns", () => {
     it("should set valid_from and recorded_at on insert", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "from-a", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "from-a",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "to-a", entityType: "project", createdAt: now });
       const relId = graph.createRelation({
         fromEntityId: fromId,
@@ -83,7 +106,11 @@ describe("GraphRepository (bi-temporal)", () => {
   describe("createObservation sets bi-temporal columns", () => {
     it("should set valid_from and recorded_at on insert", () => {
       const now = new Date().toISOString();
-      const entityId = graph.createEntity({ name: "obs-entity", entityType: "technology", createdAt: now });
+      const entityId = graph.createEntity({
+        name: "obs-entity",
+        entityType: "technology",
+        createdAt: now,
+      });
       const obsId = graph.createObservation({
         entityId,
         content: "some fact",
@@ -104,7 +131,11 @@ describe("GraphRepository (bi-temporal)", () => {
   describe("invalidateRelation", () => {
     it("should set valid_to and exclude from active_relations VIEW", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "inv-from", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "inv-from",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "inv-to", entityType: "project", createdAt: now });
       const relId = graph.createRelation({
         fromEntityId: fromId,
@@ -125,7 +156,11 @@ describe("GraphRepository (bi-temporal)", () => {
 
     it("should be idempotent (second call returns false)", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "idem-from", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "idem-from",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "idem-to", entityType: "project", createdAt: now });
       const relId = graph.createRelation({
         fromEntityId: fromId,
@@ -140,7 +175,11 @@ describe("GraphRepository (bi-temporal)", () => {
 
     it("should accept custom validTo timestamp", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "custom-from", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "custom-from",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "custom-to", entityType: "project", createdAt: now });
       const relId = graph.createRelation({
         fromEntityId: fromId,
@@ -152,9 +191,9 @@ describe("GraphRepository (bi-temporal)", () => {
       const customTime = "2025-01-01T00:00:00";
       graph.invalidateRelation(relId, customTime);
 
-      const row = ctx.db
-        .prepare("SELECT valid_to FROM relations WHERE id = ?")
-        .get(relId) as { valid_to: string };
+      const row = ctx.db.prepare("SELECT valid_to FROM relations WHERE id = ?").get(relId) as {
+        valid_to: string;
+      };
       expect(row.valid_to).toBe(customTime);
     });
 
@@ -168,7 +207,11 @@ describe("GraphRepository (bi-temporal)", () => {
   describe("invalidateObservation", () => {
     it("should set valid_to and exclude from active_observations VIEW", () => {
       const now = new Date().toISOString();
-      const entityId = graph.createEntity({ name: "obs-inv-entity", entityType: "technology", createdAt: now });
+      const entityId = graph.createEntity({
+        name: "obs-inv-entity",
+        entityType: "technology",
+        createdAt: now,
+      });
       const obsId = graph.createObservation({
         entityId,
         content: "obs to invalidate",
@@ -188,7 +231,11 @@ describe("GraphRepository (bi-temporal)", () => {
 
     it("should be idempotent (second call returns false)", () => {
       const now = new Date().toISOString();
-      const entityId = graph.createEntity({ name: "obs-idem", entityType: "technology", createdAt: now });
+      const entityId = graph.createEntity({
+        name: "obs-idem",
+        entityType: "technology",
+        createdAt: now,
+      });
       const obsId = graph.createObservation({
         entityId,
         content: "obs idem",
@@ -206,7 +253,11 @@ describe("GraphRepository (bi-temporal)", () => {
   describe("getRelationHistory", () => {
     it("should return the relation including bi-temporal fields", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "hist-from", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "hist-from",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "hist-to", entityType: "project", createdAt: now });
 
       // リレーションを作成して無効化
@@ -226,12 +277,26 @@ describe("GraphRepository (bi-temporal)", () => {
 
     it("should return multiple relations with different types between same entities", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "hist-from2", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "hist-from2",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "hist-to2", entityType: "project", createdAt: now });
 
       // 異なるrelation_typeなら複数作成可能
-      graph.createRelation({ fromEntityId: fromId, toEntityId: toId, relationType: "uses", createdAt: now });
-      graph.createRelation({ fromEntityId: fromId, toEntityId: toId, relationType: "depends_on", createdAt: now });
+      graph.createRelation({
+        fromEntityId: fromId,
+        toEntityId: toId,
+        relationType: "uses",
+        createdAt: now,
+      });
+      graph.createRelation({
+        fromEntityId: fromId,
+        toEntityId: toId,
+        relationType: "depends_on",
+        createdAt: now,
+      });
 
       // getRelationHistory は同一ペアの全リレーションを返す
       const history = graph.getRelationHistory(fromId, toId);
@@ -240,7 +305,11 @@ describe("GraphRepository (bi-temporal)", () => {
 
     it("should include validTo info for invalidated relations", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "hv-from", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "hv-from",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "hv-to", entityType: "project", createdAt: now });
       const relId = graph.createRelation({
         fromEntityId: fromId,
@@ -257,7 +326,11 @@ describe("GraphRepository (bi-temporal)", () => {
 
     it("should return empty for no matching relations", () => {
       const now = new Date().toISOString();
-      const fromId = graph.createEntity({ name: "empty-from", entityType: "technology", createdAt: now });
+      const fromId = graph.createEntity({
+        name: "empty-from",
+        entityType: "technology",
+        createdAt: now,
+      });
       const toId = graph.createEntity({ name: "empty-to", entityType: "project", createdAt: now });
 
       const history = graph.getRelationHistory(fromId, toId);
@@ -272,7 +345,12 @@ describe("GraphRepository (bi-temporal)", () => {
       const now = new Date().toISOString();
       const a = graph.createEntity({ name: "geg-a", entityType: "technology", createdAt: now });
       const b = graph.createEntity({ name: "geg-b", entityType: "project", createdAt: now });
-      const relId = graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "uses", createdAt: now });
+      const relId = graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "uses",
+        createdAt: now,
+      });
 
       // 無効化前は含まれる
       const before = graph.getEntityWithGraph(a);
@@ -289,7 +367,12 @@ describe("GraphRepository (bi-temporal)", () => {
       const now = new Date().toISOString();
       const a = graph.createEntity({ name: "geg-src", entityType: "technology", createdAt: now });
       const b = graph.createEntity({ name: "geg-dst", entityType: "project", createdAt: now });
-      const relId = graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "uses", createdAt: now });
+      const relId = graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "uses",
+        createdAt: now,
+      });
 
       graph.invalidateRelation(relId);
 
@@ -299,7 +382,11 @@ describe("GraphRepository (bi-temporal)", () => {
 
     it("should not include invalidated observations", () => {
       const now = new Date().toISOString();
-      const entityId = graph.createEntity({ name: "geg-obs", entityType: "technology", createdAt: now });
+      const entityId = graph.createEntity({
+        name: "geg-obs",
+        entityType: "technology",
+        createdAt: now,
+      });
       const obsId = graph.createObservation({
         entityId,
         content: "obs to remove",
@@ -321,7 +408,12 @@ describe("GraphRepository (bi-temporal)", () => {
       const now = new Date().toISOString();
       const a = graph.createEntity({ name: "bfs-a", entityType: "technology", createdAt: now });
       const b = graph.createEntity({ name: "bfs-b", entityType: "project", createdAt: now });
-      const relId = graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "uses", createdAt: now });
+      const relId = graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "uses",
+        createdAt: now,
+      });
 
       // 無効化前は見つかる
       expect(graph.findRelatedEntities(a, 1).some((e) => e.id === b)).toBe(true);
@@ -340,7 +432,12 @@ describe("GraphRepository (bi-temporal)", () => {
       const now = new Date().toISOString();
       const a = graph.createEntity({ name: "gstats-a", entityType: "technology", createdAt: now });
       const b = graph.createEntity({ name: "gstats-b", entityType: "project", createdAt: now });
-      const relId = graph.createRelation({ fromEntityId: a, toEntityId: b, relationType: "uses", createdAt: now });
+      const relId = graph.createRelation({
+        fromEntityId: a,
+        toEntityId: b,
+        relationType: "uses",
+        createdAt: now,
+      });
 
       const before = graph.getGraphStats();
       graph.invalidateRelation(relId);
@@ -351,7 +448,11 @@ describe("GraphRepository (bi-temporal)", () => {
 
     it("should not count invalidated observations", () => {
       const now = new Date().toISOString();
-      const entityId = graph.createEntity({ name: "gstats-obs", entityType: "technology", createdAt: now });
+      const entityId = graph.createEntity({
+        name: "gstats-obs",
+        entityType: "technology",
+        createdAt: now,
+      });
       const obsId = graph.createObservation({
         entityId,
         content: "obs to count",
@@ -402,15 +503,11 @@ describe("GraphRepository (bi-temporal)", () => {
       insertRelations();
 
       // 30%のrelationを無効化
-      const allRelIds = ctx.db
-        .prepare("SELECT id FROM relations")
-        .all() as Array<{ id: number }>;
+      const allRelIds = ctx.db.prepare("SELECT id FROM relations").all() as Array<{ id: number }>;
       const toInvalidate = allRelIds.slice(0, Math.floor(allRelIds.length * 0.3));
       const invalidateMany = ctx.db.transaction(() => {
         for (const { id } of toInvalidate) {
-          ctx.db
-            .prepare(`UPDATE relations SET valid_to = datetime('now') WHERE id = ?`)
-            .run(id);
+          ctx.db.prepare(`UPDATE relations SET valid_to = datetime('now') WHERE id = ?`).run(id);
         }
       });
       invalidateMany();

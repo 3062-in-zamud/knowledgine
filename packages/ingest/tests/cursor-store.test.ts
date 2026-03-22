@@ -112,8 +112,18 @@ describe("CursorStore", () => {
     });
 
     it("複数のカーソルを一覧取得できる", () => {
-      store.saveCursor({ pluginId: "a", sourcePath: "/p1", checkpoint: "c1", lastIngestAt: new Date("2026-01-01T00:00:00.000Z") });
-      store.saveCursor({ pluginId: "b", sourcePath: "/p2", checkpoint: "c2", lastIngestAt: new Date("2026-01-02T00:00:00.000Z") });
+      store.saveCursor({
+        pluginId: "a",
+        sourcePath: "/p1",
+        checkpoint: "c1",
+        lastIngestAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+      store.saveCursor({
+        pluginId: "b",
+        sourcePath: "/p2",
+        checkpoint: "c2",
+        lastIngestAt: new Date("2026-01-02T00:00:00.000Z"),
+      });
 
       const cursors = store.listCursors();
       expect(cursors).toHaveLength(2);
@@ -122,7 +132,12 @@ describe("CursorStore", () => {
     });
 
     it("全カーソルのlastIngestAtがDate型", () => {
-      store.saveCursor({ pluginId: "x", sourcePath: "/path", checkpoint: "cp", lastIngestAt: new Date() });
+      store.saveCursor({
+        pluginId: "x",
+        sourcePath: "/path",
+        checkpoint: "cp",
+        lastIngestAt: new Date(),
+      });
       const cursors = store.listCursors();
       for (const c of cursors) {
         expect(c.lastIngestAt).toBeInstanceOf(Date);

@@ -4,9 +4,7 @@ export interface ObsidianFrontmatter {
   custom: Record<string, unknown>;
 }
 
-export function parseObsidianFrontmatter(
-  raw: Record<string, unknown>,
-): ObsidianFrontmatter {
+export function parseObsidianFrontmatter(raw: Record<string, unknown>): ObsidianFrontmatter {
   // tags正規化
   const rawTags = raw.tags;
   let tags: string[] = [];
@@ -47,9 +45,7 @@ export function parseObsidianFrontmatter(
 
 export function extractInlineTags(content: string): string[] {
   // コードブロック除外
-  const withoutCodeBlocks = content
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/`[^`]+`/g, "");
+  const withoutCodeBlocks = content.replace(/```[\s\S]*?```/g, "").replace(/`[^`]+`/g, "");
 
   const tagRegex = /(?:^|\s)#([a-zA-Z0-9_\-/]+)/g;
   const tags = new Set<string>();

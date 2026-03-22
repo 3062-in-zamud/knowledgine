@@ -5,7 +5,13 @@ export function validateCaptureUrl(url: string): URL {
   }
   const hostname = parsed.hostname.toLowerCase();
   // localhost拒否
-  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]" || hostname === "0.0.0.0") {
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname === "[::1]" ||
+    hostname === "0.0.0.0"
+  ) {
     throw new Error("Local addresses are not allowed");
   }
   // プライベートIP拒否

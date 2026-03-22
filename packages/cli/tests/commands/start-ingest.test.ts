@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { IngestWatcher } from "../../src/lib/ingest-watcher.js";
-import type { IngestEngine, IngestSummary, PluginRegistry, IngestPlugin, PluginManifest } from "@knowledgine/ingest";
+import type {
+  IngestEngine,
+  IngestSummary,
+  PluginRegistry,
+  IngestPlugin,
+  PluginManifest,
+} from "@knowledgine/ingest";
 
 function createMockPlugin(id: string): IngestPlugin {
   return {
@@ -30,9 +36,7 @@ describe("IngestWatcher", () => {
     const summaryB: IngestSummary = { pluginId: "b", processed: 3, errors: 0, elapsedMs: 50 };
 
     const mockEngine = {
-      ingest: vi.fn()
-        .mockResolvedValueOnce(summaryA)
-        .mockResolvedValueOnce(summaryB),
+      ingest: vi.fn().mockResolvedValueOnce(summaryA).mockResolvedValueOnce(summaryB),
     } as unknown as IngestEngine;
 
     const onComplete = vi.fn();
@@ -56,7 +60,8 @@ describe("IngestWatcher", () => {
     const summaryB: IngestSummary = { pluginId: "b", processed: 3, errors: 0, elapsedMs: 50 };
 
     const mockEngine = {
-      ingest: vi.fn()
+      ingest: vi
+        .fn()
         .mockRejectedValueOnce(new Error("plugin a failed"))
         .mockResolvedValueOnce(summaryB),
     } as unknown as IngestEngine;

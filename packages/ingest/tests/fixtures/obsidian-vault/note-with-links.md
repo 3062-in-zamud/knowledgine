@@ -5,6 +5,7 @@ aliases: [linked-note]
 ---
 
 This note has various wikilinks:
+
 - Basic link: [[simple-note]]
 - Link with alias: [[simple-note|My Simple Note]]
 - Link with heading: [[simple-note#section]]

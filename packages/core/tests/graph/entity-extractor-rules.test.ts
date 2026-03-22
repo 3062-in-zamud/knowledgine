@@ -109,7 +109,9 @@ describe("EntityExtractor with ExtractionRules", () => {
       };
       const extractor = new EntityExtractor(rules);
       const result = extractor.extract("Some content", { tags: ["react"] });
-      const reactEntities = result.filter((e) => e.name === "react" && e.entityType === "technology");
+      const reactEntities = result.filter(
+        (e) => e.name === "react" && e.entityType === "technology",
+      );
       expect(reactEntities).toHaveLength(1);
     });
   });

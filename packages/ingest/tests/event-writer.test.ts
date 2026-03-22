@@ -48,7 +48,9 @@ describe("EventWriter", () => {
       const event = createMockEvent(0);
       writer.writeEvent(event);
 
-      const notes = db.prepare("SELECT count(*) as cnt FROM knowledge_notes").get() as { cnt: number };
+      const notes = db.prepare("SELECT count(*) as cnt FROM knowledge_notes").get() as {
+        cnt: number;
+      };
       expect(notes.cnt).toBe(1);
     });
 
@@ -81,7 +83,9 @@ describe("EventWriter", () => {
       const events = [createMockEvent(0), createMockEvent(1)];
       writer.writeBatch(events);
 
-      const notes = db.prepare("SELECT count(*) as cnt FROM knowledge_notes").get() as { cnt: number };
+      const notes = db.prepare("SELECT count(*) as cnt FROM knowledge_notes").get() as {
+        cnt: number;
+      };
       expect(notes.cnt).toBe(2);
     });
 

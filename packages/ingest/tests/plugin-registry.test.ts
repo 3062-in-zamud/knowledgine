@@ -37,8 +37,12 @@ describe("PluginRegistry", () => {
     });
 
     it("同じIDで再登録すると上書きされる", () => {
-      const plugin1 = makeMockPlugin({ manifest: { id: "test", name: "Old", version: "1.0.0", schemes: [], priority: 0 } });
-      const plugin2 = makeMockPlugin({ manifest: { id: "test", name: "New", version: "2.0.0", schemes: [], priority: 1 } });
+      const plugin1 = makeMockPlugin({
+        manifest: { id: "test", name: "Old", version: "1.0.0", schemes: [], priority: 0 },
+      });
+      const plugin2 = makeMockPlugin({
+        manifest: { id: "test", name: "New", version: "2.0.0", schemes: [], priority: 1 },
+      });
       registry.register(plugin1);
       registry.register(plugin2);
       expect(registry.size).toBe(1);
@@ -82,15 +86,19 @@ describe("PluginRegistry", () => {
 
     it("存在しないIDはエラーをスローする", () => {
       expect(() => registry.getOrThrow("nonexistent")).toThrowError(
-        "Plugin not found: nonexistent"
+        "Plugin not found: nonexistent",
       );
     });
   });
 
   describe("list", () => {
     it("登録済みプラグインの配列を返す", () => {
-      const p1 = makeMockPlugin({ manifest: { id: "a", name: "A", version: "1.0.0", schemes: [], priority: 0 } });
-      const p2 = makeMockPlugin({ manifest: { id: "b", name: "B", version: "1.0.0", schemes: [], priority: 0 } });
+      const p1 = makeMockPlugin({
+        manifest: { id: "a", name: "A", version: "1.0.0", schemes: [], priority: 0 },
+      });
+      const p2 = makeMockPlugin({
+        manifest: { id: "b", name: "B", version: "1.0.0", schemes: [], priority: 0 },
+      });
       registry.register(p1);
       registry.register(p2);
       const list = registry.list();
@@ -106,9 +114,15 @@ describe("PluginRegistry", () => {
 
   describe("listByPriority", () => {
     it("優先度の高い順にソートされる", () => {
-      const low = makeMockPlugin({ manifest: { id: "low", name: "Low", version: "1.0.0", schemes: [], priority: 0 } });
-      const high = makeMockPlugin({ manifest: { id: "high", name: "High", version: "1.0.0", schemes: [], priority: 3 } });
-      const mid = makeMockPlugin({ manifest: { id: "mid", name: "Mid", version: "1.0.0", schemes: [], priority: 2 } });
+      const low = makeMockPlugin({
+        manifest: { id: "low", name: "Low", version: "1.0.0", schemes: [], priority: 0 },
+      });
+      const high = makeMockPlugin({
+        manifest: { id: "high", name: "High", version: "1.0.0", schemes: [], priority: 3 },
+      });
+      const mid = makeMockPlugin({
+        manifest: { id: "mid", name: "Mid", version: "1.0.0", schemes: [], priority: 2 },
+      });
       registry.register(low);
       registry.register(high);
       registry.register(mid);
@@ -119,8 +133,12 @@ describe("PluginRegistry", () => {
     });
 
     it("元のlistは変更されない（イミュータブル）", () => {
-      const p1 = makeMockPlugin({ manifest: { id: "a", name: "A", version: "1.0.0", schemes: [], priority: 0 } });
-      const p2 = makeMockPlugin({ manifest: { id: "b", name: "B", version: "1.0.0", schemes: [], priority: 1 } });
+      const p1 = makeMockPlugin({
+        manifest: { id: "a", name: "A", version: "1.0.0", schemes: [], priority: 0 },
+      });
+      const p2 = makeMockPlugin({
+        manifest: { id: "b", name: "B", version: "1.0.0", schemes: [], priority: 1 },
+      });
       registry.register(p1);
       registry.register(p2);
       const beforeSort = registry.list().map((p) => p.manifest.id);
@@ -132,8 +150,12 @@ describe("PluginRegistry", () => {
 
   describe("disposeAll", () => {
     it("全プラグインのdisposeを呼び出してクリアする", async () => {
-      const p1 = makeMockPlugin({ manifest: { id: "a", name: "A", version: "1.0.0", schemes: [], priority: 0 } });
-      const p2 = makeMockPlugin({ manifest: { id: "b", name: "B", version: "1.0.0", schemes: [], priority: 0 } });
+      const p1 = makeMockPlugin({
+        manifest: { id: "a", name: "A", version: "1.0.0", schemes: [], priority: 0 },
+      });
+      const p2 = makeMockPlugin({
+        manifest: { id: "b", name: "B", version: "1.0.0", schemes: [], priority: 0 },
+      });
       registry.register(p1);
       registry.register(p2);
       await registry.disposeAll();

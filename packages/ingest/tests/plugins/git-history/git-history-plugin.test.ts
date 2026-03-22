@@ -12,7 +12,7 @@ async function git(args: string[], cwd: string): Promise<string> {
   const { stdout } = await execFileAsync(
     "git",
     ["-c", "user.email=test@test.com", "-c", "user.name=Test", ...args],
-    { cwd }
+    { cwd },
   );
   return stdout.trim();
 }
@@ -23,7 +23,11 @@ async function initRepo(dir: string): Promise<void> {
   await git(["checkout", "-b", "main"], dir);
 }
 
-async function addCommit(dir: string, message: string, files?: Record<string, string>): Promise<string> {
+async function addCommit(
+  dir: string,
+  message: string,
+  files?: Record<string, string>,
+): Promise<string> {
   if (files) {
     for (const [filename, content] of Object.entries(files)) {
       const filePath = join(dir, filename);
@@ -245,7 +249,20 @@ describe("GitHistoryPlugin", () => {
 
       // mainに戻ってマージ
       await git(["checkout", "main"], repoDir);
-      await git(["-c", "user.email=test@test.com", "-c", "user.name=Test", "merge", "--no-ff", "feature", "-m", "Merge feature branch"], repoDir);
+      await git(
+        [
+          "-c",
+          "user.email=test@test.com",
+          "-c",
+          "user.name=Test",
+          "merge",
+          "--no-ff",
+          "feature",
+          "-m",
+          "Merge feature branch",
+        ],
+        repoDir,
+      );
 
       const events = [];
       for await (const event of plugin.ingestAll(repoDir)) {

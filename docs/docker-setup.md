@@ -36,10 +36,10 @@ The server will be available on port 3000 with stdio transport (MCP protocol).
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `KNOWLEDGINE_ROOT_PATH` | `/data/notes` | Path to the notes directory inside the container |
-| `KNOWLEDGINE_SEMANTIC` | `false` | Enable semantic (vector) search using ONNX embeddings |
+| Variable                | Default       | Description                                           |
+| ----------------------- | ------------- | ----------------------------------------------------- |
+| `KNOWLEDGINE_ROOT_PATH` | `/data/notes` | Path to the notes directory inside the container      |
+| `KNOWLEDGINE_SEMANTIC`  | `false`       | Enable semantic (vector) search using ONNX embeddings |
 
 You can set these in a `.env` file at the project root:
 

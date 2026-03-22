@@ -80,9 +80,9 @@ export class FeedbackRepository {
   }
 
   getById(id: number): FeedbackRecord | undefined {
-    const row = this.db
-      .prepare("SELECT * FROM extraction_feedback WHERE id = ?")
-      .get(id) as FeedbackRow | undefined;
+    const row = this.db.prepare("SELECT * FROM extraction_feedback WHERE id = ?").get(id) as
+      | FeedbackRow
+      | undefined;
     return row ? rowToRecord(row) : undefined;
   }
 
@@ -113,9 +113,7 @@ export class FeedbackRepository {
 
   updateStatus(id: number, status: string): void {
     if (!VALID_STATUSES.includes(status as FeedbackStatus)) {
-      throw new Error(
-        `Invalid status: "${status}". Must be one of: ${VALID_STATUSES.join(", ")}`,
-      );
+      throw new Error(`Invalid status: "${status}". Must be one of: ${VALID_STATUSES.join(", ")}`);
     }
 
     const appliedAt = status === "applied" ? new Date().toISOString() : null;
@@ -129,9 +127,7 @@ export class FeedbackRepository {
   }
 
   delete(id: number): void {
-    const info = this.db
-      .prepare("DELETE FROM extraction_feedback WHERE id = ?")
-      .run(id);
+    const info = this.db.prepare("DELETE FROM extraction_feedback WHERE id = ?").run(id);
 
     if (info.changes === 0) {
       throw new Error(`Feedback record not found: id=${id}`);
@@ -140,9 +136,7 @@ export class FeedbackRepository {
 
   getStats(): { total: number; pending: number; applied: number; dismissed: number } {
     const rows = this.db
-      .prepare(
-        `SELECT status, COUNT(*) as count FROM extraction_feedback GROUP BY status`,
-      )
+      .prepare(`SELECT status, COUNT(*) as count FROM extraction_feedback GROUP BY status`)
       .all() as Array<{ status: string; count: number }>;
 
     const stats = { total: 0, pending: 0, applied: 0, dismissed: 0 };

@@ -30,7 +30,8 @@ const CLI_ERRORS = {
 function validateLimit(value: string | undefined): number {
   if (value === undefined) return 20;
   const n = parseInt(value, 10);
-  if (isNaN(n) || n < 1 || n > 10000) throw new Error("--limit must be a positive integer (1-10000)");
+  if (isNaN(n) || n < 1 || n > 10000)
+    throw new Error("--limit must be a positive integer (1-10000)");
   return n;
 }
 
@@ -55,10 +56,7 @@ export interface ToolSearchOptions {
   format?: string;
 }
 
-export async function toolSearchCommand(
-  query: string,
-  options: ToolSearchOptions,
-): Promise<void> {
+export async function toolSearchCommand(query: string, options: ToolSearchOptions): Promise<void> {
   const rootPath = options.path ? resolve(options.path) : resolve(process.cwd());
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {

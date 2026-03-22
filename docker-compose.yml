@@ -1,7 +1,7 @@
 services:
   knowledgine:
     build: .
-    platform: linux/amd64  # ARM64 ONNX compat issues
+    platform: linux/amd64 # ARM64 ONNX compat issues
     volumes:
       - ./notes:/data/notes
       - knowledgine-data:/app/.knowledgine

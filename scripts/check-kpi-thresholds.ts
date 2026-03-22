@@ -196,10 +196,7 @@ async function getAvgIssueResponseDays(repo: string, token: string): Promise<num
 // GitHub Issue creation
 // ---------------------------------------------------------------------------
 
-async function getExistingAlertIssues(
-  repo: string,
-  token: string,
-): Promise<Set<string>> {
+async function getExistingAlertIssues(repo: string, token: string): Promise<Set<string>> {
   const issues = await fetchJson<Array<{ title: string; state: string }>>(
     `https://api.github.com/repos/${repo}/issues?labels=kpi-alert&state=open&per_page=100`,
     {

@@ -4,7 +4,8 @@ import { join } from "node:path";
 
 // gh-parser モジュールをモック
 vi.mock("../../../src/plugins/github/gh-parser.js", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../../../src/plugins/github/gh-parser.js")>();
+  const original =
+    await importOriginal<typeof import("../../../src/plugins/github/gh-parser.js")>();
   return {
     ...original,
     execGh: vi.fn(),
@@ -92,9 +93,7 @@ describe("GitHubPlugin", () => {
       const prFixture = loadFixture("prs.json");
       const issueFixture = loadFixture("issues.json");
 
-      mockedExecGh
-        .mockResolvedValueOnce(prFixture)
-        .mockResolvedValueOnce(issueFixture);
+      mockedExecGh.mockResolvedValueOnce(prFixture).mockResolvedValueOnce(issueFixture);
 
       const events = [];
       for await (const event of plugin.ingestAll("github://owner/repo")) {
@@ -113,9 +112,7 @@ describe("GitHubPlugin", () => {
     it("should yield 0 events when both PRs and issues are empty", async () => {
       const emptyFixture = loadFixture("empty.json");
 
-      mockedExecGh
-        .mockResolvedValueOnce(emptyFixture)
-        .mockResolvedValueOnce(emptyFixture);
+      mockedExecGh.mockResolvedValueOnce(emptyFixture).mockResolvedValueOnce(emptyFixture);
 
       const events = [];
       for await (const event of plugin.ingestAll("github://owner/repo")) {
@@ -127,9 +124,7 @@ describe("GitHubPlugin", () => {
 
     it("should call execGh with correct arguments for PR list", async () => {
       const emptyFixture = loadFixture("empty.json");
-      mockedExecGh
-        .mockResolvedValueOnce(emptyFixture)
-        .mockResolvedValueOnce(emptyFixture);
+      mockedExecGh.mockResolvedValueOnce(emptyFixture).mockResolvedValueOnce(emptyFixture);
 
       const events = [];
       for await (const event of plugin.ingestAll("github://myorg/myrepo")) {
@@ -149,9 +144,7 @@ describe("GitHubPlugin", () => {
   describe("ingestIncremental", () => {
     it("should pass adjusted checkpoint in search query", async () => {
       const emptyFixture = loadFixture("empty.json");
-      mockedExecGh
-        .mockResolvedValueOnce(emptyFixture)
-        .mockResolvedValueOnce(emptyFixture);
+      mockedExecGh.mockResolvedValueOnce(emptyFixture).mockResolvedValueOnce(emptyFixture);
 
       const checkpoint = "2025-01-10T12:00:00.000Z";
       const events = [];
@@ -172,9 +165,7 @@ describe("GitHubPlugin", () => {
       const prFixture = loadFixture("prs.json");
       const issueFixture = loadFixture("issues.json");
 
-      mockedExecGh
-        .mockResolvedValueOnce(prFixture)
-        .mockResolvedValueOnce(issueFixture);
+      mockedExecGh.mockResolvedValueOnce(prFixture).mockResolvedValueOnce(issueFixture);
 
       const events = [];
       for await (const event of plugin.ingestIncremental(

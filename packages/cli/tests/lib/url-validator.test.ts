@@ -37,9 +37,7 @@ describe("validateCaptureUrl", () => {
   });
 
   it("::1 を拒否する", () => {
-    expect(() => validateCaptureUrl("http://[::1]/api")).toThrow(
-      "Local addresses are not allowed",
-    );
+    expect(() => validateCaptureUrl("http://[::1]/api")).toThrow("Local addresses are not allowed");
   });
 
   it("0.0.0.0 を拒否する", () => {

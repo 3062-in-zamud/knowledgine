@@ -78,13 +78,13 @@ knowledgine status --path ./my-notes
 
 ## Commands
 
-| Command   | Description                                                  |
-| --------- | ------------------------------------------------------------ |
-| `init`    | Scan markdown files and build FTS5 search index              |
-| `start`   | Start MCP server with file watching for incremental updates  |
+| Command   | Description                                                      |
+| --------- | ---------------------------------------------------------------- |
+| `init`    | Scan markdown files and build FTS5 search index                  |
+| `start`   | Start MCP server with file watching for incremental updates      |
 | `setup`   | Generate MCP configuration for AI tools (Claude Desktop, Cursor) |
-| `status`  | Check setup status (database, model, MCP config)             |
-| `upgrade` | Enable additional capabilities (e.g., semantic search)       |
+| `status`  | Check setup status (database, model, MCP config)                 |
+| `upgrade` | Enable additional capabilities (e.g., semantic search)           |
 
 ### init
 

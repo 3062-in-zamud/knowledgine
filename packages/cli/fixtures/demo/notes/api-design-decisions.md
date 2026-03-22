@@ -6,20 +6,23 @@ tags:
 author: demo-user
 project: backend-api
 ---
+
 # REST API Design Decisions
 
 ## Issue: Pagination Strategy
+
 Needed to decide between offset-based and cursor-based pagination
 for the search results endpoint.
 
 ### Decision: Cursor-based pagination
+
 Offset pagination breaks when items are inserted/deleted during browsing.
 
 ```typescript
 // Cursor-based pagination
 interface PaginatedResponse<T> {
   data: T[];
-  cursor: string | null;  // null means no more pages
+  cursor: string | null; // null means no more pages
   hasMore: boolean;
 }
 
@@ -31,7 +34,7 @@ app.get("/api/notes", (req, res) => {
     `SELECT * FROM notes
      WHERE ($1::text IS NULL OR id < $1)
      ORDER BY id DESC LIMIT $2`,
-    [decoded?.id, limit + 1]
+    [decoded?.id, limit + 1],
   );
 
   const hasMore = notes.length > limit;
@@ -46,6 +49,7 @@ app.get("/api/notes", (req, res) => {
 ```
 
 ## Issue: Error Response Format
+
 Standardized error responses across all endpoints.
 
 ### Solution: RFC 7807 Problem Details
@@ -73,6 +77,7 @@ app.use((err, req, res, _next) => {
 ```
 
 ## Learnings
+
 - Cursor-based pagination is more reliable for real-time data
 - Consistent error formats reduce client-side error handling complexity
 - Always version your API from the start (`/v1/`)

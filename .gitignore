@@ -10,3 +10,6 @@ coverage/
 **/CLAUDE.md
 !/CLAUDE.md
 *.onnx
+.knowledgine/
+.knowledginerc.json
+packages/core/models/

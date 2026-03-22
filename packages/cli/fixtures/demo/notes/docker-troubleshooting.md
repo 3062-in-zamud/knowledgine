@@ -6,9 +6,11 @@ tags:
 author: demo-user
 project: microservices
 ---
+
 # Docker Container Networking Issues
 
 ## Problem
+
 Containers in docker-compose could not communicate with each other.
 The API service failed to connect to the database container.
 
@@ -17,11 +19,13 @@ Error: connect ECONNREFUSED 127.0.0.1:5432
 ```
 
 ## Investigation
+
 - Verified both containers were running: `docker ps` showed healthy status
 - Checked network: `docker network ls` showed custom bridge network
 - The API was using `localhost` instead of the service name
 
 ## Solution
+
 Docker containers have their own network namespace. Use the service
 name as the hostname, not `localhost`.
 
@@ -32,7 +36,7 @@ services:
     build: ./api
     environment:
       # Wrong: DB_HOST=localhost
-      DB_HOST: postgres  # Use service name
+      DB_HOST: postgres # Use service name
       DB_PORT: 5432
     depends_on:
       postgres:
@@ -48,6 +52,7 @@ services:
 ```
 
 ## Additional Fix: DNS Resolution Timing
+
 Even with correct hostnames, the API started before DNS was ready.
 
 ```typescript
@@ -68,6 +73,7 @@ async function connectWithRetry(maxRetries = 5): Promise<Pool> {
 ```
 
 ## Learnings
+
 - Never use `localhost` for inter-container communication
 - Use `depends_on` with health checks, not just service ordering
 - Add connection retry logic for resilience
