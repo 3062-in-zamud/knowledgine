@@ -128,7 +128,7 @@ export class ObsidianPlugin implements IngestPlugin {
       }
 
       return {
-        sourceUri: `obsidian://${vaultName}/${relativePath}`,
+        sourceUri: relativePath,
         eventType: "document",
         title,
         content: sanitizeContent(processed.content),

@@ -48,6 +48,7 @@ export interface IndexFileResult {
   patternCount: number;
 }
 
+/** @deprecated Use IngestEngine with MarkdownPlugin instead */
 export async function indexFile(
   relativePath: string,
   rootPath: string,
@@ -124,6 +125,7 @@ export interface IndexAllOptions {
   onProgress?: (current: number, total: number, filePath: string) => void;
 }
 
+/** @deprecated Use IngestEngine with MarkdownPlugin instead */
 export async function indexAll(
   rootPath: string,
   repository: KnowledgeRepository,

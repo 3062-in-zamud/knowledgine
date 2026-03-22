@@ -119,6 +119,17 @@ program
   .option("--path <dir>", "Root directory")
   .option("--full", "Force full re-ingest (ignore cursor)")
   .option("--all", "Run all registered plugins")
+  .option("--repo <owner/repo>", "GitHub repository (required for --source github)")
+  .addHelpText(
+    "after",
+    `
+Examples:
+  knowledgine ingest --source markdown --path ~/notes
+  knowledgine ingest --source github --repo owner/repo --path ~/notes
+  knowledgine ingest --source claude-sessions --path ~/notes
+  knowledgine ingest --all --path ~/notes
+  knowledgine ingest --source markdown --full --path ~/notes`,
+  )
   .action(ingestCommand);
 
 const pluginsCmd = program

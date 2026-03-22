@@ -11,6 +11,12 @@ import type {
 } from "../../types.js";
 import { parseSessionFile } from "./session-parser.js";
 
+/**
+ * Maximum number of messages to include in a session summary.
+ * Prevents excessively large notes from very long sessions.
+ */
+const MAX_MESSAGES_PER_SESSION = 200;
+
 export class ClaudeSessionsPlugin implements IngestPlugin {
   readonly manifest: PluginManifest = {
     id: "claude-sessions",
@@ -31,7 +37,8 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
   async *ingestAll(sourcePath: SourceURI): AsyncGenerator<NormalizedEvent> {
     const jsonlFiles = await this.findJsonlFiles(sourcePath);
     for (const filePath of jsonlFiles) {
-      yield* this.processFile(filePath);
+      const event = await this.processFileToSummary(filePath);
+      if (event) yield event;
     }
   }
 
@@ -45,7 +52,8 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
       try {
         const fileStat = await stat(filePath);
         if (fileStat.mtimeMs >= sinceDate.getTime()) {
-          yield* this.processFile(filePath);
+          const event = await this.processFileToSummary(filePath);
+          if (event) yield event;
         }
       } catch {
         // ファイルアクセスエラーはスキップ
@@ -61,42 +69,68 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
     // no-op
   }
 
-  private async *processFile(
+  /**
+   * Process a session file into a single summary NormalizedEvent.
+   * Instead of yielding one event per message, we consolidate the entire
+   * session into one note for better search quality and performance.
+   */
+  private async processFileToSummary(
     filePath: string
-  ): AsyncGenerator<NormalizedEvent> {
+  ): Promise<NormalizedEvent | null> {
     const sessionId = basename(filePath, ".jsonl");
     const projectName = basename(dirname(filePath));
 
-    // 全メッセージを収集
     const allMessages: Array<{
       type: "user" | "assistant" | "system";
       timestamp: Date;
-      sessionId: string;
       content: string;
-      cwd: string;
-      gitBranch?: string;
       uuid: string;
     }> = [];
 
     try {
       for await (const msg of parseSessionFile(filePath)) {
         allMessages.push(msg);
+        if (allMessages.length >= MAX_MESSAGES_PER_SESSION) break;
       }
     } catch (err) {
-      console.error(`[claude-sessions] Failed to parse ${filePath}:`, err);
-      return;
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "EACCES") {
+        process.stderr.write(`  ⚠ Skipped (permission denied): ${filePath}\n`);
+      } else {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`  ⚠ Skipped (parse error): ${basename(filePath)}: ${msg}\n`);
+      }
+      return null;
     }
 
-    if (allMessages.length === 0) return;
+    if (allMessages.length === 0) return null;
 
     const firstMessage = allMessages[0];
+    const lastMessage = allMessages[allMessages.length - 1];
 
-    // セッション開始イベント
-    yield {
+    // Build a summary content from user messages (most relevant for search)
+    const userMessages = allMessages
+      .filter((m) => m.type === "user")
+      .map((m) => m.content.slice(0, 500))  // Truncate long messages
+      .join("\n\n---\n\n");
+
+    const summaryContent = [
+      `Project: ${projectName}`,
+      `Session: ${sessionId}`,
+      `Messages: ${allMessages.length}`,
+      `Started: ${firstMessage.timestamp.toISOString()}`,
+      `Ended: ${lastMessage.timestamp.toISOString()}`,
+      "",
+      "## User Messages",
+      "",
+      userMessages || "(no user messages)",
+    ].join("\n");
+
+    return {
       sourceUri: `claude-session://${projectName}/${sessionId}`,
       eventType: "session",
-      title: `Session: ${sessionId}`,
-      content: `Project: ${projectName}\nStarted: ${firstMessage.timestamp.toISOString()}`,
+      title: `Session: ${projectName}/${sessionId.slice(0, 8)}`,
+      content: summaryContent,
       timestamp: firstMessage.timestamp,
       metadata: {
         sourcePlugin: "claude-sessions",
@@ -104,25 +138,6 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
         project: projectName,
       },
     };
-
-    // メッセージイベント
-    for (const message of allMessages) {
-      const content = message.content;
-      yield {
-        sourceUri: `claude-session://${projectName}/${sessionId}#${message.uuid}`,
-        eventType: "session_event",
-        title: `${message.type}: ${content.slice(0, 80)}${content.length > 80 ? "..." : ""}`,
-        content,
-        timestamp: message.timestamp,
-        metadata: {
-          sourcePlugin: "claude-sessions",
-          sourceId: message.uuid,
-          author: message.type === "assistant" ? "claude" : "user",
-          project: projectName,
-          branch: message.gitBranch,
-        },
-      };
-    }
   }
 
   private async findJsonlFiles(dir: string): Promise<string[]> {
@@ -143,6 +158,7 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
       return;
     }
     for (const entry of entries) {
+      if (entry.name === "subagents") continue; // Skip subagent sessions
       const fullPath = join(dir, entry.name);
       if (entry.isDirectory()) {
         await this.walkDir(fullPath, results);

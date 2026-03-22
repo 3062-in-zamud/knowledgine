@@ -75,7 +75,7 @@ export class MarkdownPlugin implements IngestPlugin {
       const fileStat = await stat(filePath);
 
       return {
-        sourceUri: `file://${filePath}`,
+        sourceUri: relativePath,
         eventType: "document",
         title,
         content: processed.content,
@@ -88,7 +88,9 @@ export class MarkdownPlugin implements IngestPlugin {
         relatedPaths: [relativePath],
         rawData: processed.frontmatter,
       };
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`  ⚠ Skipped (read error): ${relative(basePath, filePath)}: ${msg}\n`);
       return null;
     }
   }

@@ -120,5 +120,6 @@ export interface IngestSummary {
   pluginId: string;
   processed: number;
   errors: number;
+  deleted: number;
   elapsedMs: number;
 }

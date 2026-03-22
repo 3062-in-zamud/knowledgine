@@ -1,5 +1,6 @@
-import { resolve } from "path";
-import { mkdirSync } from "fs";
+import { resolve, join } from "path";
+import { mkdirSync, statSync } from "fs";
+import { homedir } from "os";
 import {
   defineConfig,
   createDatabase,
@@ -16,6 +17,7 @@ export interface IngestOptions {
   path?: string;
   full?: boolean;
   all?: boolean;
+  repo?: string;
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
@@ -71,6 +73,37 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
     }
   }
 
+  // Determine sourcePath based on plugin type
+  let sourcePath = rootPath;
+  if (options.source === "github") {
+    if (!options.repo) {
+      console.error("Error: --repo <owner/repo> is required for --source github");
+      console.error("Usage: knowledgine ingest --source github --repo owner/repo --path <dir>");
+      process.exitCode = 1;
+      db.close();
+      return;
+    }
+    sourcePath = `github://${options.repo}`;
+  } else if (options.source === "claude-sessions") {
+    // Map the project root path to the Claude projects directory name
+    // e.g. /Users/foo/workspaces/bar → -Users-foo-workspaces-bar
+    const projectDirName = rootPath.replace(/\//g, "-");
+    const projectSessionDir = join(homedir(), ".claude", "projects", projectDirName);
+
+    // Use project-specific directory if it exists, otherwise scan all
+    try {
+      const dirStat = statSync(projectSessionDir);
+      if (dirStat.isDirectory()) {
+        sourcePath = projectSessionDir;
+      } else {
+        sourcePath = join(homedir(), ".claude", "projects");
+      }
+    } catch {
+      // Project-specific dir doesn't exist — fall back to all projects
+      sourcePath = join(homedir(), ".claude", "projects");
+    }
+  }
+
   // Run ingest
   const engine = new IngestEngine(registry, db, repository);
   const startTime = Date.now();
@@ -112,11 +145,11 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
 
       progress.finish();
     } else {
-      const summary = await engine.ingest(options.source!, rootPath, {
+      const summary = await engine.ingest(options.source!, sourcePath, {
         full: options.full,
       });
       console.error(
-        `Ingest complete (${formatDuration(summary.elapsedMs)}): ${summary.processed} events, ${summary.errors} errors`,
+        `Ingest complete (${formatDuration(summary.elapsedMs)}): ${summary.processed} events, ${summary.errors} errors${summary.deleted > 0 ? `, ${summary.deleted} stale notes removed` : ""}`,
       );
     }
   } catch (error) {

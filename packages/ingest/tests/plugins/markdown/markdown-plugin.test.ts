@@ -58,7 +58,7 @@ describe("MarkdownPlugin", () => {
 
       for (const event of events) {
         expect(event.eventType).toBe("document");
-        expect(event.sourceUri).toMatch(/^file:\/\//);
+        expect(event.sourceUri).not.toContain("://");
         expect(event.metadata.sourcePlugin).toBe("markdown");
         expect(event.timestamp).toBeInstanceOf(Date);
       }
@@ -136,7 +136,7 @@ Body content here.
       expect(events[0].title).toBe("my-note");
     });
 
-    it("should set sourceUri with file:// scheme", async () => {
+    it("should set sourceUri as relative path", async () => {
       await writeFile(join(testDir, "note.md"), "# Note");
 
       const events = [];
@@ -144,7 +144,7 @@ Body content here.
         events.push(event);
       }
 
-      expect(events[0].sourceUri).toBe(`file://${join(testDir, "note.md")}`);
+      expect(events[0].sourceUri).toBe("note.md");
     });
 
     it("should set relatedPaths as relative path", async () => {

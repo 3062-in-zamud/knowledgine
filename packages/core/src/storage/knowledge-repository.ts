@@ -494,6 +494,38 @@ export class KnowledgeRepository {
     return stmt.all() as KnowledgeNote[];
   }
 
+  /**
+   * 全ノートを取得する
+   */
+  getAllNotes(): KnowledgeNote[] {
+    const stmt = this.db.prepare("SELECT * FROM knowledge_notes");
+    return stmt.all() as KnowledgeNote[];
+  }
+
+  /**
+   * 特定のソースプラグインで作成されたノートを取得する
+   * frontmatter_json 内の source_plugin フィールドで絞り込む
+   */
+  getNotesBySourcePlugin(pluginId: string): KnowledgeNote[] {
+    const stmt = this.db.prepare(
+      `SELECT * FROM knowledge_notes WHERE frontmatter_json LIKE ?`,
+    );
+    return stmt.all(`%"source_plugin":"${pluginId}"%`) as KnowledgeNote[];
+  }
+
+  /**
+   * 指定IDリストのノートを一括削除する
+   */
+  deleteNotesByIds(ids: number[]): number {
+    if (ids.length === 0) return 0;
+    const placeholders = ids.map(() => "?").join(",");
+    const stmt = this.db.prepare(
+      `DELETE FROM knowledge_notes WHERE id IN (${placeholders})`,
+    );
+    const info = stmt.run(...ids);
+    return info.changes;
+  }
+
   close(): void {
     this.db.close();
   }

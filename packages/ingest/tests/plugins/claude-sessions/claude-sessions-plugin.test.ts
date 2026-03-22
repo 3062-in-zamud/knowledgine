@@ -64,7 +64,7 @@ describe("ClaudeSessionsPlugin", () => {
   });
 
   describe("ingestAll", () => {
-    it("should generate session start event + message events for 2 sessions (2 files)", async () => {
+    it("should generate one summary event per session file", async () => {
       // セッション1
       const proj1Dir = join(testDir, "my-project");
       await mkdir(proj1Dir, { recursive: true });
@@ -87,30 +87,20 @@ describe("ClaudeSessionsPlugin", () => {
         events.push(event);
       }
 
-      // session1: 1 session + 2 messages, session2: 1 session + 1 message = 5 total
-      expect(events).toHaveLength(5);
+      // Each session file produces one summary event
+      expect(events).toHaveLength(2);
 
-      const sessionEvents = events.filter((e) => e.eventType === "session");
-      const messageEvents = events.filter((e) => e.eventType === "session_event");
-      expect(sessionEvents).toHaveLength(2);
-      expect(messageEvents).toHaveLength(3);
+      // All events are session type summaries
+      expect(events.every((e) => e.eventType === "session")).toBe(true);
 
-      // セッション開始イベントの確認
-      const sess1Start = sessionEvents.find((e) => e.sourceUri.includes("session-abc"));
-      expect(sess1Start).toBeDefined();
-      expect(sess1Start!.sourceUri).toBe("claude-session://my-project/session-abc");
-      expect(sess1Start!.title).toBe("Session: session-abc");
-      expect(sess1Start!.metadata.sourcePlugin).toBe("claude-sessions");
-      expect(sess1Start!.metadata.project).toBe("my-project");
-      expect(sess1Start!.timestamp).toBeInstanceOf(Date);
-
-      // メッセージイベントの確認
-      const msg1 = messageEvents.find((e) => e.metadata.sourceId === "uuid-1a");
-      expect(msg1).toBeDefined();
-      expect(msg1!.sourceUri).toBe("claude-session://my-project/session-abc#uuid-1a");
-      expect(msg1!.eventType).toBe("session_event");
-      expect(msg1!.metadata.author).toBe("user");
-      expect(msg1!.metadata.project).toBe("my-project");
+      // セッションサマリーの確認
+      const sess1 = events.find((e) => e.sourceUri.includes("session-abc"));
+      expect(sess1).toBeDefined();
+      expect(sess1!.sourceUri).toBe("claude-session://my-project/session-abc");
+      expect(sess1!.metadata.sourcePlugin).toBe("claude-sessions");
+      expect(sess1!.metadata.project).toBe("my-project");
+      expect(sess1!.timestamp).toBeInstanceOf(Date);
+      expect(sess1!.content).toContain("Hello session 1");
     });
 
     it("should yield 0 events when directory does not exist", async () => {
@@ -124,12 +114,12 @@ describe("ClaudeSessionsPlugin", () => {
       expect(events).toHaveLength(0);
     });
 
-    it("should skip messages where all content is thinking blocks", async () => {
+    it("should skip thinking-only messages in summary content", async () => {
       const projDir = join(testDir, "proj");
       await mkdir(projDir, { recursive: true });
       const content = JSON.stringify([{ type: "thinking", text: "hmm" }]);
       const lines = [
-        // thinking-onlyエントリ（スキップされる）
+        // thinking-onlyエントリ（パーサーでスキップされる）
         JSON.stringify({
           type: "assistant",
           uuid: "thinking-uuid",
@@ -147,13 +137,16 @@ describe("ClaudeSessionsPlugin", () => {
         events.push(event);
       }
 
-      const messageEvents = events.filter((e) => e.eventType === "session_event");
-      // thinking-onlyはスキップ → valid-uuidのみ
-      expect(messageEvents).toHaveLength(1);
-      expect(messageEvents[0].metadata.sourceId).toBe("valid-uuid");
+      // 1 session file → 1 summary event
+      expect(events).toHaveLength(1);
+      expect(events[0].eventType).toBe("session");
+      // Summary should contain the valid user message
+      expect(events[0].content).toContain("Valid message");
+      // Summary should not contain "hmm" (thinking block was skipped by parser)
+      expect(events[0].content).not.toContain("hmm");
     });
 
-    it("should skip corrupted lines and still yield valid events", async () => {
+    it("should skip corrupted lines and still yield summary", async () => {
       const projDir = join(testDir, "proj");
       await mkdir(projDir, { recursive: true });
       const lines = [
@@ -168,8 +161,11 @@ describe("ClaudeSessionsPlugin", () => {
         events.push(event);
       }
 
-      const messageEvents = events.filter((e) => e.eventType === "session_event");
-      expect(messageEvents).toHaveLength(2);
+      // 1 session file → 1 summary event (corrupted line skipped)
+      expect(events).toHaveLength(1);
+      expect(events[0].eventType).toBe("session");
+      expect(events[0].content).toContain("OK message");
+      expect(events[0].content).toContain("Messages: 2");
     });
   });
 

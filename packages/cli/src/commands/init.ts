@@ -13,7 +13,8 @@ import {
   ModelManager,
   downloadModel,
 } from "@knowledgine/core";
-import { indexAll } from "../lib/indexer.js";
+import { IngestEngine, PluginRegistry, MarkdownPlugin } from "@knowledgine/ingest";
+import { postIngestProcessing } from "../lib/entity-extractor.js";
 import { createProgress, createStepProgress } from "../lib/progress.js";
 import { copyDemoFixtures } from "../lib/demo-manager.js";
 import { getDemoNotesPath } from "./demo.js";
@@ -203,38 +204,34 @@ export async function initCommand(options: InitOptions): Promise<void> {
   stepProgress.completeStep("Initializing database");
 
   // ---------------------------------------------------------------------------
-  // Step 3: Index markdown files
+  // Step 3: Index markdown files via IngestEngine
   // ---------------------------------------------------------------------------
   stepProgress.startStep("Indexing markdown files");
-  let indexProgress: import("../lib/progress.js").Progress | null = null;
 
-  const summary = await indexAll(rootPath, repository, graphRepository, {
-    onProgress: (current, total, filePath) => {
-      if (!indexProgress) {
-        console.error(`  Found ${total} markdown files`);
-        indexProgress = createProgress(total, "  Indexing");
-      }
-      indexProgress.update(current, filePath);
-    },
-  });
-
-  if (indexProgress !== null) {
-    // Print a newline after the in-place progress bar
-    (indexProgress as import("../lib/progress.js").Progress).finish();
+  const registry = new PluginRegistry();
+  registry.register(new MarkdownPlugin());
+  const mdPlugin = registry.get("markdown");
+  if (mdPlugin) {
+    await mdPlugin.initialize();
   }
+  const engine = new IngestEngine(registry, db, repository);
+  const ingestSummary = await engine.ingest("markdown", rootPath, { full: true });
 
-  if (summary.totalFiles === 0) {
+  if (ingestSummary.processed === 0) {
     stepProgress.warn("No markdown files found in the directory.");
   }
 
-  if (summary.errors.length > 0) {
-    // File read failures are non-fatal: log as warnings and continue
-    for (const err of summary.errors) {
-      stepProgress.warn(`Skipped (read error): ${err}`);
-    }
+  if (ingestSummary.errors > 0) {
+    stepProgress.warn(`${ingestSummary.errors} file(s) could not be indexed`);
   }
 
   stepProgress.completeStep("Indexing markdown files");
+
+  // Entity extraction (post-ingest batch)
+  const postSummary = await postIngestProcessing(
+    repository,
+    graphRepository,
+  );
 
   // ---------------------------------------------------------------------------
   // Step 4 & 5 (semantic only): Download model + generate embeddings
@@ -301,8 +298,8 @@ export async function initCommand(options: InitOptions): Promise<void> {
         // Still print summary for what was indexed
         console.error("");
         console.error("knowledgine initialized (without embeddings).");
-        console.error(`  Notes:      ${summary.processedFiles} indexed`);
-        console.error(`  Patterns:   ${summary.totalPatterns} extracted`);
+        console.error(`  Notes:      ${ingestSummary.processed} indexed`);
+        console.error(`  Patterns:   ${postSummary.totalEntities} entities extracted`);
         console.error(`  Embeddings: skipped (model download failed)`);
         console.error("");
         console.error("Next: Run 'knowledgine setup' to connect your AI tool.");
@@ -354,13 +351,15 @@ export async function initCommand(options: InitOptions): Promise<void> {
   // ---------------------------------------------------------------------------
   // Final summary
   // ---------------------------------------------------------------------------
+  const stats = repository.getStats();
   const notesWithoutEmb = repository.getNotesWithoutEmbeddings().length;
-  const embeddingsGenerated = summary.processedFiles - notesWithoutEmb;
+  const embeddingsGenerated = stats.totalNotes - notesWithoutEmb;
 
   console.error("");
   console.error("knowledgine initialized successfully.");
-  console.error(`  Notes:      ${summary.processedFiles} indexed`);
-  console.error(`  Patterns:   ${summary.totalPatterns} extracted`);
+  console.error(`  Notes:      ${stats.totalNotes} indexed`);
+  console.error(`  Patterns:   ${stats.totalPatterns} extracted`);
+  console.error(`  Entities:   ${postSummary.totalEntities} extracted`);
   if (enableSemantic && config.embedding.enabled) {
     console.error(
       `  Embeddings: ${embeddingsGenerated > 0 ? `${embeddingsGenerated} generated` : "none"}`,

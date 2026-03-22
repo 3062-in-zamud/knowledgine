@@ -64,16 +64,14 @@ describe("ObsidianPlugin", () => {
       expect(events.length).toBe(4);
     });
 
-    it("generates correct sourceUri format", async () => {
+    it("generates correct sourceUri as relative path", async () => {
       const events: { sourceUri: string }[] = [];
       for await (const event of plugin.ingestAll(tmpDir)) {
         events.push(event);
       }
-      const vaultName = tmpDir.split("/").pop();
       for (const event of events) {
-        expect(event.sourceUri).toMatch(
-          new RegExp(`^obsidian://${vaultName}/`),
-        );
+        expect(event.sourceUri).not.toContain("://");
+        expect(event.sourceUri).toMatch(/\.md$/);
       }
     });
 
