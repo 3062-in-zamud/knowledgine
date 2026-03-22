@@ -46,10 +46,12 @@ describe("sanitizeContent", () => {
   });
 
   it("Slack token (xoxb-) をマスクする", () => {
-    const content = "slack token: DUMMY_SLACK_TOKEN";
+    // トークンを動的に組み立てて GitHub Secret Scanning の誤検知を回避
+    const slackToken = ["xoxb", "12345678901", "abcdefghijklmnop"].join("-");
+    const content = `slack token: ${slackToken}`;
     const result = sanitizeContent(content);
     expect(result).toContain("[REDACTED]");
-    expect(result).not.toContain("DUMMY_SLACK_TOKEN");
+    expect(result).not.toContain(slackToken);
   });
 
   it("sk- プレフィクストークン (OpenAI等) をマスクする", () => {
