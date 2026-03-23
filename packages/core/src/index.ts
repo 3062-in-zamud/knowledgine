@@ -73,6 +73,7 @@ export { migration005a } from "./storage/migrations/005a_events_layer.js";
 export { migration006 } from "./storage/migrations/006_extraction_feedback.js";
 export { migration005b } from "./storage/migrations/005b_bitemporal.js";
 export { migration005c } from "./storage/migrations/005c_provenance.js";
+export { migration007 } from "./storage/migrations/007_spec_alignment.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -92,6 +93,7 @@ import { migration005a } from "./storage/migrations/005a_events_layer.js";
 import { migration005b } from "./storage/migrations/005b_bitemporal.js";
 import { migration005c } from "./storage/migrations/005c_provenance.js";
 import { migration006 } from "./storage/migrations/006_extraction_feedback.js";
+import { migration007 } from "./storage/migrations/007_spec_alignment.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -102,12 +104,14 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration006,
   migration005b,
   migration005c,
+  migration007,
 ];
 
 // Provenance
 export { ProvenanceRepository } from "./provenance/provenance-repository.js";
 export type {
   ProvenanceRecord,
+  ProvenanceLink,
   FileTimelineEntry,
   Snapshot,
 } from "./provenance/provenance-repository.js";

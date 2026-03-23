@@ -1,68 +1,71 @@
+import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { DatabaseError } from "../errors.js";
 
 export interface ProvenanceRecord {
-  id: number;
+  id: string;
   entityUri: string;
   activityType: "ingest" | "extract" | "link" | "embed";
-  agent: string;
-  inputUris: string[];
-  outputUris: string[];
-  startedAt: string;
-  endedAt?: string;
+  agent?: string;
+  sourceUri?: string;
+  generatedAt: string;
   metadata?: Record<string, unknown>;
+}
+
+export interface ProvenanceLink {
+  id: string;
+  fromEntityUri: string;
+  toEntityUri: string;
+  relation: string;
   createdAt: string;
 }
 
 export interface FileTimelineEntry {
-  id: number;
   filePath: string;
-  eventType: "created" | "modified" | "deleted" | "renamed";
-  eventId?: number;
-  occurredAt: string;
-  metadata?: Record<string, unknown>;
+  eventId: string;
+  changedAt: string;
+  changeType: "created" | "modified" | "deleted" | "renamed";
 }
 
 export interface Snapshot {
-  id: number;
+  id: string;
   snapshotAt: string;
-  noteCount: number;
-  eventCount: number;
-  entityCount: number;
+  entityCount?: number;
+  eventCount?: number;
   metadata?: Record<string, unknown>;
-  createdAt: string;
 }
 
 interface ProvenanceRow {
-  id: number;
+  id: string;
   entity_uri: string;
   activity_type: string;
-  agent: string;
-  input_uris: string;
-  output_uris: string;
-  started_at: string;
-  ended_at: string | null;
-  metadata_json: string | null;
+  agent: string | null;
+  source_uri: string | null;
+  generated_at: string;
+  metadata: string | null;
+}
+
+interface ProvenanceLinkRow {
+  id: string;
+  from_entity_uri: string;
+  to_entity_uri: string;
+  relation: string;
   created_at: string;
 }
 
 interface FileTimelineRow {
-  id: number;
   file_path: string;
-  event_type: string;
-  event_id: number | null;
-  occurred_at: string;
-  metadata_json: string | null;
+  event_id: string;
+  changed_at: string;
+  change_type: string;
 }
 
 interface SnapshotRow {
-  id: number;
+  id: string;
   snapshot_at: string;
-  note_count: number;
-  event_count: number;
-  entity_count: number;
-  metadata_json: string | null;
-  created_at: string;
+  entity_count: number | null;
+  event_count: number | null;
+  metadata: string | null;
 }
 
 function rowToProvenance(row: ProvenanceRow): ProvenanceRecord {
@@ -70,28 +73,29 @@ function rowToProvenance(row: ProvenanceRow): ProvenanceRecord {
     id: row.id,
     entityUri: row.entity_uri,
     activityType: row.activity_type as ProvenanceRecord["activityType"],
-    agent: row.agent,
-    inputUris: JSON.parse(row.input_uris) as string[],
-    outputUris: JSON.parse(row.output_uris) as string[],
-    startedAt: row.started_at,
-    endedAt: row.ended_at ?? undefined,
-    metadata: row.metadata_json
-      ? (JSON.parse(row.metadata_json) as Record<string, unknown>)
-      : undefined,
+    agent: row.agent ?? undefined,
+    sourceUri: row.source_uri ?? undefined,
+    generatedAt: row.generated_at,
+    metadata: row.metadata ? (JSON.parse(row.metadata) as Record<string, unknown>) : undefined,
+  };
+}
+
+function rowToProvenanceLink(row: ProvenanceLinkRow): ProvenanceLink {
+  return {
+    id: row.id,
+    fromEntityUri: row.from_entity_uri,
+    toEntityUri: row.to_entity_uri,
+    relation: row.relation,
     createdAt: row.created_at,
   };
 }
 
 function rowToFileTimeline(row: FileTimelineRow): FileTimelineEntry {
   return {
-    id: row.id,
     filePath: row.file_path,
-    eventType: row.event_type as FileTimelineEntry["eventType"],
-    eventId: row.event_id ?? undefined,
-    occurredAt: row.occurred_at,
-    metadata: row.metadata_json
-      ? (JSON.parse(row.metadata_json) as Record<string, unknown>)
-      : undefined,
+    eventId: row.event_id,
+    changedAt: row.changed_at,
+    changeType: row.change_type as FileTimelineEntry["changeType"],
   };
 }
 
@@ -99,13 +103,9 @@ function rowToSnapshot(row: SnapshotRow): Snapshot {
   return {
     id: row.id,
     snapshotAt: row.snapshot_at,
-    noteCount: row.note_count,
-    eventCount: row.event_count,
-    entityCount: row.entity_count,
-    metadata: row.metadata_json
-      ? (JSON.parse(row.metadata_json) as Record<string, unknown>)
-      : undefined,
-    createdAt: row.created_at,
+    entityCount: row.entity_count ?? undefined,
+    eventCount: row.event_count ?? undefined,
+    metadata: row.metadata ? (JSON.parse(row.metadata) as Record<string, unknown>) : undefined,
   };
 }
 
@@ -114,23 +114,23 @@ export class ProvenanceRepository {
 
   // ── 来歴記録 ────────────────────────────────────────────────────
 
-  record(entry: Omit<ProvenanceRecord, "id" | "createdAt">): number {
+  record(entry: Omit<ProvenanceRecord, "id">): string {
     try {
+      const id = randomUUID();
       const stmt = this.db.prepare(`
-        INSERT INTO provenance (entity_uri, activity_type, agent, input_uris, output_uris, started_at, ended_at, metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO provenance (id, entity_uri, activity_type, agent, source_uri, generated_at, metadata)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `);
-      const info = stmt.run(
+      stmt.run(
+        id,
         entry.entityUri,
         entry.activityType,
-        entry.agent,
-        JSON.stringify(entry.inputUris ?? []),
-        JSON.stringify(entry.outputUris ?? []),
-        entry.startedAt,
-        entry.endedAt ?? null,
+        entry.agent ?? null,
+        entry.sourceUri ?? null,
+        entry.generatedAt,
         entry.metadata ? JSON.stringify(entry.metadata) : null,
       );
-      return Number(info.lastInsertRowid);
+      return id;
     } catch (error) {
       throw new DatabaseError("provenance.record", error, { entityUri: entry.entityUri });
     }
@@ -138,40 +138,94 @@ export class ProvenanceRepository {
 
   getByEntityUri(uri: string): ProvenanceRecord[] {
     const rows = this.db
-      .prepare("SELECT * FROM provenance WHERE entity_uri = ? ORDER BY started_at DESC")
+      .prepare("SELECT * FROM provenance WHERE entity_uri = ? ORDER BY generated_at DESC")
       .all(uri) as ProvenanceRow[];
     return rows.map(rowToProvenance);
   }
 
   getByAgent(agent: string, limit = 100): ProvenanceRecord[] {
     const rows = this.db
-      .prepare("SELECT * FROM provenance WHERE agent = ? ORDER BY started_at DESC LIMIT ?")
+      .prepare("SELECT * FROM provenance WHERE agent = ? ORDER BY generated_at DESC LIMIT ?")
       .all(agent, limit) as ProvenanceRow[];
     return rows.map(rowToProvenance);
   }
 
   getByActivity(type: ProvenanceRecord["activityType"], limit = 100): ProvenanceRecord[] {
     const rows = this.db
-      .prepare("SELECT * FROM provenance WHERE activity_type = ? ORDER BY started_at DESC LIMIT ?")
+      .prepare(
+        "SELECT * FROM provenance WHERE activity_type = ? ORDER BY generated_at DESC LIMIT ?",
+      )
       .all(type, limit) as ProvenanceRow[];
     return rows.map(rowToProvenance);
+  }
+
+  // ── プロベナンスリンク ─────────────────────────────────────────
+
+  createLink(
+    fromEntityUri: string,
+    toEntityUri: string,
+    relation: string,
+    createdAt?: string,
+  ): string {
+    try {
+      const id = randomUUID();
+      const now = createdAt ?? new Date().toISOString();
+      this.db
+        .prepare(
+          `INSERT INTO provenance_links (id, from_entity_uri, to_entity_uri, relation, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(id, fromEntityUri, toEntityUri, relation, now);
+      return id;
+    } catch (error) {
+      throw new DatabaseError("provenance.createLink", error, { fromEntityUri, toEntityUri });
+    }
+  }
+
+  findLinks(fromEntityUri?: string, toEntityUri?: string): ProvenanceLink[] {
+    if (fromEntityUri && toEntityUri) {
+      const rows = this.db
+        .prepare(
+          "SELECT * FROM provenance_links WHERE from_entity_uri = ? AND to_entity_uri = ? ORDER BY created_at DESC",
+        )
+        .all(fromEntityUri, toEntityUri) as ProvenanceLinkRow[];
+      return rows.map(rowToProvenanceLink);
+    } else if (fromEntityUri) {
+      const rows = this.db
+        .prepare(
+          "SELECT * FROM provenance_links WHERE from_entity_uri = ? ORDER BY created_at DESC",
+        )
+        .all(fromEntityUri) as ProvenanceLinkRow[];
+      return rows.map(rowToProvenanceLink);
+    } else if (toEntityUri) {
+      const rows = this.db
+        .prepare("SELECT * FROM provenance_links WHERE to_entity_uri = ? ORDER BY created_at DESC")
+        .all(toEntityUri) as ProvenanceLinkRow[];
+      return rows.map(rowToProvenanceLink);
+    } else {
+      const rows = this.db
+        .prepare("SELECT * FROM provenance_links ORDER BY created_at DESC")
+        .all() as ProvenanceLinkRow[];
+      return rows.map(rowToProvenanceLink);
+    }
   }
 
   // ── ファイルタイムライン ──────────────────────────────────────────
 
   recordFileEvent(
     filePath: string,
-    eventType: FileTimelineEntry["eventType"],
-    eventId?: number,
-    occurredAt?: string,
-  ): number {
+    changeType: FileTimelineEntry["changeType"],
+    eventId?: string,
+    changedAt?: string,
+  ): void {
     try {
-      const stmt = this.db.prepare(`
-        INSERT INTO file_timeline (file_path, event_type, event_id, occurred_at)
-        VALUES (?, ?, ?, COALESCE(?, datetime('now')))
-      `);
-      const info = stmt.run(filePath, eventType, eventId ?? null, occurredAt ?? null);
-      return Number(info.lastInsertRowid);
+      const now = changedAt ?? new Date().toISOString();
+      this.db
+        .prepare(
+          `INSERT INTO file_timeline (file_path, event_id, changed_at, change_type)
+           VALUES (?, ?, ?, ?)`,
+        )
+        .run(filePath, eventId ?? "", now, changeType);
     } catch (error) {
       throw new DatabaseError("provenance.recordFileEvent", error, { filePath });
     }
@@ -179,7 +233,7 @@ export class ProvenanceRepository {
 
   getFileTimeline(filePath: string): FileTimelineEntry[] {
     const rows = this.db
-      .prepare("SELECT * FROM file_timeline WHERE file_path = ? ORDER BY occurred_at ASC")
+      .prepare("SELECT * FROM file_timeline WHERE file_path = ? ORDER BY changed_at ASC")
       .all(filePath) as FileTimelineRow[];
     return rows.map(rowToFileTimeline);
   }
@@ -188,15 +242,24 @@ export class ProvenanceRepository {
 
   createSnapshot(
     snapshotAt: string,
-    stats: { noteCount: number; eventCount: number; entityCount: number },
-  ): number {
+    stats: { entityCount?: number; eventCount?: number },
+    metadata?: Record<string, unknown>,
+  ): string {
     try {
-      const stmt = this.db.prepare(`
-        INSERT INTO snapshots (snapshot_at, note_count, event_count, entity_count)
-        VALUES (?, ?, ?, ?)
-      `);
-      const info = stmt.run(snapshotAt, stats.noteCount, stats.eventCount, stats.entityCount);
-      return Number(info.lastInsertRowid);
+      const id = randomUUID();
+      this.db
+        .prepare(
+          `INSERT INTO snapshots (id, snapshot_at, entity_count, event_count, metadata)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(
+          id,
+          snapshotAt,
+          stats.entityCount ?? null,
+          stats.eventCount ?? null,
+          metadata ? JSON.stringify(metadata) : null,
+        );
+      return id;
     } catch (error) {
       throw new DatabaseError("provenance.createSnapshot", error, { snapshotAt });
     }

@@ -28,10 +28,10 @@ interface RelationRow {
   strength: number;
   description: string | null;
   created_at: string;
-  valid_from: string | null;
-  valid_to: string | null;
+  valid_at: string | null;
+  invalid_at: string | null;
   recorded_at: string | null;
-  superseded_at: string | null;
+  superseded_by: string | null;
 }
 
 interface ObservationRow {
@@ -44,10 +44,10 @@ interface ObservationRow {
   source_pattern_id: number | null;
   created_at: string;
   metadata_json: string | null;
-  valid_from: string | null;
-  valid_to: string | null;
+  valid_at: string | null;
+  invalid_at: string | null;
   recorded_at: string | null;
-  superseded_at: string | null;
+  superseded_by: string | null;
 }
 
 function rowToEntity(row: EntityRow): Entity & { id: number } {
@@ -225,7 +225,7 @@ export class GraphRepository {
     try {
       const now = new Date().toISOString();
       const stmt = this.db.prepare(`
-        INSERT INTO relations (from_entity_id, to_entity_id, relation_type, strength, description, created_at, valid_from, recorded_at)
+        INSERT INTO relations (from_entity_id, to_entity_id, relation_type, strength, description, created_at, valid_at, recorded_at)
         VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       `);
       const info = stmt.run(
@@ -254,7 +254,7 @@ export class GraphRepository {
       const strength = relation.strength ?? 1.0;
       const insertStmt = this.db.prepare(`
         INSERT OR IGNORE INTO relations
-          (from_entity_id, to_entity_id, relation_type, strength, description, created_at, valid_from, recorded_at)
+          (from_entity_id, to_entity_id, relation_type, strength, description, created_at, valid_at, recorded_at)
         VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       `);
       insertStmt.run(
@@ -312,7 +312,7 @@ export class GraphRepository {
       const now = new Date().toISOString();
       const stmt = this.db.prepare(`
         INSERT INTO observations
-          (entity_id, content, observation_type, confidence, source_note_id, source_pattern_id, created_at, metadata_json, valid_from, recorded_at)
+          (entity_id, content, observation_type, confidence, source_note_id, source_pattern_id, created_at, metadata_json, valid_at, recorded_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
       `);
       const info = stmt.run(
@@ -586,26 +586,26 @@ export class GraphRepository {
 
   // ── Bi-temporal Operations ────────────────────────────────────
 
-  invalidateRelation(id: number, validTo?: string): boolean {
+  invalidateRelation(id: number, invalidAt?: string): boolean {
     try {
       const info = this.db
         .prepare(
-          `UPDATE relations SET valid_to = COALESCE(?, datetime('now')) WHERE id = ? AND valid_to IS NULL`,
+          `UPDATE relations SET invalid_at = COALESCE(?, datetime('now')) WHERE id = ? AND invalid_at IS NULL`,
         )
-        .run(validTo ?? null, id);
+        .run(invalidAt ?? null, id);
       return info.changes > 0;
     } catch (error) {
       throw new DatabaseError("invalidateRelation", error, { id });
     }
   }
 
-  invalidateObservation(id: number, validTo?: string): boolean {
+  invalidateObservation(id: number, invalidAt?: string): boolean {
     try {
       const info = this.db
         .prepare(
-          `UPDATE observations SET valid_to = COALESCE(?, datetime('now')) WHERE id = ? AND valid_to IS NULL`,
+          `UPDATE observations SET invalid_at = COALESCE(?, datetime('now')) WHERE id = ? AND invalid_at IS NULL`,
         )
-        .run(validTo ?? null, id);
+        .run(invalidAt ?? null, id);
       return info.changes > 0;
     } catch (error) {
       throw new DatabaseError("invalidateObservation", error, { id });
@@ -618,10 +618,10 @@ export class GraphRepository {
   ): Array<
     Relation & {
       id: number;
-      validFrom: string | null;
-      validTo: string | null;
+      validAt: string | null;
+      invalidAt: string | null;
       recordedAt: string | null;
-      supersededAt: string | null;
+      supersededBy: string | null;
     }
   > {
     const rows = this.db
@@ -631,10 +631,10 @@ export class GraphRepository {
       .all(fromEntityId, toEntityId) as RelationRow[];
     return rows.map((row) => ({
       ...rowToRelation(row),
-      validFrom: row.valid_from,
-      validTo: row.valid_to,
+      validAt: row.valid_at,
+      invalidAt: row.invalid_at,
       recordedAt: row.recorded_at,
-      supersededAt: row.superseded_at,
+      supersededBy: row.superseded_by,
     }));
   }
 }

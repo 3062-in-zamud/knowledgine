@@ -12,7 +12,7 @@ import { migration005a } from "../../src/storage/migrations/005a_events_layer.js
 import { migration006 } from "../../src/storage/migrations/006_extraction_feedback.js";
 import type { TestContext } from "../helpers/test-db.js";
 
-describe("migration005c: provenance", () => {
+describe("migration007: spec_alignment provenance", () => {
   describe("schema creation", () => {
     it("should create provenance table", () => {
       const db = createDatabase(":memory:");
@@ -44,6 +44,16 @@ describe("migration005c: provenance", () => {
       db.close();
     });
 
+    it("should create provenance_links table", () => {
+      const db = createDatabase(":memory:");
+      new Migrator(db, ALL_MIGRATIONS).migrate();
+      const result = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='provenance_links'")
+        .get();
+      expect(result).toBeDefined();
+      db.close();
+    });
+
     it("should not break existing tables", () => {
       const db = createDatabase(":memory:");
       new Migrator(db, ALL_MIGRATIONS).migrate();
@@ -59,31 +69,22 @@ describe("migration005c: provenance", () => {
       db.close();
     });
 
-    it("should enforce CHECK constraint on activity_type", () => {
+    it("provenance table should have TEXT PRIMARY KEY (id)", () => {
       const db = createDatabase(":memory:");
       new Migrator(db, ALL_MIGRATIONS).migrate();
+      // TEXT型のIDを直接挿入できることを確認
+      const uuid = "test-uuid-1234-5678-abcd-ef0123456789";
       expect(() => {
         db.prepare(
-          `INSERT INTO provenance (entity_uri, activity_type, agent, started_at) VALUES (?, ?, ?, ?)`,
-        ).run("file://test", "invalid_type", "test-agent", new Date().toISOString());
-      }).toThrow();
-      db.close();
-    });
-
-    it("should enforce CHECK constraint on file_timeline event_type", () => {
-      const db = createDatabase(":memory:");
-      new Migrator(db, ALL_MIGRATIONS).migrate();
-      expect(() => {
-        db.prepare(
-          `INSERT INTO file_timeline (file_path, event_type, occurred_at) VALUES (?, ?, ?)`,
-        ).run("/test/file.md", "invalid_event", new Date().toISOString());
-      }).toThrow();
+          `INSERT INTO provenance (id, entity_uri, activity_type, generated_at) VALUES (?, ?, ?, ?)`,
+        ).run(uuid, "file://test", "ingest", new Date().toISOString());
+      }).not.toThrow();
       db.close();
     });
   });
 
-  describe("Migration path: Wave 2 → Wave 3", () => {
-    it("should auto-apply 005b and 005c on existing Wave 2 DB", () => {
+  describe("Migration path: Wave 2 → Wave 3 → Wave 4", () => {
+    it("should auto-apply all migrations on existing Wave 2 DB", () => {
       const db = createDatabase(":memory:");
       const wave2Migrations = [
         migration001,
@@ -97,7 +98,7 @@ describe("migration005c: provenance", () => {
       expect(new Migrator(db, wave2Migrations).getCurrentVersion()).toBe(6);
 
       new Migrator(db, ALL_MIGRATIONS).migrate();
-      expect(new Migrator(db, ALL_MIGRATIONS).getCurrentVersion()).toBe(8);
+      expect(new Migrator(db, ALL_MIGRATIONS).getCurrentVersion()).toBe(9);
 
       // VIEWとテーブルの存在確認
       const tables = db
@@ -107,6 +108,7 @@ describe("migration005c: provenance", () => {
       expect(names).toContain("active_relations");
       expect(names).toContain("active_observations");
       expect(names).toContain("provenance");
+      expect(names).toContain("provenance_links");
       expect(names).toContain("file_timeline");
       expect(names).toContain("snapshots");
       db.close();
@@ -136,11 +138,11 @@ describe("ProvenanceRepository", () => {
         entityUri: "file://test.md",
         activityType: "ingest",
         agent: "test-agent",
-        inputUris: ["file://source.md"],
-        outputUris: ["file://output.md"],
-        startedAt: now,
+        sourceUri: "file://source.md",
+        generatedAt: now,
       });
-      expect(id).toBeGreaterThan(0);
+      expect(typeof id).toBe("string");
+      expect(id.length).toBeGreaterThan(0);
 
       const records = repo.getByEntityUri("file://test.md");
       expect(records.length).toBe(1);
@@ -149,36 +151,28 @@ describe("ProvenanceRepository", () => {
       expect(records[0].agent).toBe("test-agent");
     });
 
-    it("should serialize and deserialize inputUris/outputUris as JSON arrays", () => {
+    it("should return a UUID as the id", () => {
       const now = new Date().toISOString();
-      repo.record({
-        entityUri: "file://array-test.md",
+      const id = repo.record({
+        entityUri: "file://uuid-test.md",
         activityType: "extract",
-        agent: "extractor",
-        inputUris: ["file://a.md", "file://b.md"],
-        outputUris: ["entity://concept-1", "entity://concept-2"],
-        startedAt: now,
+        generatedAt: now,
       });
-
-      const records = repo.getByEntityUri("file://array-test.md");
-      expect(records[0].inputUris).toEqual(["file://a.md", "file://b.md"]);
-      expect(records[0].outputUris).toEqual(["entity://concept-1", "entity://concept-2"]);
+      // UUID形式: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     });
 
-    it("should store empty arrays as []", () => {
+    it("should store and retrieve sourceUri", () => {
       const now = new Date().toISOString();
       repo.record({
-        entityUri: "file://empty-arrays.md",
-        activityType: "link",
-        agent: "linker",
-        inputUris: [],
-        outputUris: [],
-        startedAt: now,
+        entityUri: "file://source-uri-test.md",
+        activityType: "extract",
+        sourceUri: "file://source.md",
+        generatedAt: now,
       });
 
-      const records = repo.getByEntityUri("file://empty-arrays.md");
-      expect(records[0].inputUris).toEqual([]);
-      expect(records[0].outputUris).toEqual([]);
+      const records = repo.getByEntityUri("file://source-uri-test.md");
+      expect(records[0].sourceUri).toBe("file://source.md");
     });
 
     it("should return empty array for unknown entityUri", () => {
@@ -192,14 +186,24 @@ describe("ProvenanceRepository", () => {
         entityUri: "file://meta-test.md",
         activityType: "embed",
         agent: "embedder",
-        inputUris: [],
-        outputUris: [],
-        startedAt: now,
+        generatedAt: now,
         metadata: { model: "all-MiniLM", dimensions: 384 },
       });
 
       const records = repo.getByEntityUri("file://meta-test.md");
       expect(records[0].metadata).toEqual({ model: "all-MiniLM", dimensions: 384 });
+    });
+
+    it("should handle optional agent field", () => {
+      const now = new Date().toISOString();
+      repo.record({
+        entityUri: "file://no-agent.md",
+        activityType: "link",
+        generatedAt: now,
+      });
+
+      const records = repo.getByEntityUri("file://no-agent.md");
+      expect(records[0].agent).toBeUndefined();
     });
   });
 
@@ -210,25 +214,19 @@ describe("ProvenanceRepository", () => {
         entityUri: "file://a.md",
         activityType: "ingest",
         agent: "agent-x",
-        inputUris: [],
-        outputUris: [],
-        startedAt: now,
+        generatedAt: now,
       });
       repo.record({
         entityUri: "file://b.md",
         activityType: "ingest",
         agent: "agent-y",
-        inputUris: [],
-        outputUris: [],
-        startedAt: now,
+        generatedAt: now,
       });
       repo.record({
         entityUri: "file://c.md",
         activityType: "ingest",
         agent: "agent-x",
-        inputUris: [],
-        outputUris: [],
-        startedAt: now,
+        generatedAt: now,
       });
 
       const records = repo.getByAgent("agent-x");
@@ -243,9 +241,7 @@ describe("ProvenanceRepository", () => {
           entityUri: `file://limit-${i}.md`,
           activityType: "ingest",
           agent: "limit-agent",
-          inputUris: [],
-          outputUris: [],
-          startedAt: now,
+          generatedAt: now,
         });
       }
       const records = repo.getByAgent("limit-agent", 3);
@@ -264,17 +260,13 @@ describe("ProvenanceRepository", () => {
         entityUri: "file://extract-1.md",
         activityType: "extract",
         agent: "ex-agent",
-        inputUris: [],
-        outputUris: [],
-        startedAt: now,
+        generatedAt: now,
       });
       repo.record({
         entityUri: "file://ingest-1.md",
         activityType: "ingest",
         agent: "in-agent",
-        inputUris: [],
-        outputUris: [],
-        startedAt: now,
+        generatedAt: now,
       });
 
       const records = repo.getByActivity("extract");
@@ -289,13 +281,69 @@ describe("ProvenanceRepository", () => {
           entityUri: `file://act-${i}.md`,
           activityType: "embed",
           agent: "embedder",
-          inputUris: [],
-          outputUris: [],
-          startedAt: now,
+          generatedAt: now,
         });
       }
       const records = repo.getByActivity("embed", 2);
       expect(records.length).toBeLessThanOrEqual(2);
+    });
+  });
+
+  // ── プロベナンスリンク ─────────────────────────────────────────
+
+  describe("createLink / findLinks", () => {
+    it("should create and retrieve a link", () => {
+      const now = new Date().toISOString();
+      const id = repo.createLink("entity://a", "entity://b", "depends_on", now);
+      expect(typeof id).toBe("string");
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+
+      const links = repo.findLinks("entity://a");
+      expect(links.length).toBe(1);
+      expect(links[0].fromEntityUri).toBe("entity://a");
+      expect(links[0].toEntityUri).toBe("entity://b");
+      expect(links[0].relation).toBe("depends_on");
+    });
+
+    it("should find links by toEntityUri", () => {
+      const now = new Date().toISOString();
+      repo.createLink("entity://a", "entity://c", "relates_to", now);
+      repo.createLink("entity://b", "entity://c", "relates_to", now);
+
+      const links = repo.findLinks(undefined, "entity://c");
+      expect(links.length).toBe(2);
+      expect(links.every((l) => l.toEntityUri === "entity://c")).toBe(true);
+    });
+
+    it("should find links by both fromEntityUri and toEntityUri", () => {
+      const now = new Date().toISOString();
+      repo.createLink("entity://a", "entity://b", "uses", now);
+      repo.createLink("entity://a", "entity://c", "uses", now);
+
+      const links = repo.findLinks("entity://a", "entity://b");
+      expect(links.length).toBe(1);
+      expect(links[0].toEntityUri).toBe("entity://b");
+    });
+
+    it("should return all links when no filter provided", () => {
+      const now = new Date().toISOString();
+      repo.createLink("entity://a", "entity://b", "uses", now);
+      repo.createLink("entity://c", "entity://d", "extends", now);
+
+      const links = repo.findLinks();
+      expect(links.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("should return empty array when no matching links", () => {
+      const links = repo.findLinks("entity://nonexistent");
+      expect(links).toEqual([]);
+    });
+
+    it("should use auto-generated createdAt when not provided", () => {
+      repo.createLink("entity://x", "entity://y", "linked_to");
+      const links = repo.findLinks("entity://x");
+      expect(links.length).toBe(1);
+      expect(links[0].createdAt).toBeTruthy();
     });
   });
 
@@ -310,11 +358,11 @@ describe("ProvenanceRepository", () => {
 
       const timeline = repo.getFileTimeline(path);
       expect(timeline.length).toBe(3);
-      expect(timeline[0].eventType).toBe("created");
-      expect(timeline[1].eventType).toBe("modified");
-      expect(timeline[2].eventType).toBe("modified");
+      expect(timeline[0].changeType).toBe("created");
+      expect(timeline[1].changeType).toBe("modified");
+      expect(timeline[2].changeType).toBe("modified");
       // 時系列順（ASC）
-      expect(timeline[0].occurredAt < timeline[1].occurredAt).toBe(true);
+      expect(timeline[0].changedAt < timeline[1].changedAt).toBe(true);
     });
 
     it("should accumulate multiple events for same file", () => {
@@ -333,20 +381,20 @@ describe("ProvenanceRepository", () => {
     });
 
     it("should store eventId when provided", () => {
-      // 有効なeventレコードを作成してから参照する
-      const eventInfo = ctx.db
-        .prepare(
-          `INSERT INTO events (event_type, source_type, content, content_hash, occurred_at)
-           VALUES (?, ?, ?, ?, ?)`,
-        )
-        .run("document_change", "markdown", "content", "hash123", "2024-01-01T00:00:00");
-      const eventId = Number(eventInfo.lastInsertRowid);
-
       const path = "/notes/linked.md";
+      const eventId = "evt-abc-123";
       repo.recordFileEvent(path, "created", eventId, "2024-01-01T00:00:00");
 
       const timeline = repo.getFileTimeline(path);
       expect(timeline[0].eventId).toBe(eventId);
+    });
+
+    it("should store empty string as eventId when not provided", () => {
+      const path = "/notes/no-event.md";
+      repo.recordFileEvent(path, "modified", undefined, "2024-01-01T00:00:00");
+
+      const timeline = repo.getFileTimeline(path);
+      expect(timeline[0].eventId).toBe("");
     });
   });
 
@@ -356,31 +404,22 @@ describe("ProvenanceRepository", () => {
     it("should create and retrieve snapshots", () => {
       const snapshotAt = new Date().toISOString();
       const id = repo.createSnapshot(snapshotAt, {
-        noteCount: 100,
-        eventCount: 50,
         entityCount: 30,
+        eventCount: 50,
       });
-      expect(id).toBeGreaterThan(0);
+      expect(typeof id).toBe("string");
+      expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
 
       const snapshots = repo.getSnapshots();
       expect(snapshots.length).toBe(1);
-      expect(snapshots[0].noteCount).toBe(100);
       expect(snapshots[0].eventCount).toBe(50);
       expect(snapshots[0].entityCount).toBe(30);
     });
 
     it("should return snapshots ordered by snapshot_at DESC", () => {
-      repo.createSnapshot("2024-01-01T00:00:00", { noteCount: 10, eventCount: 5, entityCount: 3 });
-      repo.createSnapshot("2024-12-01T00:00:00", {
-        noteCount: 100,
-        eventCount: 50,
-        entityCount: 30,
-      });
-      repo.createSnapshot("2024-06-01T00:00:00", {
-        noteCount: 50,
-        eventCount: 25,
-        entityCount: 15,
-      });
+      repo.createSnapshot("2024-01-01T00:00:00", { entityCount: 3, eventCount: 5 });
+      repo.createSnapshot("2024-12-01T00:00:00", { entityCount: 30, eventCount: 50 });
+      repo.createSnapshot("2024-06-01T00:00:00", { entityCount: 15, eventCount: 25 });
 
       const snapshots = repo.getSnapshots();
       expect(snapshots[0].snapshotAt).toBe("2024-12-01T00:00:00");
@@ -391,9 +430,8 @@ describe("ProvenanceRepository", () => {
     it("should respect limit parameter", () => {
       for (let i = 0; i < 5; i++) {
         repo.createSnapshot(`2024-0${i + 1}-01T00:00:00`, {
-          noteCount: i * 10,
-          eventCount: i * 5,
           entityCount: i * 3,
+          eventCount: i * 5,
         });
       }
       const snapshots = repo.getSnapshots(2);
@@ -403,6 +441,14 @@ describe("ProvenanceRepository", () => {
     it("should return empty array when no snapshots exist", () => {
       const snapshots = repo.getSnapshots();
       expect(snapshots).toEqual([]);
+    });
+
+    it("should store optional metadata", () => {
+      const snapshotAt = new Date().toISOString();
+      repo.createSnapshot(snapshotAt, { entityCount: 10, eventCount: 5 }, { version: "1.0" });
+
+      const snapshots = repo.getSnapshots();
+      expect(snapshots[0].metadata).toEqual({ version: "1.0" });
     });
   });
 });

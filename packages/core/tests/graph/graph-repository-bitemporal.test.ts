@@ -80,7 +80,7 @@ describe("GraphRepository (bi-temporal)", () => {
   // ── New: bi-temporal columns set on INSERT ─────────────────────────────
 
   describe("createRelation sets bi-temporal columns", () => {
-    it("should set valid_from and recorded_at on insert", () => {
+    it("should set valid_at and recorded_at on insert", () => {
       const now = new Date().toISOString();
       const fromId = graph.createEntity({
         name: "from-a",
@@ -96,15 +96,15 @@ describe("GraphRepository (bi-temporal)", () => {
       });
 
       const row = ctx.db
-        .prepare("SELECT valid_from, recorded_at FROM relations WHERE id = ?")
-        .get(relId) as { valid_from: string | null; recorded_at: string | null };
-      expect(row.valid_from).not.toBeNull();
+        .prepare("SELECT valid_at, recorded_at FROM relations WHERE id = ?")
+        .get(relId) as { valid_at: string | null; recorded_at: string | null };
+      expect(row.valid_at).not.toBeNull();
       expect(row.recorded_at).not.toBeNull();
     });
   });
 
   describe("createObservation sets bi-temporal columns", () => {
-    it("should set valid_from and recorded_at on insert", () => {
+    it("should set valid_at and recorded_at on insert", () => {
       const now = new Date().toISOString();
       const entityId = graph.createEntity({
         name: "obs-entity",
@@ -119,9 +119,9 @@ describe("GraphRepository (bi-temporal)", () => {
       });
 
       const row = ctx.db
-        .prepare("SELECT valid_from, recorded_at FROM observations WHERE id = ?")
-        .get(obsId) as { valid_from: string | null; recorded_at: string | null };
-      expect(row.valid_from).not.toBeNull();
+        .prepare("SELECT valid_at, recorded_at FROM observations WHERE id = ?")
+        .get(obsId) as { valid_at: string | null; recorded_at: string | null };
+      expect(row.valid_at).not.toBeNull();
       expect(row.recorded_at).not.toBeNull();
     });
   });
@@ -191,10 +191,10 @@ describe("GraphRepository (bi-temporal)", () => {
       const customTime = "2025-01-01T00:00:00";
       graph.invalidateRelation(relId, customTime);
 
-      const row = ctx.db.prepare("SELECT valid_to FROM relations WHERE id = ?").get(relId) as {
-        valid_to: string;
+      const row = ctx.db.prepare("SELECT invalid_at FROM relations WHERE id = ?").get(relId) as {
+        invalid_at: string;
       };
-      expect(row.valid_to).toBe(customTime);
+      expect(row.invalid_at).toBe(customTime);
     });
 
     it("should return false for non-existent id", () => {
@@ -272,7 +272,7 @@ describe("GraphRepository (bi-temporal)", () => {
       const history = graph.getRelationHistory(fromId, toId);
       expect(history.length).toBe(1);
       expect(history[0].id).toBe(relId1);
-      expect(history[0].validTo).not.toBeNull();
+      expect(history[0].invalidAt).not.toBeNull();
     });
 
     it("should return multiple relations with different types between same entities", () => {
@@ -321,7 +321,7 @@ describe("GraphRepository (bi-temporal)", () => {
 
       const history = graph.getRelationHistory(fromId, toId);
       expect(history.length).toBe(1);
-      expect(history[0].validTo).not.toBeNull();
+      expect(history[0].invalidAt).not.toBeNull();
     });
 
     it("should return empty for no matching relations", () => {
@@ -493,7 +493,7 @@ describe("GraphRepository (bi-temporal)", () => {
           if (fromIdx !== toIdx) {
             ctx.db
               .prepare(
-                `INSERT OR IGNORE INTO relations (from_entity_id, to_entity_id, relation_type, strength, created_at, valid_from, recorded_at)
+                `INSERT OR IGNORE INTO relations (from_entity_id, to_entity_id, relation_type, strength, created_at, valid_at, recorded_at)
                  VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
               )
               .run(entityIds[fromIdx], entityIds[toIdx], "related_to", 1.0, now);
@@ -507,7 +507,7 @@ describe("GraphRepository (bi-temporal)", () => {
       const toInvalidate = allRelIds.slice(0, Math.floor(allRelIds.length * 0.3));
       const invalidateMany = ctx.db.transaction(() => {
         for (const { id } of toInvalidate) {
-          ctx.db.prepare(`UPDATE relations SET valid_to = datetime('now') WHERE id = ?`).run(id);
+          ctx.db.prepare(`UPDATE relations SET invalid_at = datetime('now') WHERE id = ?`).run(id);
         }
       });
       invalidateMany();
