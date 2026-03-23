@@ -10,7 +10,7 @@ import {
   ModelManager,
 } from "@knowledgine/core";
 import { createBox, colors, symbols } from "../lib/ui/index.js";
-import { getConfigPath, getTargetLabel, TARGETS, PROJECT_CONFIG_SUPPORT } from "./setup.js";
+import { getConfigPath, TARGETS, PROJECT_CONFIG_SUPPORT } from "./setup.js";
 import * as TOML from "smol-toml";
 
 export interface StatusOptions {

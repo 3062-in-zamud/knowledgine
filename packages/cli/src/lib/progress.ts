@@ -6,7 +6,6 @@
  */
 
 import { colors, createBox } from "./ui/index.js";
-import { createSpinner } from "./ui/spinner.js";
 
 export interface Progress {
   update(current: number, detail?: string): void;

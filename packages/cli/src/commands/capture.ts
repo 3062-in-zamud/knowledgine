@@ -11,7 +11,7 @@ import {
 import { EventWriter, sanitizeContent } from "@knowledgine/ingest";
 import type { NormalizedEvent } from "@knowledgine/ingest";
 import { validateCaptureUrl } from "../lib/url-validator.js";
-import { createBox, createTable, colors, symbols } from "../lib/ui/index.js";
+import { createBox, createTable, symbols } from "../lib/ui/index.js";
 
 export interface CaptureCommandOptions {
   url?: string;
