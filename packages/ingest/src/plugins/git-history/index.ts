@@ -31,7 +31,12 @@ export class GitHistoryPlugin implements IngestPlugin {
   ];
 
   async initialize(_config?: PluginConfig): Promise<PluginInitResult> {
-    return { ok: true };
+    try {
+      await execGit(["--version"], { cwd: process.cwd(), timeout: 5000 });
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "git is not installed or not in PATH" };
+    }
   }
 
   async *ingestAll(sourcePath: SourceURI): AsyncGenerator<NormalizedEvent> {
@@ -45,9 +50,12 @@ export class GitHistoryPlugin implements IngestPlugin {
 
     let raw: string;
     try {
-      raw = await execGit(["log", "--reverse", `--format=${getGitLogFormat()}`], {
-        cwd: sourcePath,
-      });
+      raw = await execGit(
+        ["log", "--reverse", "--date=iso-strict", `--format=${getGitLogFormat()}`],
+        {
+          cwd: sourcePath,
+        },
+      );
     } catch (err: unknown) {
       // コミットが0件の場合、git logがエラーを返すケースがある（初期ブランチでコミットなし）
       const errObj = err as { stderr?: string; code?: number };
@@ -81,7 +89,13 @@ export class GitHistoryPlugin implements IngestPlugin {
     const currentBranch = await this.getBranch(sourcePath);
 
     const raw = await execGit(
-      ["log", "--reverse", `--format=${getGitLogFormat()}`, `${checkpoint}..HEAD`],
+      [
+        "log",
+        "--reverse",
+        "--date=iso-strict",
+        `--format=${getGitLogFormat()}`,
+        `${checkpoint}..HEAD`,
+      ],
       { cwd: sourcePath },
     );
 

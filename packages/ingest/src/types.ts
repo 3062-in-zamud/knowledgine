@@ -52,6 +52,7 @@ export interface PluginInitResult {
 // Normalized event types
 export type NormalizedEventType =
   | "commit"
+  | "change"
   | "diff"
   | "session"
   | "session_event"

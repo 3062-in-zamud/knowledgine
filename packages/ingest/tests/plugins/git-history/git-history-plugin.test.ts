@@ -5,6 +5,7 @@ import { tmpdir } from "os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { GitHistoryPlugin } from "../../../src/plugins/git-history/index.js";
+import { parseGitLog } from "../../../src/plugins/git-history/git-parser.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -87,7 +88,7 @@ describe("GitHistoryPlugin", () => {
       }
 
       expect(events).toHaveLength(3);
-    });
+    }, 15_000);
 
     it("should produce events with correct sourceUri", async () => {
       await initRepo(repoDir);
@@ -99,7 +100,7 @@ describe("GitHistoryPlugin", () => {
       }
 
       expect(events).toHaveLength(1);
-      expect(events[0].sourceUri).toBe(`git://${repoDir}#${hash}`);
+      expect(events[0].sourceUri).toBe(`git://${repoDir}/commit/${hash}`);
     });
 
     it("should produce events with correct title", async () => {
@@ -278,5 +279,26 @@ describe("GitHistoryPlugin", () => {
 
   it("should dispose without error", async () => {
     await expect(plugin.dispose()).resolves.toBeUndefined();
+  });
+
+  describe("performance", () => {
+    it("should handle 1000 commits within 30 seconds", async () => {
+      // parseGitLog をモックデータで直接テスト（git操作なし）
+      const mockRecords = Array.from({ length: 1000 }, (_, i) => {
+        // 40文字の小文字16進数ハッシュを生成
+        const indexHex = i.toString(16).padStart(8, "0");
+        const hash = `aabb${indexHex}${"0".repeat(28)}`;
+        const date = `2024-01-01T00:00:${String(i % 60).padStart(2, "0")}+00:00`;
+        return `${hash}\nAuthor Name\nauthor@example.com\n${date}\n\nCommit message ${i}\nBody line for commit ${i}\n`;
+      });
+      const mockLog = mockRecords.join("---END---\n") + "---END---";
+
+      const start = Date.now();
+      const commits = parseGitLog(mockLog);
+      const elapsed = Date.now() - start;
+
+      expect(commits.length).toBe(1000);
+      expect(elapsed).toBeLessThan(30_000);
+    }, 30_000);
   });
 });

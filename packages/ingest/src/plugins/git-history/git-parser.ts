@@ -36,45 +36,32 @@ export interface ParsedCommit {
   isMerge: boolean;
 }
 
-const GIT_LOG_FORMAT =
-  "---REC_SEP---%n%H%n%aI%n%an%n%ae%n%P%n%s%n---BODY_SEP---%n%b%n---REC_END---";
+const GIT_LOG_FORMAT = "%H%n%an%n%ae%n%ad%n%P%n%s%n%b%n---END---";
 
 export function getGitLogFormat(): string {
   return GIT_LOG_FORMAT;
 }
 
 export function parseGitLog(raw: string): ParsedCommit[] {
-  const records = raw.split("---REC_END---");
+  const records = raw.split("\n---END---");
   const commits: ParsedCommit[] = [];
 
   for (const record of records) {
     const trimmed = record.trim();
     if (!trimmed) continue;
 
-    const recSepIdx = trimmed.indexOf("---REC_SEP---");
-    if (recSepIdx === -1) continue;
-
-    const afterRecSep = trimmed.slice(recSepIdx + "---REC_SEP---".length).trimStart();
-    const bodySepIdx = afterRecSep.indexOf("---BODY_SEP---");
-    if (bodySepIdx === -1) continue;
-
-    const headerPart = afterRecSep.slice(0, bodySepIdx).trimEnd();
-    const bodyPart = afterRecSep
-      .slice(bodySepIdx + "---BODY_SEP---".length)
-      .trimStart()
-      .trimEnd();
-
-    const lines = headerPart.split("\n");
+    const lines = trimmed.split("\n");
     if (lines.length < 6) continue;
 
     const hash = lines[0].trim();
-    const authorDate = lines[1].trim();
-    const authorName = lines[2].trim();
-    const authorEmail = lines[3].trim();
+    if (!hash || !SHA1_REGEX.test(hash)) continue;
+
+    const authorName = lines[1].trim();
+    const authorEmail = lines[2].trim();
+    const authorDate = lines[3].trim();
     const parentsRaw = lines[4].trim();
     const subject = lines[5].trim();
-
-    if (!hash || !SHA1_REGEX.test(hash)) continue;
+    const body = lines.slice(6).join("\n").trim();
 
     const parents = parentsRaw ? parentsRaw.split(" ").filter(Boolean) : [];
 
@@ -85,7 +72,7 @@ export function parseGitLog(raw: string): ParsedCommit[] {
       authorEmail,
       parents,
       subject,
-      body: bodyPart,
+      body,
       isMerge: parents.length > 1,
     });
   }
@@ -157,8 +144,8 @@ export function commitToNormalizedEvent(
   };
 
   return {
-    sourceUri: `git://${repoPath}#${commit.hash}`,
-    eventType: "commit",
+    sourceUri: `git://${repoPath}/commit/${commit.hash}`,
+    eventType: "change",
     title: commit.subject,
     content: `Author: ${commit.authorName} <${commit.authorEmail}>\nDate: ${commit.authorDate}\n\n${commit.subject}\n\n${commit.body}\n\n---\n${diff}`,
     timestamp: new Date(commit.authorDate),

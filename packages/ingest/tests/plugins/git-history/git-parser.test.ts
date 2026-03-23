@@ -41,16 +41,14 @@ describe("parseGitLog", () => {
   const HASH_F = "ffff234567890123456789012345678901234ff1";
 
   it("should parse a single commit", () => {
-    const raw = `---REC_SEP---
-${HASH1}
-2024-01-15T10:00:00+09:00
+    const raw = `${HASH1}
 John Doe
 john@example.com
+2024-01-15T10:00:00+09:00
 abcd1234567890abcdef1234567890abcdef1234
 Add feature X
----BODY_SEP---
 This adds feature X with great detail.
----REC_END---`;
+---END---`;
 
     const commits = parseGitLog(raw);
     expect(commits).toHaveLength(1);
@@ -64,26 +62,22 @@ This adds feature X with great detail.
   });
 
   it("should parse multiple commits", () => {
-    const raw = `---REC_SEP---
-${HASH_A}
-2024-01-15T10:00:00+09:00
+    const raw = `${HASH_A}
 Alice
 alice@example.com
+2024-01-15T10:00:00+09:00
 
 First commit
----BODY_SEP---
 
----REC_END---
----REC_SEP---
+---END---
 ${HASH_B}
-2024-01-16T10:00:00+09:00
 Bob
 bob@example.com
+2024-01-16T10:00:00+09:00
 
 Second commit
----BODY_SEP---
 
----REC_END---`;
+---END---`;
 
     const commits = parseGitLog(raw);
     expect(commits).toHaveLength(2);
@@ -94,16 +88,14 @@ Second commit
   });
 
   it("should parse merge commit with multiple parents", () => {
-    const raw = `---REC_SEP---
-${HASH_C}
-2024-01-17T10:00:00+09:00
+    const raw = `${HASH_C}
 Carol
 carol@example.com
+2024-01-17T10:00:00+09:00
 ${HASH_PARENT1} ${HASH_PARENT2}
 Merge branch 'feature'
----BODY_SEP---
 
----REC_END---`;
+---END---`;
 
     const commits = parseGitLog(raw);
     expect(commits).toHaveLength(1);
@@ -112,16 +104,14 @@ Merge branch 'feature'
   });
 
   it("should parse commit with empty body", () => {
-    const raw = `---REC_SEP---
-${HASH_D}
-2024-01-18T10:00:00+09:00
+    const raw = `${HASH_D}
 Dave
 dave@example.com
+2024-01-18T10:00:00+09:00
 
 Fix bug
----BODY_SEP---
 
----REC_END---`;
+---END---`;
 
     const commits = parseGitLog(raw);
     expect(commits).toHaveLength(1);
@@ -129,16 +119,14 @@ Fix bug
   });
 
   it("should parse commit with Japanese subject", () => {
-    const raw = `---REC_SEP---
-${HASH_E}
-2024-01-19T10:00:00+09:00
+    const raw = `${HASH_E}
 田中太郎
 tanaka@example.com
+2024-01-19T10:00:00+09:00
 
 機能Xを追加する
----BODY_SEP---
 詳細な説明がここに入ります。
----REC_END---`;
+---END---`;
 
     const commits = parseGitLog(raw);
     expect(commits).toHaveLength(1);
@@ -146,19 +134,23 @@ tanaka@example.com
     expect(commits[0].body).toBe("詳細な説明がここに入ります。");
   });
 
-  it("should skip malformed records missing ---REC_END---", () => {
-    const raw = `---REC_SEP---
-${HASH_F}
-2024-01-20T10:00:00+09:00
+  it("should skip records with invalid SHA1 hash", () => {
+    const raw = `${HASH_F}
 Eve
 eve@example.com
+2024-01-20T10:00:00+09:00
 
 Good commit
----BODY_SEP---
 
----REC_END---
----REC_SEP---
-incomplete data without REC_END`;
+---END---
+not-a-valid-hash
+Someone
+someone@example.com
+2024-01-21T10:00:00+09:00
+
+Bad record
+
+---END---`;
 
     const commits = parseGitLog(raw);
     expect(commits).toHaveLength(1);
@@ -279,7 +271,12 @@ describe("commitToNormalizedEvent", () => {
 
   it("should produce a NormalizedEvent with correct sourceUri", () => {
     const event = commitToNormalizedEvent(sampleCommit, "diff content", "/repo/path");
-    expect(event.sourceUri).toBe(`git:///repo/path#${COMMIT_HASH}`);
+    expect(event.sourceUri).toBe(`git:///repo/path/commit/${COMMIT_HASH}`);
+  });
+
+  it("should have eventType 'change'", () => {
+    const event = commitToNormalizedEvent(sampleCommit, "", "/repo/path");
+    expect(event.eventType).toBe("change");
   });
 
   it("should have timestamp as a Date instance", () => {

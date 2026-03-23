@@ -24,6 +24,7 @@ export function computeContentHash(content: string): string {
 
 const EVENT_TYPE_MAP: Record<string, EventType> = {
   commit: "git_commit",
+  change: "git_commit",
   diff: "git_commit",
   session: "session_start",
   session_event: "session_message",
