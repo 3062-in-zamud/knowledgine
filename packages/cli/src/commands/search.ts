@@ -2,6 +2,7 @@ import { resolve } from "path";
 import { existsSync } from "fs";
 import {
   loadConfig,
+  resolveDefaultPath,
   createDatabase,
   loadSqliteVecExtension,
   Migrator,
@@ -20,6 +21,7 @@ import {
   formatRelatedNotes,
 } from "../lib/formatter.js";
 import type { OutputFormat } from "../lib/formatter.js";
+import { colors, symbols } from "../lib/ui/index.js";
 
 export interface SearchCommandOptions {
   demo?: boolean;
@@ -32,11 +34,7 @@ export interface SearchCommandOptions {
 }
 
 export async function searchCommand(query: string, options: SearchCommandOptions): Promise<void> {
-  const rootPath = options.demo
-    ? getDemoNotesPath()
-    : options.path
-      ? resolve(options.path)
-      : resolve(process.cwd());
+  const rootPath = options.demo ? getDemoNotesPath() : resolveDefaultPath(options.path);
 
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {
@@ -114,14 +112,25 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       r.matchReason.filter((m) => m.startsWith("Warning:")),
     );
     if (warnings.length > 0) {
-      console.error(`\n⚠ ${warnings[0]}\n`);
+      console.error(`\n${symbols.warning} ${colors.warning(warnings[0])}\n`);
+    }
+
+    // セマンティック検索が要求されたが利用不可の場合の警告
+    if (mode !== "keyword" && (!config.embedding?.enabled || !embeddingProvider)) {
+      console.error(
+        `${symbols.warning} ${colors.warning("Semantic search is not configured. Falling back to FTS5.")}`,
+      );
+      console.error(
+        `${symbols.arrow} ${colors.hint("Run 'knowledgine upgrade --semantic' to enable semantic search.")}`,
+      );
+      console.error("");
     }
 
     if (format === "json") {
       console.log(JSON.stringify({ ok: true, command: "search", result }));
     } else if (format === "table") {
       if (result.results.length === 0) {
-        console.error(`No results for "${query}".`);
+        console.error(`${symbols.info} ${colors.hint(`No results for "${query}".`)}`);
       } else {
         console.error(formatToolSearchResults(result.results, "table"));
       }
@@ -143,11 +152,11 @@ function formatLegacySearchResults(
   results: Array<{ score: number; filePath: string; title: string }>,
 ): void {
   if (results.length === 0) {
-    console.error(`No results for "${query}".`);
+    console.error(`${symbols.info} ${colors.hint(`No results for "${query}".`)}`);
     return;
   }
 
-  console.error(`Results for "${query}" (${results.length} matches):`);
+  console.error(colors.bold(`Results for "${query}" (${results.length} matches):`));
   console.error("");
 
   for (let i = 0; i < results.length; i++) {
@@ -165,11 +174,11 @@ export function formatSearchResults(
   results: Array<{ note: unknown; score: number }>,
 ): void {
   if (results.length === 0) {
-    console.error(`No results for "${query}".`);
+    console.error(`${symbols.info} ${colors.hint(`No results for "${query}".`)}`);
     return;
   }
 
-  console.error(`Results for "${query}" (${results.length} matches):`);
+  console.error(colors.bold(`Results for "${query}" (${results.length} matches):`));
   console.error("");
 
   for (let i = 0; i < results.length; i++) {

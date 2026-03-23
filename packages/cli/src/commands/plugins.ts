@@ -1,20 +1,20 @@
 import { resolve } from "path";
 import { mkdirSync } from "fs";
-import { defineConfig, createDatabase, Migrator, ALL_MIGRATIONS } from "@knowledgine/core";
+import { defineConfig, resolveDefaultPath, createDatabase, Migrator, ALL_MIGRATIONS } from "@knowledgine/core";
 import { CursorStore } from "@knowledgine/ingest";
 import { createDefaultRegistry } from "../lib/plugin-loader.js";
+import { createTable } from "../lib/ui/index.js";
 
 export async function pluginsListCommand(): Promise<void> {
   const registry = createDefaultRegistry();
   const plugins = registry.list();
 
-  const header = `${"ID".padEnd(20)}${"Name".padEnd(25)}${"Version".padEnd(10)}Priority`;
-  console.error(header);
-
-  for (const plugin of plugins) {
+  const rows = plugins.map((plugin) => {
     const { id, name, version, priority } = plugin.manifest;
-    console.error(`${id.padEnd(20)}${name.padEnd(25)}${version.padEnd(10)}${priority}`);
-  }
+    return [id, name, version, String(priority)];
+  });
+
+  console.error(createTable({ head: ["ID", "Name", "Version", "Priority"], rows }));
 }
 
 export interface PluginsStatusOptions {
@@ -22,7 +22,7 @@ export interface PluginsStatusOptions {
 }
 
 export async function pluginsStatusCommand(options: PluginsStatusOptions): Promise<void> {
-  const rootPath = resolve(options.path ?? process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
 
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   mkdirSync(knowledgineDir, { recursive: true });
@@ -37,10 +37,7 @@ export async function pluginsStatusCommand(options: PluginsStatusOptions): Promi
   const registry = createDefaultRegistry();
   const plugins = registry.list();
 
-  const header = `${"Plugin".padEnd(20)}${"Last Ingest".padEnd(25)}Checkpoint`;
-  console.error(header);
-
-  for (const plugin of plugins) {
+  const rows = plugins.map((plugin) => {
     const cursor = cursorMap.get(plugin.manifest.id);
     const lastIngest = cursor
       ? cursor.lastIngestAt.toISOString().replace("T", " ").slice(0, 19)
@@ -48,8 +45,10 @@ export async function pluginsStatusCommand(options: PluginsStatusOptions): Promi
     const checkpoint = cursor
       ? cursor.checkpoint.slice(0, 20) + (cursor.checkpoint.length > 20 ? "..." : "")
       : "-";
-    console.error(`${plugin.manifest.id.padEnd(20)}${lastIngest.padEnd(25)}${checkpoint}`);
-  }
+    return [plugin.manifest.id, lastIngest, checkpoint];
+  });
+
+  console.error(createTable({ head: ["Plugin", "Last Ingest", "Checkpoint"], rows }));
 
   db.close();
 }

@@ -1,6 +1,7 @@
 import { resolve } from "path";
 import {
   loadConfig,
+  resolveDefaultPath,
   createDatabase,
   Migrator,
   ALL_MIGRATIONS,
@@ -8,6 +9,7 @@ import {
   FeedbackLearner,
 } from "@knowledgine/core";
 import type { FeedbackErrorType } from "@knowledgine/core";
+import { createTable, colors, symbols } from "../lib/ui/index.js";
 
 function createFeedbackDeps(rootPath: string): {
   feedbackRepository: FeedbackRepository;
@@ -22,13 +24,26 @@ function createFeedbackDeps(rootPath: string): {
   return { feedbackRepository, feedbackLearner };
 }
 
+function statusColor(status: string): string {
+  switch (status) {
+    case "pending":
+      return colors.warning(status);
+    case "applied":
+      return colors.success(status);
+    case "dismissed":
+      return colors.dim(status);
+    default:
+      return status;
+  }
+}
+
 export interface FeedbackListOptions {
   status?: string;
   path?: string;
 }
 
 export async function feedbackListCommand(options: FeedbackListOptions): Promise<void> {
-  const rootPath = resolve(options.path ?? process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const { feedbackRepository } = createFeedbackDeps(rootPath);
 
   const records = feedbackRepository.list({ status: options.status });
@@ -38,15 +53,14 @@ export async function feedbackListCommand(options: FeedbackListOptions): Promise
     return;
   }
 
-  console.log(`Found ${records.length} feedback record(s):\n`);
-  for (const r of records) {
-    console.log(`  [#${r.id}] ${r.errorType} | entity="${r.entityName}" | status=${r.status}`);
-    if (r.entityType) console.log(`         type: ${r.entityType}`);
-    if (r.correctType) console.log(`         correct_type: ${r.correctType}`);
-    if (r.details) console.log(`         details: ${r.details}`);
-    console.log(`         created: ${r.createdAt}`);
-    console.log();
-  }
+  const rows = records.map((r) => [
+    String(r.id),
+    r.errorType,
+    r.entityName,
+    statusColor(r.status),
+  ]);
+
+  console.log(createTable({ head: ["ID", "Error Type", "Entity", "Status"], rows }));
 }
 
 export interface FeedbackApplyOptions {
@@ -57,19 +71,19 @@ export async function feedbackApplyCommand(
   idStr: string,
   options: FeedbackApplyOptions,
 ): Promise<void> {
-  const rootPath = resolve(options.path ?? process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const { feedbackLearner } = createFeedbackDeps(rootPath);
   const id = parseInt(idStr, 10);
 
   if (isNaN(id) || id <= 0) {
-    console.error(`Invalid feedback ID: ${idStr}`);
+    console.error(`${symbols.error} Invalid feedback ID: ${idStr}`);
     process.exitCode = 1;
     return;
   }
 
   try {
     feedbackLearner.applyFeedback(id);
-    console.log(`Feedback #${id} applied successfully. Extraction rules updated.`);
+    console.log(`${symbols.success} Feedback #${id} applied successfully. Extraction rules updated.`);
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
@@ -84,19 +98,19 @@ export async function feedbackDismissCommand(
   idStr: string,
   options: FeedbackDismissOptions,
 ): Promise<void> {
-  const rootPath = resolve(options.path ?? process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const { feedbackRepository } = createFeedbackDeps(rootPath);
   const id = parseInt(idStr, 10);
 
   if (isNaN(id) || id <= 0) {
-    console.error(`Invalid feedback ID: ${idStr}`);
+    console.error(`${symbols.error} Invalid feedback ID: ${idStr}`);
     process.exitCode = 1;
     return;
   }
 
   try {
     feedbackRepository.updateStatus(id, "dismissed");
-    console.log(`Feedback #${id} dismissed.`);
+    console.log(`${symbols.success} Feedback #${id} dismissed.`);
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
@@ -108,7 +122,7 @@ export interface FeedbackStatsOptions {
 }
 
 export async function feedbackStatsCommand(options: FeedbackStatsOptions): Promise<void> {
-  const rootPath = resolve(options.path ?? process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const { feedbackRepository } = createFeedbackDeps(rootPath);
 
   const stats = feedbackRepository.getStats();
@@ -131,11 +145,11 @@ export interface FeedbackReportOptions {
 }
 
 export async function feedbackReportCommand(options: FeedbackReportOptions): Promise<void> {
-  const rootPath = resolve(options.path ?? process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
 
   if (!VALID_ERROR_TYPES.includes(options.type as FeedbackErrorType)) {
     console.error(
-      `Error: Invalid error type "${options.type}". Must be one of: ${VALID_ERROR_TYPES.join(", ")}`,
+      `${symbols.error} Error: Invalid error type "${options.type}". Must be one of: ${VALID_ERROR_TYPES.join(", ")}`,
     );
     process.exitCode = 1;
     return;
@@ -151,13 +165,13 @@ export async function feedbackReportCommand(options: FeedbackReportOptions): Pro
       correctType: options.correctType,
       details: options.details,
     });
-    console.log(`Feedback #${record.id} created.`);
+    console.log(`${symbols.success} Feedback #${record.id} created.`);
     console.log(`  Entity:     ${record.entityName}`);
     console.log(`  Error type: ${record.errorType}`);
     if (record.entityType) console.log(`  Type:       ${record.entityType}`);
     if (record.correctType) console.log(`  Correct:    ${record.correctType}`);
     if (record.details) console.log(`  Details:    ${record.details}`);
-    console.log(`  Status:     ${record.status}`);
+    console.log(`  Status:     ${statusColor(record.status)}`);
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;

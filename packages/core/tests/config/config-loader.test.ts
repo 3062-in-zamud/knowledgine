@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { tmpdir } from "os";
-import { loadConfig, writeRcConfig } from "../../src/config/config-loader.js";
+import { loadConfig, writeRcConfig, resolveDefaultPath } from "../../src/config/config-loader.js";
 
 describe("loadConfig", () => {
   let testDir: string;
@@ -97,6 +97,68 @@ describe("loadConfig", () => {
     expect(config.embedding.enabled).toBe(true);
     // Should not throw and should still return valid config
     expect(config.rootPath).toBe(testDir);
+  });
+});
+
+describe("resolveDefaultPath", () => {
+  const originalEnv = process.env;
+  const originalCwd = process.cwd;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    delete process.env["KNOWLEDGINE_PATH"];
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    process.cwd = originalCwd;
+  });
+
+  it("returns resolved cliPath when provided", () => {
+    const result = resolveDefaultPath("/some/path");
+    expect(result).toBe(resolve("/some/path"));
+  });
+
+  it("returns resolved relative cliPath when provided", () => {
+    const result = resolveDefaultPath("./relative/path");
+    expect(result).toBe(resolve("./relative/path"));
+  });
+
+  it("uses KNOWLEDGINE_PATH env var when no cliPath", () => {
+    process.env["KNOWLEDGINE_PATH"] = "/env/path";
+    const result = resolveDefaultPath();
+    expect(result).toBe(resolve("/env/path"));
+  });
+
+  it("CLI arg takes priority over env var", () => {
+    process.env["KNOWLEDGINE_PATH"] = "/env/path";
+    const result = resolveDefaultPath("/cli/path");
+    expect(result).toBe(resolve("/cli/path"));
+  });
+
+  it("falls back to cwd when no config or env", () => {
+    // Use a temp dir as cwd to avoid reading the project's .knowledginerc.json
+    const tempCwd = mkdtempSync(join(tmpdir(), "knowledgine-cwd-test-"));
+    process.cwd = () => tempCwd;
+    try {
+      const result = resolveDefaultPath();
+      expect(result).toBe(resolve(tempCwd));
+    } finally {
+      process.cwd = originalCwd;
+      rmSync(tempCwd, { recursive: true, force: true });
+    }
+  });
+
+  it("handles undefined cliPath", () => {
+    const tempCwd = mkdtempSync(join(tmpdir(), "knowledgine-cwd-test-"));
+    process.cwd = () => tempCwd;
+    try {
+      const result = resolveDefaultPath(undefined);
+      expect(result).toBe(resolve(tempCwd));
+    } finally {
+      process.cwd = originalCwd;
+      rmSync(tempCwd, { recursive: true, force: true });
+    }
   });
 });
 

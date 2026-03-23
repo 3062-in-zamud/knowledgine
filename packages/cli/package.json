@@ -20,11 +20,18 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@clack/prompts": "^1.1.0",
     "@knowledgine/core": "workspace:*",
     "@knowledgine/ingest": "workspace:*",
     "@knowledgine/mcp-server": "workspace:*",
+    "boxen": "^8.0.1",
+    "chalk": "^5.6.2",
     "chokidar": "^5.0.0",
-    "commander": "^14.0.3"
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.3",
+    "log-symbols": "^7.0.1",
+    "ora": "^9.3.0",
+    "smol-toml": "^1.6.0"
   },
   "files": [
     "dist",

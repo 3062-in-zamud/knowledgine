@@ -4,6 +4,7 @@ import type {
   StatsResult,
   SearchEntitiesResult,
 } from "@knowledgine/core";
+import { createTable, colors, scoreColor } from "./ui/index.js";
 
 export type OutputFormat = "json" | "table" | "plain";
 
@@ -19,12 +20,12 @@ export function formatSearchResults(
   }
   // table
   if (results.length === 0) return "";
-  const header = `${"Score".padEnd(7)}${"Title".padEnd(40)}FilePath`;
-  const sep = "-".repeat(header.length);
-  const rows = results.map(
-    (r) => `${r.score.toFixed(2).padEnd(7)}${r.title.slice(0, 38).padEnd(40)}${r.filePath}`,
-  );
-  return [header, sep, ...rows].join("\n");
+  const rows = results.map((r) => [
+    scoreColor(r.score)(r.score.toFixed(2)),
+    r.title,
+    colors.dim(r.filePath),
+  ]);
+  return createTable({ head: ["Score", "Title", "File"], rows });
 }
 
 export function formatRelatedNotes(result: FindRelatedResult, format: OutputFormat): string {
@@ -39,20 +40,16 @@ export function formatRelatedNotes(result: FindRelatedResult, format: OutputForm
     return lines.join("\n");
   }
   // table
-  const lines: string[] = [`Related notes for noteId=${result.noteId}:`];
-  if (result.relatedNotes.length > 0) {
-    const header = `  ${"Score".padEnd(7)}${"Title".padEnd(40)}FilePath`;
-    lines.push(header);
-    lines.push("  " + "-".repeat(header.length - 2));
-    for (const n of result.relatedNotes) {
-      lines.push(
-        `  ${n.score.toFixed(2).padEnd(7)}${n.title.slice(0, 38).padEnd(40)}${n.filePath}`,
-      );
-    }
-  } else {
-    lines.push("  (no related notes found)");
+  const header = `Related notes for noteId=${result.noteId}:`;
+  if (result.relatedNotes.length === 0) {
+    return `${header}\n  (no related notes found)`;
   }
-  return lines.join("\n");
+  const rows = result.relatedNotes.map((n) => [
+    scoreColor(n.score)(n.score.toFixed(2)),
+    n.title,
+    colors.dim(n.filePath),
+  ]);
+  return `${header}\n${createTable({ head: ["Score", "Title", "File"], rows })}`;
 }
 
 export function formatStats(stats: StatsResult, format: OutputFormat): string {
@@ -69,25 +66,24 @@ export function formatStats(stats: StatsResult, format: OutputFormat): string {
     ].join("\n");
   }
   // table
-  const lines: string[] = [
-    `${"Metric".padEnd(30)}Value`,
-    "-".repeat(50),
-    `${"Total Notes".padEnd(30)}${stats.totalNotes}`,
-    `${"Total Patterns".padEnd(30)}${stats.totalPatterns}`,
-    `${"Total Links".padEnd(30)}${stats.totalLinks}`,
-    `${"Total Pairs".padEnd(30)}${stats.totalPairs}`,
-    `${"Embeddings Available".padEnd(30)}${stats.embeddingStatus.available}`,
+  const rows: string[][] = [
+    ["Total Notes", colors.info(String(stats.totalNotes))],
+    ["Total Patterns", colors.info(String(stats.totalPatterns))],
+    ["Total Links", colors.info(String(stats.totalLinks))],
+    ["Total Pairs", colors.info(String(stats.totalPairs))],
+    ["Embeddings Available", colors.info(String(stats.embeddingStatus.available))],
   ];
   if (stats.embeddingStatus.notesWithoutEmbeddings !== null) {
-    lines.push(
-      `${"Notes Without Embeddings".padEnd(30)}${stats.embeddingStatus.notesWithoutEmbeddings}`,
-    );
+    rows.push([
+      "Notes Without Embeddings",
+      colors.info(String(stats.embeddingStatus.notesWithoutEmbeddings)),
+    ]);
   }
   if (stats.graphStats) {
-    lines.push(`${"Graph Entities".padEnd(30)}${stats.graphStats.totalEntities}`);
-    lines.push(`${"Graph Relations".padEnd(30)}${stats.graphStats.totalRelations}`);
+    rows.push(["Graph Entities", colors.info(String(stats.graphStats.totalEntities))]);
+    rows.push(["Graph Relations", colors.info(String(stats.graphStats.totalRelations))]);
   }
-  return lines.join("\n");
+  return createTable({ head: ["Metric", "Value"], rows });
 }
 
 export function formatEntities(result: SearchEntitiesResult, format: OutputFormat): string {
@@ -101,11 +97,10 @@ export function formatEntities(result: SearchEntitiesResult, format: OutputForma
   }
   // table
   if (result.entities.length === 0) return "";
-  const header = `${"ID".padEnd(6)}${"Type".padEnd(15)}${"Name".padEnd(30)}Description`;
-  const sep = "-".repeat(header.length);
-  const rows = result.entities.map(
-    (e) =>
-      `${String(e.id).padEnd(6)}${e.entityType.padEnd(15)}${e.name.slice(0, 28).padEnd(30)}${e.description ?? ""}`,
-  );
-  return [header, sep, ...rows].join("\n");
+  const rows = result.entities.map((e) => [
+    String(e.id),
+    colors.accent(e.entityType),
+    e.name,
+  ]);
+  return createTable({ head: ["ID", "Type", "Name"], rows });
 }

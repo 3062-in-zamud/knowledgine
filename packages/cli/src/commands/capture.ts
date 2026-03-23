@@ -2,6 +2,7 @@ import { resolve } from "path";
 import { existsSync, readFileSync } from "fs";
 import {
   loadConfig,
+  resolveDefaultPath,
   createDatabase,
   Migrator,
   KnowledgeRepository,
@@ -10,6 +11,7 @@ import {
 import { EventWriter, sanitizeContent } from "@knowledgine/ingest";
 import type { NormalizedEvent } from "@knowledgine/ingest";
 import { validateCaptureUrl } from "../lib/url-validator.js";
+import { createBox, createTable, colors, symbols } from "../lib/ui/index.js";
 
 export interface CaptureCommandOptions {
   url?: string;
@@ -52,7 +54,7 @@ export async function captureAddCommand(
   options: CaptureCommandOptions,
 ): Promise<void> {
   // 1. DB初期化
-  const rootPath = options.path ? resolve(options.path) : resolve(process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {
     console.error("Error: Knowledge base not initialized.\n  Run: knowledgine init --path <dir>");
@@ -156,12 +158,15 @@ export async function captureAddCommand(
         }),
       );
     } else {
-      console.error(`Captured (id: ${result.id})`);
-      console.error(`  Title: ${title}`);
+      const lines = [
+        `${symbols.success} Captured (id: ${result.id})`,
+        `  Title: ${title}`,
+      ];
       if (tags.length > 0) {
-        console.error(`  Tags:  ${tags.join(", ")}`);
+        lines.push(`  Tags:  ${tags.join(", ")}`);
       }
-      console.error(`  Source: ${sourceType} (manual)`);
+      lines.push(`  Source: ${sourceType} (manual)`);
+      console.error(createBox(lines.join("\n"), { title: "Captured" }));
     }
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
@@ -177,7 +182,7 @@ export interface CaptureListOptions {
 }
 
 export async function captureListCommand(options: CaptureListOptions): Promise<void> {
-  const rootPath = options.path ? resolve(options.path) : resolve(process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {
     console.error("Error: Knowledge base not initialized.\n  Run: knowledgine init --path <dir>");
@@ -208,13 +213,13 @@ export async function captureListCommand(options: CaptureListOptions): Promise<v
         console.error("No captured notes found.");
         return;
       }
-      console.error(`Found ${notes.length} captured note(s):\n`);
-      for (const note of notes) {
-        console.error(`  [#${note.id}] ${note.title}`);
-        console.error(`         source: ${note.file_path}`);
-        console.error(`         created: ${note.created_at}`);
-        console.error();
-      }
+      const rows = notes.map((n) => [
+        String(n.id),
+        n.title,
+        n.file_path,
+        n.created_at,
+      ]);
+      console.error(createTable({ head: ["ID", "Title", "Source", "Created"], rows }));
     }
   } finally {
     db.close();
@@ -229,7 +234,7 @@ export async function captureDeleteCommand(
   idStr: string,
   options: CaptureDeleteOptions,
 ): Promise<void> {
-  const rootPath = options.path ? resolve(options.path) : resolve(process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {
     console.error("Error: Knowledge base not initialized.\n  Run: knowledgine init --path <dir>");
@@ -248,14 +253,14 @@ export async function captureDeleteCommand(
   try {
     const note = repository.getNoteById(id);
     if (!note) {
-      console.error(`Error: Note #${id} not found.`);
+      console.error(`${symbols.error} Error: Note #${id} not found.`);
       process.exitCode = 1;
       return;
     }
 
     if (!note.file_path.startsWith("capture://")) {
       console.error(
-        `Error: Note #${id} is not a captured note (file_path: ${note.file_path}). Only capture:// notes can be deleted with this command.`,
+        `${symbols.error} Error: Note #${id} is not a captured note (file_path: ${note.file_path}). Only capture:// notes can be deleted with this command.`,
       );
       process.exitCode = 1;
       return;
@@ -263,9 +268,9 @@ export async function captureDeleteCommand(
 
     const deleted = repository.deleteNoteById(id);
     if (deleted) {
-      console.error(`Deleted captured note #${id}: ${note.title}`);
+      console.error(`${symbols.success} Deleted captured note #${id}: ${note.title}`);
     } else {
-      console.error(`Error: Failed to delete note #${id}.`);
+      console.error(`${symbols.error} Error: Failed to delete note #${id}.`);
       process.exitCode = 1;
     }
   } catch (error) {

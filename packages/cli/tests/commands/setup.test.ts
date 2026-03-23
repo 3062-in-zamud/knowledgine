@@ -187,7 +187,7 @@ describe("setup command", () => {
     await setupCommand({ target: "claude-code", path: testDir });
 
     const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
-    const expectedPath = join(homedir(), ".claude", "mcp.json");
+    const expectedPath = join(homedir(), ".claude.json");
     expect(output).toContain(expectedPath);
     expect(output).toContain("Claude Code");
     expect(output).toContain('"knowledgine"');

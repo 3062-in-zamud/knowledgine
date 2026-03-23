@@ -3,6 +3,7 @@ import { mkdirSync, statSync } from "fs";
 import { homedir } from "os";
 import {
   defineConfig,
+  resolveDefaultPath,
   createDatabase,
   Migrator,
   KnowledgeRepository,
@@ -11,6 +12,7 @@ import {
 import { IngestEngine } from "@knowledgine/ingest";
 import { createDefaultRegistry, initializePlugins } from "../lib/plugin-loader.js";
 import { createProgress, formatDuration, createSummaryReport } from "../lib/progress.js";
+import { colors, symbols } from "../lib/ui/index.js";
 
 export interface IngestOptions {
   source?: string;
@@ -23,20 +25,20 @@ export interface IngestOptions {
 export async function ingestCommand(options: IngestOptions): Promise<void> {
   // Validate mutually exclusive options
   if (options.source && options.all) {
-    console.error("Error: --source and --all cannot be used together");
+    console.error(colors.error("Error: --source and --all cannot be used together"));
     process.exitCode = 1;
     return;
   }
 
   if (!options.source && !options.all) {
-    console.error("Error: Specify --source <pluginId> or --all");
+    console.error(colors.error("Error: Specify --source <pluginId> or --all"));
     console.error("Usage: knowledgine ingest --source <id> --path <dir>");
     console.error("       knowledgine ingest --all --path <dir>");
     process.exitCode = 1;
     return;
   }
 
-  const rootPath = resolve(options.path ?? process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
 
   // Initialize database (same pattern as init.ts)
   const knowledgineDir = resolve(rootPath, ".knowledgine");
@@ -53,7 +55,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
   // Check for specific plugin
   if (options.source) {
     if (!registry.has(options.source)) {
-      console.error(`Error: Plugin "${options.source}" is not registered.`);
+      console.error(colors.error(`Error: Plugin "${options.source}" is not registered.`));
       console.error(
         `Available plugins: ${registry
           .list()
@@ -67,7 +69,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
 
     const initResult = initResults.get(options.source);
     if (initResult && !initResult.ok) {
-      console.error(`Error: Plugin "${options.source}" failed to initialize: ${initResult.error}`);
+      console.error(colors.error(`Error: Plugin "${options.source}" failed to initialize: ${initResult.error}`));
       process.exitCode = 1;
       db.close();
       return;
@@ -78,7 +80,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
   let sourcePath = rootPath;
   if (options.source === "github") {
     if (!options.repo) {
-      console.error("Error: --repo <owner/repo> is required for --source github");
+      console.error(colors.error("Error: --repo <owner/repo> is required for --source github"));
       console.error("Usage: knowledgine ingest --source github --repo owner/repo --path <dir>");
       process.exitCode = 1;
       db.close();
@@ -121,7 +123,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         const initResult = initResults.get(plugin.manifest.id);
         if (initResult && !initResult.ok) {
           console.error(
-            `Warning: Skipping "${plugin.manifest.id}" (init failed: ${initResult.error})`,
+            `  ${symbols.info} ${colors.hint(plugin.manifest.id)} skipped (init failed: ${initResult.error})`,
           );
           completed++;
           progress.update(completed, plugin.manifest.id);
@@ -136,15 +138,21 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
           totalProcessed += summary.processed;
           totalErrors += summary.errors;
           progress.update(completed, plugin.manifest.id);
-          console.error(
-            `  ${plugin.manifest.id}: ${summary.processed} events (${summary.errors} errors, ${formatDuration(summary.elapsedMs)})`,
-          );
+          if (summary.errors > 0) {
+            console.error(
+              `  ${symbols.warning} ${colors.warning(plugin.manifest.id)}: ${summary.processed} events (${summary.errors} errors, ${formatDuration(summary.elapsedMs)})`,
+            );
+          } else {
+            console.error(
+              `  ${symbols.success} ${colors.success(plugin.manifest.id)}: ${summary.processed} events (${formatDuration(summary.elapsedMs)})`,
+            );
+          }
         } catch (error) {
           completed++;
           totalErrors++;
           progress.update(completed, plugin.manifest.id);
           console.error(
-            `  ${plugin.manifest.id}: failed - ${error instanceof Error ? error.message : String(error)}`,
+            `  ${symbols.warning} ${colors.warning(plugin.manifest.id)}: failed - ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       }
@@ -176,7 +184,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       console.error("\n" + report);
     }
   } catch (error) {
-    console.error(`Ingest failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(colors.error(`Ingest failed: ${error instanceof Error ? error.message : String(error)}`));
     process.exitCode = 1;
   } finally {
     db.close();

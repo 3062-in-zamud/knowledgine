@@ -1,6 +1,7 @@
 import { resolve } from "path";
 import { existsSync } from "fs";
 import { cleanDemo, getDemoDir } from "../lib/demo-manager.js";
+import { createBox, colors, symbols } from "../lib/ui/index.js";
 
 export interface DemoOptions {
   clean?: boolean;
@@ -20,7 +21,7 @@ export async function demoCommand(options: DemoOptions): Promise<void> {
       return;
     }
     cleanDemo(demoPath);
-    console.error("Demo files cleaned successfully.");
+    console.error(`${symbols.success} Demo files cleaned successfully.`);
     return;
   }
 
@@ -28,25 +29,30 @@ export async function demoCommand(options: DemoOptions): Promise<void> {
   const demoDir = getDemoDir();
   const hasDemoFixtures = existsSync(demoDir);
 
-  console.error("knowledgine demo mode");
-  console.error("");
   if (!hasDemoFixtures) {
-    console.error("Error: Demo fixtures not found. Reinstall the package.");
+    console.error(`${symbols.error} Error: Demo fixtures not found. Reinstall the package.`);
     return;
   }
-  console.error("Try knowledgine with sample developer notes:");
-  console.error("");
-  console.error("  1. knowledgine init --demo        Set up demo environment");
-  console.error('  2. knowledgine search "auth" --demo  Search demo notes');
-  console.error("  3. knowledgine demo --clean        Remove demo files");
-  console.error("");
-  console.error("The demo includes 8 sample notes covering:");
-  console.error("  - Authentication debugging (JWT)");
-  console.error("  - React performance optimization");
-  console.error("  - Docker networking troubleshooting");
-  console.error("  - REST API design decisions");
-  console.error("  - TypeScript migration learnings");
-  console.error("  - Database query optimization");
-  console.error("  - CI/CD pipeline setup");
-  console.error("  - Code review guidelines");
+
+  const usageLines = [
+    colors.bold("knowledgine demo mode"),
+    "",
+    "Try knowledgine with sample developer notes:",
+    "",
+    `  1. ${colors.accent("knowledgine init --demo")}        Set up demo environment`,
+    `  2. ${colors.accent('knowledgine search "auth" --demo')}  Search demo notes`,
+    `  3. ${colors.accent("knowledgine demo --clean")}        Remove demo files`,
+    "",
+    "The demo includes 8 sample notes covering:",
+    `  ${symbols.bullet} Authentication debugging (JWT)`,
+    `  ${symbols.bullet} React performance optimization`,
+    `  ${symbols.bullet} Docker networking troubleshooting`,
+    `  ${symbols.bullet} REST API design decisions`,
+    `  ${symbols.bullet} TypeScript migration learnings`,
+    `  ${symbols.bullet} Database query optimization`,
+    `  ${symbols.bullet} CI/CD pipeline setup`,
+    `  ${symbols.bullet} Code review guidelines`,
+  ];
+
+  console.error(createBox(usageLines.join("\n")));
 }

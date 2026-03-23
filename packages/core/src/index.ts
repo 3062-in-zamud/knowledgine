@@ -55,7 +55,7 @@ export {
 } from "./errors.js";
 
 // Config loader
-export { loadConfig, writeRcConfig } from "./config/config-loader.js";
+export { loadConfig, writeRcConfig, resolveDefaultPath } from "./config/config-loader.js";
 export type { RcConfig } from "./config/config-loader.js";
 
 // Storage

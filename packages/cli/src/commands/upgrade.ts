@@ -3,6 +3,7 @@ import { existsSync } from "fs";
 import {
   loadConfig,
   writeRcConfig,
+  resolveDefaultPath,
   createDatabase,
   loadSqliteVecExtension,
   Migrator,
@@ -14,6 +15,7 @@ import {
   downloadModel,
 } from "@knowledgine/core";
 import { createProgress } from "../lib/progress.js";
+import { colors, symbols, createBox } from "../lib/ui/index.js";
 
 export interface UpgradeOptions {
   semantic?: boolean;
@@ -21,7 +23,7 @@ export interface UpgradeOptions {
 }
 
 export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
-  const rootPath = resolve(options.path ?? process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
 
   if (!options.semantic) {
     console.error("Usage: knowledgine upgrade --semantic");
@@ -34,7 +36,7 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
   // Check initialization
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {
-    console.error(`Error: Not initialized. Run 'knowledgine init --path ${rootPath}' first.`);
+    console.error(colors.error(`Error: Not initialized. Run 'knowledgine init --path ${rootPath}' first.`));
     process.exitCode = 1;
     return;
   }
@@ -102,7 +104,7 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
   // Download model
   const modelManager = new ModelManager();
   if (!modelManager.isModelAvailable()) {
-    console.error("Downloading embedding model (~23MB)...");
+    console.error(colors.info("Downloading embedding model (~23MB)..."));
     try {
       await downloadModel(modelManager, {
         onProgress: (progress) => {
@@ -113,21 +115,21 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
           }
         },
         onFileComplete: (file) => {
-          process.stderr.write(`\r  [done] ${file}          \n`);
+          process.stderr.write(`\r  ${symbols.success} ${file}          \n`);
         },
       });
-      console.error("Model download complete.");
+      console.error(`${symbols.success} ${colors.success("Model download complete.")}`);
     } catch (error) {
       console.error(
-        `\nModel download failed: ${error instanceof Error ? error.message : String(error)}`,
+        colors.error(`\nModel download failed: ${error instanceof Error ? error.message : String(error)}`),
       );
-      console.error("Semantic search upgrade aborted.");
+      console.error(colors.error("Semantic search upgrade aborted."));
       db.close();
       process.exitCode = 1;
       return;
     }
   } else {
-    console.error("Embedding model already available.");
+    console.error(`${symbols.success} ${colors.success("Embedding model already available.")}`);
   }
 
   // Generate embeddings for notes that don't have them
@@ -136,7 +138,7 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
 
   if (notesWithout.length > 0) {
     // Warm up the ONNX session (first call is slow due to model loading)
-    console.error("\nLoading embedding model...");
+    console.error(colors.info("\nLoading embedding model..."));
     await embeddingProvider.embed("warmup");
     console.error("");
 
@@ -156,19 +158,26 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
     }
 
     embProgress.finish();
-    console.error(`  Generated: ${generated}, Failed: ${failed}`);
+    console.error(`  ${symbols.success} ${colors.success(`Generated: ${generated}`)}, Failed: ${failed}`);
   } else {
-    console.error("All notes already have embeddings.");
+    console.error(`${symbols.success} ${colors.success("All notes already have embeddings.")}`);
   }
 
   // Write .knowledginerc.json
   writeRcConfig(rootPath, { semantic: true });
 
-  console.error("");
-  console.error("Semantic search enabled successfully.");
-  console.error("  Config: .knowledginerc.json written (semantic: true)");
-  console.error("");
-  console.error("Restart the MCP server to activate semantic search.");
+  console.error(
+    "\n" +
+      createBox(
+        [
+          `${symbols.success} ${colors.success("Semantic search enabled")}`,
+          `  Config: .knowledginerc.json written`,
+          "",
+          `${symbols.arrow} ${colors.hint("Restart MCP server to activate.")}`,
+        ].join("\n"),
+        { title: "Upgrade Complete", type: "success" },
+      ),
+  );
 
   db.close();
 }

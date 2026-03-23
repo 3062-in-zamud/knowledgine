@@ -1,6 +1,17 @@
 {
   "name": "@knowledgine/ingest",
   "version": "0.2.0",
+  "description": "Plugin-based knowledge ingestion engine for knowledgine. Supports Git history, GitHub, Obsidian, and Claude Sessions.",
+  "keywords": ["knowledgine", "ingest", "knowledge-management", "plugin", "mcp"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/3062-in-zamud/knowledgine.git",
+    "directory": "packages/ingest"
+  },
+  "homepage": "https://github.com/3062-in-zamud/knowledgine#readme",
+  "bugs": {
+    "url": "https://github.com/3062-in-zamud/knowledgine/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,6 +23,7 @@
   },
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
+    "prepublishOnly": "pnpm run build",
     "test": "vitest",
     "test:run": "vitest run"
   },

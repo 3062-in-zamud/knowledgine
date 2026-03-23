@@ -2,6 +2,7 @@ import { resolve } from "path";
 import { existsSync } from "fs";
 import {
   loadConfig,
+  resolveDefaultPath,
   createDatabase,
   Migrator,
   KnowledgeRepository,
@@ -57,7 +58,7 @@ export interface ToolSearchOptions {
 }
 
 export async function toolSearchCommand(query: string, options: ToolSearchOptions): Promise<void> {
-  const rootPath = options.path ? resolve(options.path) : resolve(process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {
     console.error(CLI_ERRORS.NOT_INITIALIZED);
@@ -108,7 +109,7 @@ export interface ToolRelatedOptions {
 }
 
 export async function toolRelatedCommand(options: ToolRelatedOptions): Promise<void> {
-  const rootPath = options.path ? resolve(options.path) : resolve(process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {
     console.error(CLI_ERRORS.NOT_INITIALIZED);
@@ -172,7 +173,7 @@ export interface ToolStatsOptions {
 }
 
 export async function toolStatsCommand(options: ToolStatsOptions): Promise<void> {
-  const rootPath = options.path ? resolve(options.path) : resolve(process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {
     console.error(CLI_ERRORS.NOT_INITIALIZED);
@@ -216,7 +217,7 @@ export async function toolEntitiesCommand(
   query: string,
   options: ToolEntitiesOptions,
 ): Promise<void> {
-  const rootPath = options.path ? resolve(options.path) : resolve(process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {
     console.error(CLI_ERRORS.NOT_INITIALIZED);

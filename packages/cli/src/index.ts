@@ -19,6 +19,7 @@ import { demoCommand } from "./commands/demo.js";
 import { searchCommand } from "./commands/search.js";
 import { captureAddCommand, captureListCommand, captureDeleteCommand } from "./commands/capture.js";
 import { registerToolCommands } from "./commands/tool.js";
+import { createOutputErrorHandler } from "./lib/unknown-command-handler.js";
 
 const program = new Command();
 
@@ -243,6 +244,11 @@ captureCmd
   .action(captureDeleteCommand);
 
 registerToolCommands(program);
+
+program.showSuggestionAfterError(true);
+program.configureOutput({
+  outputError: createOutputErrorHandler(() => program.commands.map((c) => c.name())),
+});
 
 // Global error handler for unhandled exceptions (e.g., native module errors)
 process.on("uncaughtException", (error) => {

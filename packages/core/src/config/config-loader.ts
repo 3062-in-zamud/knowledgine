@@ -6,6 +6,7 @@ import type { KnowledgineConfig } from "../config.js";
 
 export interface RcConfig {
   semantic?: boolean;
+  defaultPath?: string;
   [key: string]: unknown;
 }
 
@@ -51,9 +52,36 @@ function loadRcFile(rootPath: string): RcConfig | null {
 }
 
 /**
- * Write a .knowledginerc.json config file to the project root.
+ * Resolve the default root path.
+ * Priority: cliPath > KNOWLEDGINE_PATH env > cwd/.knowledginerc.json defaultPath > cwd
  */
-export function writeRcConfig(rootPath: string, config: RcConfig): void {
-  const rcPath = resolve(rootPath, ".knowledginerc.json");
-  writeFileSync(rcPath, JSON.stringify(config, null, 2) + "\n");
+export function resolveDefaultPath(cliPath?: string): string {
+  if (cliPath) return resolve(cliPath);
+
+  const envPath = process.env["KNOWLEDGINE_PATH"];
+  if (envPath) return resolve(envPath);
+
+  // Read from cwd's .knowledginerc.json (NOT rootPath's — avoids circular dependency)
+  const rcConfig = loadRcFile(process.cwd());
+  if (rcConfig?.defaultPath) return resolve(rcConfig.defaultPath);
+
+  return resolve(process.cwd());
+}
+
+/**
+ * Write a .knowledginerc.json config file to the specified directory.
+ * Merges with existing config if present.
+ */
+export function writeRcConfig(dirPath: string, config: RcConfig): void {
+  const rcPath = resolve(dirPath, ".knowledginerc.json");
+  let existing: RcConfig = {};
+  try {
+    if (existsSync(rcPath)) {
+      existing = JSON.parse(readFileSync(rcPath, "utf-8")) as RcConfig;
+    }
+  } catch {
+    // If existing file is invalid, overwrite it
+  }
+  const merged = { ...existing, ...config };
+  writeFileSync(rcPath, JSON.stringify(merged, null, 2) + "\n");
 }

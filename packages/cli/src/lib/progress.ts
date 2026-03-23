@@ -5,6 +5,9 @@
  * All output goes to stderr to avoid MCP stdout conflicts.
  */
 
+import { colors, createBox } from "./ui/index.js";
+import { createSpinner } from "./ui/spinner.js";
+
 export interface Progress {
   update(current: number, detail?: string): void;
   finish(): void;
@@ -44,10 +47,11 @@ export interface SummaryEntry {
 
 export function createSummaryReport(title: string, entries: SummaryEntry[]): string {
   const maxLabelLen = entries.length > 0 ? Math.max(...entries.map((e) => e.label.length)) : 0;
-  const header = `── ${title} ${"─".repeat(Math.max(0, 36 - title.length - 4))}`;
-  const footer = "─".repeat(header.length);
-  const lines = entries.map((e) => `  ${e.label.padEnd(maxLabelLen)}  ${e.value}`);
-  return [header, ...lines, footer].join("\n");
+  const lines = entries.map(
+    (e) => `${colors.label(e.label.padEnd(maxLabelLen))}  ${e.value}`,
+  );
+  const content = lines.join("\n");
+  return createBox(content, { type: "success", title });
 }
 
 export function formatDuration(ms: number): string {
@@ -91,6 +95,13 @@ function stepIcon(status: StepStatus): string {
   }
 }
 
+function renderProgressBar(current: number, total: number, width: number = 16): string {
+  const ratio = total > 0 ? Math.min(current / total, 1) : 0;
+  const filled = Math.round(ratio * width);
+  const empty = width - filled;
+  return `[${"█".repeat(filled)}${"░".repeat(empty)}]`;
+}
+
 export function createProgress(total: number, label: string): Progress {
   const isTTY = process.stderr.isTTY ?? false;
   const startTime = Date.now();
@@ -103,9 +114,8 @@ export function createProgress(total: number, label: string): Progress {
   function update(current: number, detail?: string): void {
     if (isTTY) {
       const detailStr = detail ? ` ${detail}` : "";
-      const line = useColor()
-        ? `\r[${current}/${total}] ${label}...${detailStr}`
-        : `\r[${current}/${total}] ${label}...${detailStr}`;
+      const bar = renderProgressBar(current, total);
+      const line = `\r[${current}/${total}] ${label}...${detailStr} ${bar}`;
       write(line);
     } else {
       // Non-TTY: output at 0%, 25%, 50%, 75%, 100% milestones
@@ -164,7 +174,23 @@ export function createStepProgress(totalSteps: number, title?: string): StepProg
   function printStepLine(step: Step): void {
     const icon = stepIcon(step.status);
     const reasonStr = step.reason ? ` (${step.reason})` : "";
-    write(`  ${icon} ${step.name}${reasonStr}\n`);
+    if (useColor()) {
+      switch (step.status) {
+        case "done":
+          write(`  ${colors.success(icon)} ${step.name}${reasonStr}\n`);
+          break;
+        case "failed":
+          write(`  ${colors.error(icon)} ${colors.error(step.name)}${reasonStr}\n`);
+          break;
+        case "skipped":
+          write(`  ${colors.warning(icon)} ${colors.dim(step.name)}${reasonStr}\n`);
+          break;
+        default:
+          write(`  ${icon} ${step.name}${reasonStr}\n`);
+      }
+    } else {
+      write(`  ${icon} ${step.name}${reasonStr}\n`);
+    }
   }
 
   if (title) {
@@ -182,7 +208,11 @@ export function createStepProgress(totalSteps: number, title?: string): StepProg
     }
     // Print running indicator so the user sees activity
     const icon = stepIcon("running");
-    write(`  ${icon} ${name}...\n`);
+    if (useColor()) {
+      write(`  ${colors.info(icon)} ${name}...\n`);
+    } else {
+      write(`  ${icon} ${name}...\n`);
+    }
   }
 
   function completeStep(name: string): void {
@@ -248,3 +278,6 @@ export function createStepProgress(totalSteps: number, title?: string): StepProg
 
   return { startStep, completeStep, failStep, skipStep, warn, finish };
 }
+
+// Re-export spinner for convenience in commands
+export { createSpinner, type Ora } from "./ui/spinner.js";

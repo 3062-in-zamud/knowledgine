@@ -3,6 +3,7 @@ import { mkdirSync, statSync } from "fs";
 import {
   loadConfig,
   writeRcConfig,
+  resolveDefaultPath,
   createDatabase,
   loadSqliteVecExtension,
   Migrator,
@@ -13,17 +14,19 @@ import {
   ModelManager,
   DEFAULT_MODEL_NAME,
   downloadModel,
+  VERSION,
 } from "@knowledgine/core";
 import { IngestEngine, PluginRegistry, MarkdownPlugin } from "@knowledgine/ingest";
 import { postIngestProcessing } from "../lib/entity-extractor.js";
 import {
   createProgress,
   createStepProgress,
-  createSummaryReport,
   formatDuration,
 } from "../lib/progress.js";
 import { copyDemoFixtures } from "../lib/demo-manager.js";
 import { getDemoNotesPath } from "./demo.js";
+import { colors, symbols } from "../lib/ui/index.js";
+import * as p from "@clack/prompts";
 
 export interface InitOptions {
   path?: string;
@@ -103,21 +106,25 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const initStartTime = Date.now();
   let rootPath: string;
 
+  p.intro(`${colors.bold("knowledgine")} ${colors.dim(`v${VERSION}`)}`);
+
   if (options.demo) {
     const demoPath = getDemoNotesPath(options.path);
     const count = copyDemoFixtures(demoPath);
-    console.error(`Copied ${count} demo notes to ${demoPath}`);
+    console.error(`${symbols.info} ${colors.info(`Copied ${count} demo notes to ${demoPath}`)}`);
     rootPath = demoPath;
   } else {
-    rootPath = resolve(options.path ?? process.cwd());
+    rootPath = resolveDefaultPath(options.path);
   }
 
   // Deprecation warning for --skip-embeddings
   if (options.skipEmbeddings) {
     console.error(
-      "Warning: --skip-embeddings is deprecated. Embeddings are now opt-in by default.",
+      `${symbols.warning} ${colors.warning("--skip-embeddings is deprecated. Embeddings are now opt-in by default.")}`,
     );
-    console.error("  Use 'knowledgine init --semantic' to enable semantic search.");
+    console.error(
+      `  ${colors.warning("Use 'knowledgine init --semantic' to enable semantic search.")}`,
+    );
     console.error("");
   }
 
@@ -148,9 +155,9 @@ export async function initCommand(options: InitOptions): Promise<void> {
       const estimatedNeeded = estimateMarkdownSize(rootPath) * DISK_MULTIPLIER_FTS5;
       stepProgress.failStep("Creating .knowledgine directory", "Insufficient disk space");
       console.error("");
-      console.error("Error: Disk is full. Cannot create the knowledge base.");
+      console.error(colors.error("Error: Disk is full. Cannot create the knowledge base."));
       console.error("");
-      console.error("Disk space requirements:");
+      console.error(`${symbols.warning} ${colors.warning("Disk space requirements:")}`);
       console.error(
         `  FTS5 text search only: source files x${DISK_MULTIPLIER_FTS5} (index overhead)`,
       );
@@ -166,7 +173,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
         console.error(`  Available:        ~${(freeDisk / (1024 * 1024)).toFixed(1)} MB`);
       }
       console.error("");
-      console.error("Free up disk space and re-run:");
+      console.error(`${symbols.warning} ${colors.warning("Free up disk space and re-run:")}`);
       console.error(
         `  knowledgine init${options.path ? ` --path ${options.path}` : ""}${enableSemantic ? " --semantic" : ""}`,
       );
@@ -287,10 +294,10 @@ export async function initCommand(options: InitOptions): Promise<void> {
         const message = lastError instanceof Error ? lastError.message : "unknown error";
         stepProgress.failStep("Downloading embedding model", message);
         console.error("");
-        console.error("Semantic search unavailable. Text search (FTS5) works without embeddings.");
-        console.error(`To retry: knowledgine init --path ${rootPath} --semantic`);
+        console.error(colors.error("Semantic search unavailable. Text search (FTS5) works without embeddings."));
+        console.error(colors.error(`To retry: knowledgine init --path ${rootPath} --semantic`));
         console.error("");
-        console.error("Offline alternative: Copy the model files manually to:");
+        console.error(`${symbols.info} ${colors.info("Offline alternative: Copy the model files manually to:")}`);
         console.error(`  ${modelManager.getModelDir()}`);
         console.error("  Then re-run the init command.");
 
@@ -301,7 +308,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
         console.error(`  Patterns:   ${postSummary.totalEntities} entities extracted`);
         console.error(`  Embeddings: skipped (model download failed)`);
         console.error("");
-        console.error("Next: Run 'knowledgine setup' to connect your AI tool.");
+        console.error(`${symbols.arrow} ${colors.hint("Next: Run 'knowledgine setup' to connect your AI tool.")}`);
         db.close();
         return;
       }
@@ -340,12 +347,26 @@ export async function initCommand(options: InitOptions): Promise<void> {
       }
     }
 
-    // Write .knowledginerc.json to persist semantic search setting
-    writeRcConfig(rootPath, { semantic: true });
     stepProgress.completeStep("Generating embeddings");
   }
 
   stepProgress.finish();
+
+  // ---------------------------------------------------------------------------
+  // Auto-configure defaultPath so users don't need --path every time
+  // ---------------------------------------------------------------------------
+  const cwd = process.cwd();
+  const resolvedRoot = resolve(rootPath);
+  // Write defaultPath to cwd's .knowledginerc.json (where resolveDefaultPath reads from)
+  // Only if rootPath differs from cwd (otherwise cwd fallback already works)
+  if (resolvedRoot !== resolve(cwd)) {
+    writeRcConfig(cwd, { defaultPath: resolvedRoot });
+  }
+  // Also write semantic flag to rootPath's .knowledginerc.json if semantic enabled
+  // (this is where loadConfig reads from)
+  if (enableSemantic && config.embedding.enabled) {
+    writeRcConfig(rootPath, { semantic: true });
+  }
 
   // ---------------------------------------------------------------------------
   // Final summary
@@ -375,19 +396,34 @@ export async function initCommand(options: InitOptions): Promise<void> {
         ]),
     { label: "Duration:", value: elapsed },
   ];
-  console.error("\n" + createSummaryReport("knowledgine init", summaryEntries));
-  console.error("");
+  // Summary as clack note for visual consistency
+  const summaryLines = summaryEntries.map(
+    (e) => `${colors.dim(e.label.padEnd(12))} ${e.value}`,
+  );
+  p.note(summaryLines.join("\n"), "knowledgine init");
+
   if (options.demo) {
-    console.error("Demo ready! Try:");
-    console.error('  knowledgine search "auth" --demo');
-    console.error('  knowledgine search "typescript" --demo');
-    console.error('  knowledgine search "docker" --demo');
-    console.error("");
-    console.error("Clean up when done:");
-    console.error("  knowledgine demo --clean");
+    p.note(
+      [
+        `${symbols.arrow} ${colors.info('knowledgine search "auth" --demo')}`,
+        `${symbols.arrow} ${colors.info('knowledgine search "typescript" --demo')}`,
+        `${symbols.arrow} ${colors.info('knowledgine search "docker" --demo')}`,
+        "",
+        `${colors.dim('knowledgine demo --clean  to remove demo files')}`,
+      ].join("\n"),
+      "Try these searches",
+    );
   } else {
-    console.error("Next: Run 'knowledgine setup' to connect your AI tool.");
+    p.note(
+      [
+        `${symbols.arrow} ${colors.info("knowledgine setup")}          ${colors.dim("Configure your AI tools")}`,
+        `${symbols.arrow} ${colors.info('knowledgine search "query"')}  ${colors.dim("Search your notes")}`,
+      ].join("\n"),
+      "Next steps",
+    );
   }
+  p.outro(`${colors.success("Your knowledge is now searchable!")} ${colors.dim(`(${elapsed})`)}`);
+
 
   db.close();
 }

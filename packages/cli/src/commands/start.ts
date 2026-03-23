@@ -3,6 +3,7 @@ import { mkdirSync } from "fs";
 import { watch } from "chokidar";
 import {
   loadConfig,
+  resolveDefaultPath,
   createDatabase,
   loadSqliteVecExtension,
   Migrator,
@@ -18,6 +19,7 @@ import {
 } from "@knowledgine/core";
 import { createKnowledgineMcpServer, StdioServerTransport } from "@knowledgine/mcp-server";
 import { indexFile } from "../lib/indexer.js";
+import { createBox, colors, symbols } from "../lib/ui/index.js";
 
 export interface StartOptions {
   path?: string;
@@ -25,7 +27,7 @@ export interface StartOptions {
 }
 
 export async function startCommand(options: StartOptions): Promise<void> {
-  const rootPath = resolve(options.path ?? process.cwd());
+  const rootPath = resolveDefaultPath(options.path);
 
   // Ensure .knowledgine directory exists
   mkdirSync(resolve(rootPath, ".knowledgine"), { recursive: true });
@@ -38,7 +40,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     const modelManager = new ModelManager();
     if (modelManager.isModelAvailable(config.embedding.modelName)) {
       config.embedding.enabled = true;
-      console.error("[knowledgine] Semantic search enabled (model detected)");
+      console.error(`${symbols.success} ${colors.success("Semantic search enabled (model detected)")}`);
     }
   }
 
@@ -58,7 +60,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
   // Warn if no notes indexed (H-8)
   const stats = repository.getStats();
   if (stats.totalNotes === 0) {
-    console.error("Warning: No notes indexed. Run `knowledgine init` first.");
+    console.error(`${symbols.warning} ${colors.warning("No notes indexed. Run `knowledgine init` first.")}`);
   }
 
   // Initialize embedding provider if model is available and semantic is enabled
@@ -72,13 +74,13 @@ export async function startCommand(options: StartOptions): Promise<void> {
       const notesWithout = repository.getNotesWithoutEmbeddings();
       if (notesWithout.length > 0) {
         console.error(
-          `Warning: ${notesWithout.length} notes have no embeddings. ` +
-            "Semantic search unavailable. Run 'knowledgine upgrade --semantic' to download the model and generate embeddings.",
+          `${symbols.warning} ${colors.warning(`${notesWithout.length} notes have no embeddings. ` +
+            "Semantic search unavailable. Run 'knowledgine upgrade --semantic' to download the model and generate embeddings.")}`,
         );
       }
     }
   } else {
-    console.error("[knowledgine] Running with FTS5 full-text search only");
+    console.error(`${symbols.info} ${colors.info("Running with FTS5 full-text search only")}`);
   }
 
   // Start MCP server via stdio
@@ -92,7 +94,19 @@ export async function startCommand(options: StartOptions): Promise<void> {
   });
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("MCP server started on stdio");
+
+  const searchMode = config.embedding.enabled ? "semantic + FTS5" : "FTS5 full-text search";
+  console.error(
+    createBox(
+      [
+        `${symbols.info} Path:   ${rootPath}`,
+        `${symbols.info} Notes:  ${stats.totalNotes} indexed`,
+        `${symbols.info} Search: ${searchMode}`,
+      ].join("\n"),
+      { title: "knowledgine MCP Server", type: "info" },
+    ),
+  );
+  console.error(colors.success("MCP server started on stdio"));
 
   // IngestEngine integration (only when --ingest flag is set)
   let ingestWatcher: import("../lib/ingest-watcher.js").IngestWatcher | undefined;
@@ -109,7 +123,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     // Warn about failed plugins but continue
     for (const [pluginId, result] of initResults) {
       if (!result.ok) {
-        console.error(`Warning: Plugin "${pluginId}" failed to initialize: ${result.error}`);
+        console.error(`${symbols.warning} ${colors.warning(`Plugin "${pluginId}" failed to initialize: ${result.error}`)}`);
       }
     }
 
@@ -121,21 +135,21 @@ export async function startCommand(options: StartOptions): Promise<void> {
       onComplete: (summaries) => {
         const total = summaries.reduce((acc, s) => acc + s.processed, 0);
         const errors = summaries.reduce((acc, s) => acc + s.errors, 0);
-        console.error(`Ingest complete: ${total} events processed, ${errors} errors`);
+        console.error(`${symbols.success} ${colors.success(`Ingest complete: ${total} events processed, ${errors} errors`)}`);
       },
       onError: (pluginId, error) => {
-        console.error(`Ingest error (${pluginId}): ${error.message}`);
+        console.error(`${symbols.error} ${colors.error(`Ingest error (${pluginId}): ${error.message}`)}`);
       },
     });
 
     // Run initial ingest in background (don't block MCP responses)
     ingestWatcher.runInitialIngest().catch((error) => {
       console.error(
-        `Initial ingest failed: ${error instanceof Error ? error.message : String(error)}`,
+        `${symbols.error} ${colors.error(`Initial ingest failed: ${error instanceof Error ? error.message : String(error)}`)}`,
       );
     });
 
-    console.error("IngestEngine started (background ingestion)");
+    console.error(`${symbols.info} ${colors.info("IngestEngine started (background ingestion)")}`);
   }
 
   // File watcher for auto-reindexing
@@ -166,9 +180,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
           repository.saveEmbedding(noteId, embedding, config.embedding.modelName);
         }
       }
-      console.error(`Indexed: ${filePath}`);
+      console.error(`${symbols.arrow} ${colors.info(`Indexed: ${filePath}`)}`);
     } catch (error) {
-      console.error(`Error indexing ${filePath}:`, error instanceof Error ? error.message : error);
+      console.error(`${symbols.error} ${colors.error(`Error indexing ${filePath}: ${error instanceof Error ? error.message : error}`)}`);
     }
   });
 
@@ -189,11 +203,10 @@ export async function startCommand(options: StartOptions): Promise<void> {
           repository.saveEmbedding(noteId, embedding, config.embedding.modelName);
         }
       }
-      console.error(`Re-indexed: ${filePath}`);
+      console.error(`${symbols.arrow} ${colors.info(`Re-indexed: ${filePath}`)}`);
     } catch (error) {
       console.error(
-        `Error re-indexing ${filePath}:`,
-        error instanceof Error ? error.message : error,
+        `${symbols.error} ${colors.error(`Error re-indexing ${filePath}: ${error instanceof Error ? error.message : error}`)}`,
       );
     }
   });
@@ -201,9 +214,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
   watcher.on("unlink", (filePath: string) => {
     try {
       repository.deleteNoteByPath(filePath);
-      console.error(`Removed: ${filePath}`);
+      console.error(`${symbols.arrow} ${colors.info(`Removed: ${filePath}`)}`);
     } catch (error) {
-      console.error(`Error removing ${filePath}:`, error instanceof Error ? error.message : error);
+      console.error(`${symbols.error} ${colors.error(`Error removing ${filePath}: ${error instanceof Error ? error.message : error}`)}`);
     }
   });
 

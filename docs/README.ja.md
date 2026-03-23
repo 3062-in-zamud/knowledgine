@@ -9,6 +9,8 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
 
+<!-- TODO: CLI出力の最終化後にデモGIFを追加。録画コマンド: vhs docs/assets/demo.tape -->
+
 ---
 
 ## なぜ knowledgine なのか
@@ -16,6 +18,20 @@
 開発者はマークダウンノートに膨大な知識を蓄積しています。デバッグの記録、アーキテクチャ上の意思決定、問題と解決策のペア、苦労して得た教訓。しかしそれらはファイルの中に孤立したまま、AI コーディングアシスタントからは見えない状態が続いています。
 
 knowledgine はそのギャップを埋めます。マークダウンファイルをスキャンしてパターン（問題と解決策のペア、コードスニペット、学習内容）を検出し、FTS5 全文検索を備えたローカル SQLite データベースに格納します。MCP サーバーがその知識を MCP 対応の AI ツールに公開し、必要なタイミングで適切なコンテキストをアシスタントが取得できるようになります。
+
+- **ローカルファースト** — すべてのデータはローカルの SQLite データベースに保存されます。クラウド不要、API キー不要。
+- **$0 コスト** — エンベディングモデルはローカルで動作。クエリごとの課金なし。
+- **オフライン対応** — ネットワーク接続なしで全機能を利用できます。
+- **MCP ネイティブ** — Claude Desktop、Cursor、Claude Code ですぐに使えます。
+
+---
+
+## 今すぐ試す（30秒）
+
+```bash
+npx @knowledgine/cli init --demo --path /tmp/knowledgine-demo
+npx @knowledgine/cli search "React performance" --path /tmp/knowledgine-demo/knowledgine-demo-notes
+```
 
 ---
 
@@ -46,7 +62,15 @@ npm install -g @knowledgine/cli
 knowledgine init --path ./my-notes
 ```
 
-マークダウンファイルをスキャンし、エンベディングモデル（約 23MB）をダウンロードし、全文検索・セマンティック検索インデックスを含む `.knowledgine/index.sqlite` を生成します。
+マークダウンファイルをスキャンし、FTS5 全文検索を備えた `.knowledgine/index.sqlite` を生成します。モデルのダウンロードは不要です。
+
+セマンティック検索を有効にする場合（任意、約 23MB のモデルをダウンロード）:
+
+```bash
+knowledgine init --path ./my-notes --semantic
+# または既存のインデックスをアップグレード:
+knowledgine upgrade --semantic --path ./my-notes
+```
 
 ### 3. AI ツールと接続
 
@@ -70,22 +94,39 @@ knowledgine status --path ./my-notes
 
 ## コマンド
 
-| コマンド | 説明                                                                                   |
-| -------- | -------------------------------------------------------------------------------------- |
-| `init`   | マークダウンファイルをスキャン、エンベディングモデルをダウンロード、インデックスを構築 |
-| `start`  | ファイル監視付き MCP サーバーを起動（増分更新）                                        |
-| `setup`  | AI ツール（Claude Desktop、Cursor）向けの MCP 設定を生成                               |
-| `status` | セットアップ状態を確認（データベース、モデル、MCP 設定）                               |
+| コマンド     | 説明                                                                                          |
+|--------------|-----------------------------------------------------------------------------------------------|
+| `init`       | マークダウンファイルをスキャンしてインデックス化（デフォルトは FTS5 全文検索）                |
+| `start`      | ファイル監視付き MCP サーバーを起動（増分更新）                                               |
+| `setup`      | AI ツール（Claude Desktop、Cursor、Claude Code）向けの MCP 設定を生成                        |
+| `status`     | セットアップ状態を確認（データベース、モデル、MCP 設定）                                      |
+| `upgrade`    | 追加機能を有効化（セマンティック検索など）                                                    |
+| `search`     | インデックス済みノートを検索（キーワード・セマンティック・ハイブリッドモード）                |
+| `capture`    | テキスト・URL・ファイルからナレッジスニペットを取得・管理                                     |
+| `ingest`     | 外部ソースからナレッジを取り込む（Git、GitHub、Obsidian、Claude Sessions）                    |
+| `feedback`   | エンティティ抽出フィードバックを管理（list、apply、dismiss、report）                          |
+| `plugins`    | ingest プラグインを管理（list、status）                                                       |
+| `tool`       | CLI から MCP ツールを実行（search、related、stats、entities）                                 |
+| `demo`       | デモ環境の初期化またはデモファイルのクリーンアップ                                            |
 
 ### init
 
 ```bash
 knowledgine init --path ./my-notes
-knowledgine init --path ./my-notes --skip-embeddings
+knowledgine init --path ./my-notes --semantic
 ```
 
 - `--path <dir>`: スキャン対象ディレクトリ（デフォルト: カレントディレクトリ）
-- `--skip-embeddings`: エンベディングモデルのダウンロードと生成をスキップ（テキスト検索は引き続き利用可能）
+- `--semantic`: セマンティック検索を有効化（エンベディングモデルをダウンロードして生成）
+
+### upgrade
+
+```bash
+knowledgine upgrade --semantic --path ./my-notes
+```
+
+- `--semantic`: エンベディングモデルをダウンロードし、全インデックス済みノートのエンベディングを生成
+- `--path <dir>`: ルートディレクトリ（デフォルト: カレントディレクトリ）
 
 ### setup
 
@@ -105,6 +146,52 @@ knowledgine status --path ./my-notes
 ```
 
 データベース統計、モデルの利用可能状態、MCP 設定の状態、全体の準備状況を表示します。
+
+### search
+
+```bash
+knowledgine search "React performance" --path ./my-notes
+knowledgine search "architecture decisions" --mode semantic --path ./my-notes
+knowledgine search "debugging tips" --mode hybrid --path ./my-notes --format table
+```
+
+- `--mode <mode>`: 検索モード（`keyword`、`semantic`、`hybrid`）。デフォルト: `keyword`
+- `--format <format>`: 出力形式（`plain`、`table`、`json`）。デフォルト: `plain`
+- `--limit <n>`: 最大件数。デフォルト: 20
+- `--related <noteId>`: ノート ID で関連ノートを検索
+- `--demo`: デモノートを検索
+
+### capture
+
+```bash
+knowledgine capture add "TIL: Use React.memo for expensive components" --path ./my-notes
+knowledgine capture add --url https://example.com/article --path ./my-notes
+knowledgine capture list --path ./my-notes
+knowledgine capture delete <id> --path ./my-notes
+```
+
+### ingest
+
+```bash
+knowledgine ingest --source markdown --path ./my-notes
+knowledgine ingest --source github --repo owner/repo --path ./my-notes
+knowledgine ingest --source claude-sessions --path ./my-notes
+knowledgine ingest --all --path ./my-notes
+```
+
+---
+
+## 比較
+
+| 機能              | knowledgine      | Mem0             | Obsidian Search  |
+|-------------------|------------------|------------------|------------------|
+| コスト            | 無料（ローカル） | API 課金あり     | プラグイン課金   |
+| データプライバシー | 100% ローカル   | クラウド         | ローカル         |
+| オフライン        | 可               | 不可             | 可               |
+| AI 連携           | MCP ネイティブ   | REST API         | 限定的           |
+| セットアップ      | 1 コマンド       | アカウント + API キー | アプリ + プラグイン |
+| 自動抽出          | パターン・エンティティ | 手動         | 手動             |
+| 検索              | FTS5 + セマンティック | ベクトル     | 基本テキスト     |
 
 ---
 
@@ -169,6 +256,7 @@ knowledgine status --path ./my-notes
 @knowledgine/cli
 ├── @knowledgine/mcp-server
 │   └── @knowledgine/core
+├── @knowledgine/ingest
 └── @knowledgine/core
 ```
 
@@ -177,6 +265,7 @@ knowledgine status --path ./my-notes
 | `@knowledgine/core`       | ナレッジ抽出エンジン。マークダウン内のパターン（問題と解決策のペア、コードブロック、タグ）を検出し、3 階層メモリモデルを管理し、SQLite 経由で FTS5 検索を提供します。 |
 | `@knowledgine/mcp-server` | MCP 対応 AI クライアントに `search_knowledge`、`find_related`、`get_stats`、`search_entities`、`get_entity_graph` ツールを公開する MCP サーバーです。                 |
 | `@knowledgine/cli`        | コマンドラインインターフェース。`init` でインデックス構築とモデルダウンロード、`setup` で AI ツール設定、`start` でファイル監視付き MCP サーバーを起動します。        |
+| `@knowledgine/ingest`     | プラグインベースの取り込みエンジン。Git 履歴、GitHub、Obsidian、Claude Sessions からナレッジを収集します。                                                            |
 
 ---
 
@@ -190,11 +279,28 @@ knowledgine は合理的なデフォルト値を持っています。`init` や 
 | `watchPatterns`  | `["**/*.md"]`         | インデックス化・監視するファイルの glob パターン。                     |
 | `ignorePatterns` | `["node_modules/**"]` | 除外するファイルの glob パターン。                                     |
 
+### .knowledginerc.json
+
+プロジェクトルートに `.knowledginerc.json` ファイルを作成すると、設定を永続化できます。
+
+```json
+{
+  "semantic": true,
+  "defaultPath": "./my-notes"
+}
+```
+
+| フィールド    | デフォルト | 説明                                       |
+| ------------- | ---------- | ------------------------------------------ |
+| `semantic`    | `false`    | セマンティック検索を有効化                 |
+| `defaultPath` | —          | `--path` を省略した場合のデフォルトパス    |
+
 ---
 
 ## トラブルシューティング
 
-### ネイティブビルドの失敗（`better-sqlite3`）
+<details>
+<summary>ネイティブビルドの失敗（better-sqlite3）</summary>
 
 ```bash
 # macOS
@@ -207,32 +313,37 @@ sudo apt-get install build-essential python3
 npm install --global windows-build-tools
 ```
 
-### エンベディングモデルのダウンロード失敗
+</details>
 
-`init` でモデルのダウンロードに失敗してもテキスト検索（FTS5）は利用できます。再試行:
+<details>
+<summary>エンベディングモデルのダウンロード失敗</summary>
 
-```bash
-knowledgine init --path ./my-notes
-```
-
-エンベディングを完全にスキップする場合:
+`init --semantic` または `upgrade --semantic` でモデルのダウンロードに失敗してもテキスト検索（FTS5）は利用できます。再試行:
 
 ```bash
-knowledgine init --path ./my-notes --skip-embeddings
+knowledgine upgrade --semantic --path ./my-notes
 ```
 
-### MCP 接続の問題
+</details>
+
+<details>
+<summary>MCP 接続の問題</summary>
 
 1. セットアップ確認: `knowledgine status --path ./my-notes`
 2. 設定の再生成: `knowledgine setup --target claude-desktop --path ./my-notes --write`
 3. 設定書き込み後に AI ツールを再起動
 4. 設定内のパスがノートディレクトリと一致しているか確認
 
+</details>
+
 ---
 
-## コントリビューション
+## コミュニティ
 
-開発環境のセットアップ、コミット規約、プルリクエストのガイドラインは [CONTRIBUTING.md](../CONTRIBUTING.md) を参照してください。
+- [バグ報告](https://github.com/3062-in-zamud/knowledgine/issues/new?template=bug_report.yml)
+- [機能リクエスト](https://github.com/3062-in-zamud/knowledgine/issues/new?template=feature_request.yml)
+- [ディスカッション](https://github.com/3062-in-zamud/knowledgine/discussions)
+- [コントリビューション](../CONTRIBUTING.md)
 
 ---
 

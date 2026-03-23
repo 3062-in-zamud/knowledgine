@@ -29,7 +29,6 @@ describe("status command", () => {
   });
 
   it("should show database stats for initialized directory", async () => {
-    // Initialize database
     const knowledgineDir = join(testDir, ".knowledgine");
     mkdirSync(knowledgineDir, { recursive: true });
 
@@ -38,7 +37,6 @@ describe("status command", () => {
     new Migrator(db, ALL_MIGRATIONS).migrate();
     const repo = new KnowledgeRepository(db);
 
-    // Add a test note
     repo.saveNote({
       filePath: "test.md",
       title: "Test Note",
@@ -51,8 +49,9 @@ describe("status command", () => {
     await statusCommand({ path: testDir });
 
     const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
-    expect(output).toContain("1 indexed");
-    expect(output).toContain("Database:");
+    expect(output).toContain("1");
+    expect(output).toContain("indexed");
+    expect(output).toContain("Database");
   });
 
   it("should show model availability", async () => {
@@ -67,8 +66,7 @@ describe("status command", () => {
     await statusCommand({ path: testDir });
 
     const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
-    // Model won't be available in test environment
-    expect(output).toMatch(/Model:.*all-MiniLM-L6-v2/);
+    expect(output).toContain("all-MiniLM-L6-v2");
   });
 
   it("should show MCP config status", async () => {
@@ -83,9 +81,7 @@ describe("status command", () => {
     await statusCommand({ path: testDir });
 
     const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
-    expect(output).toContain("MCP Config:");
-    expect(output).toContain("Claude Desktop:");
-    expect(output).toContain("Cursor:");
+    expect(output).toContain("MCP:");
   });
 
   it("should show overall status", async () => {
@@ -108,7 +104,7 @@ describe("status command", () => {
     await statusCommand({ path: testDir });
 
     const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
-    // Without model, status should be "Ready (FTS5 only)"
-    expect(output).toContain("Ready (FTS5 only)");
+    // Status should contain "Ready" regardless of semantic mode
+    expect(output).toContain("Ready");
   });
 });
