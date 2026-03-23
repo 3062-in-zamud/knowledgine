@@ -16,6 +16,8 @@ import {
   parseIssueList,
   prToNormalizedEvent,
   issueToNormalizedEvent,
+  commentToNormalizedEvent,
+  reviewToNormalizedEvent,
 } from "./gh-parser.js";
 
 export class GitHubPlugin implements IngestPlugin {
@@ -61,7 +63,42 @@ export class GitHubPlugin implements IngestPlugin {
       "all",
     ]);
     for (const pr of parsePRList(prJson)) {
+      // PR 本体のイベント
       yield prToNormalizedEvent(pr, owner, repo);
+
+      // PR のコメントとレビューを取得
+      try {
+        const detailJson = await this.execWithRetry([
+          "pr",
+          "view",
+          String(pr.number),
+          "-R",
+          `${owner}/${repo}`,
+          "--json",
+          "comments,reviews",
+        ]);
+        const details = JSON.parse(detailJson) as {
+          comments?: Array<{ body: string; author: { login: string }; createdAt: string }>;
+          reviews?: Array<{
+            body: string;
+            author: { login: string };
+            state: string;
+            createdAt: string;
+          }>;
+        };
+        if (details.comments) {
+          for (const comment of details.comments) {
+            yield commentToNormalizedEvent(comment, pr.number, owner, repo, "pr");
+          }
+        }
+        if (details.reviews) {
+          for (const review of details.reviews) {
+            yield reviewToNormalizedEvent(review, pr.number, owner, repo);
+          }
+        }
+      } catch {
+        // 詳細取得失敗は警告のみ（PR本体は既にyield済み）
+      }
     }
 
     // Issues
@@ -140,7 +177,12 @@ export class GitHubPlugin implements IngestPlugin {
     // no-op
   }
 
-  /** Exponential backoff リトライ (3回、1s→2s→4s) */
+  private isRateLimitError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.toLowerCase().includes("rate limit");
+  }
+
+  /** Rate limit エラーのみリトライ。それ以外のエラーは即座にスロー */
   private async execWithRetry(args: string[], maxRetries = 3): Promise<string> {
     let lastError: unknown;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -148,9 +190,11 @@ export class GitHubPlugin implements IngestPlugin {
         return await execGh(args);
       } catch (error) {
         lastError = error;
-        if (attempt < maxRetries - 1) {
+        if (this.isRateLimitError(error) && attempt < maxRetries - 1) {
           const delay = Math.min(1000 * Math.pow(2, attempt), 30_000);
           await new Promise((resolve) => setTimeout(resolve, delay));
+        } else if (!this.isRateLimitError(error)) {
+          throw error; // rate limit 以外のエラーは即座にスロー
         }
       }
     }

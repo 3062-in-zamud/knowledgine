@@ -161,3 +161,59 @@ export function issueToNormalizedEvent(
     },
   };
 }
+
+export function commentToNormalizedEvent(
+  comment: { body: string; author: { login: string }; createdAt: string },
+  prOrIssueNumber: number,
+  owner: string,
+  repo: string,
+  type: "pr" | "issue",
+): NormalizedEvent {
+  const content = sanitizeContent(truncateContent(comment.body));
+  const path = type === "pr" ? "pull" : "issues";
+  return {
+    sourceUri: `github://${owner}/${repo}/${path}/${prOrIssueNumber}/comments`,
+    eventType: "discussion",
+    title: `Comment on ${type === "pr" ? "PR" : "Issue"} #${prOrIssueNumber} by ${comment.author.login}`,
+    content,
+    timestamp: new Date(comment.createdAt),
+    metadata: {
+      sourcePlugin: "github",
+      sourceId: `${type}-${prOrIssueNumber}-comment-${comment.createdAt}`,
+      author: comment.author.login,
+      tags: [],
+      extra: {
+        type: "comment",
+        parentNumber: prOrIssueNumber,
+        parentType: type,
+      },
+    },
+  };
+}
+
+export function reviewToNormalizedEvent(
+  review: { body: string; author: { login: string }; state: string; createdAt: string },
+  prNumber: number,
+  owner: string,
+  repo: string,
+): NormalizedEvent {
+  const content = sanitizeContent(truncateContent(review.body));
+  return {
+    sourceUri: `github://${owner}/${repo}/pull/${prNumber}/reviews`,
+    eventType: "discussion",
+    title: `Review on PR #${prNumber} by ${review.author.login} (${review.state})`,
+    content,
+    timestamp: new Date(review.createdAt),
+    metadata: {
+      sourcePlugin: "github",
+      sourceId: `pr-${prNumber}-review-${review.createdAt}`,
+      author: review.author.login,
+      tags: [],
+      extra: {
+        type: "review",
+        state: review.state,
+        prNumber,
+      },
+    },
+  };
+}

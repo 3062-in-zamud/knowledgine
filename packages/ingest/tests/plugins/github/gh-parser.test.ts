@@ -7,6 +7,8 @@ import {
   prToNormalizedEvent,
   issueToNormalizedEvent,
   parseGitHubSourceUri,
+  commentToNormalizedEvent,
+  reviewToNormalizedEvent,
 } from "../../../src/plugins/github/gh-parser.js";
 import type { ParsedPR, ParsedIssue } from "../../../src/plugins/github/gh-parser.js";
 
@@ -199,6 +201,108 @@ describe("parseGitHubSourceUri", () => {
 
   it("should throw for URI missing repo", () => {
     expect(() => parseGitHubSourceUri("github://owner")).toThrow("Invalid GitHub source URI");
+  });
+});
+
+describe("commentToNormalizedEvent", () => {
+  const sampleComment = {
+    body: "LGTM! Great work.",
+    author: { login: "reviewer1" },
+    createdAt: "2025-01-03T00:00:00Z",
+  };
+
+  it("should produce correct sourceUri for PR comment", () => {
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr");
+    expect(event.sourceUri).toBe("github://owner/repo/pull/1/comments");
+  });
+
+  it("should produce correct sourceUri for issue comment", () => {
+    const event = commentToNormalizedEvent(sampleComment, 10, "owner", "repo", "issue");
+    expect(event.sourceUri).toBe("github://owner/repo/issues/10/comments");
+  });
+
+  it("should produce correct title for PR comment", () => {
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr");
+    expect(event.title).toBe("Comment on PR #1 by reviewer1");
+  });
+
+  it("should produce correct title for issue comment", () => {
+    const event = commentToNormalizedEvent(sampleComment, 10, "owner", "repo", "issue");
+    expect(event.title).toBe("Comment on Issue #10 by reviewer1");
+  });
+
+  it("should set eventType to discussion", () => {
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr");
+    expect(event.eventType).toBe("discussion");
+  });
+
+  it("should set metadata correctly", () => {
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr");
+    expect(event.metadata.sourcePlugin).toBe("github");
+    expect(event.metadata.author).toBe("reviewer1");
+    expect(event.metadata.extra).toMatchObject({
+      type: "comment",
+      parentNumber: 1,
+      parentType: "pr",
+    });
+  });
+
+  it("should set timestamp from createdAt", () => {
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr");
+    expect(event.timestamp).toEqual(new Date("2025-01-03T00:00:00Z"));
+  });
+
+  it("should sanitize comment body", () => {
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr");
+    expect(event.content).toBeDefined();
+    expect(typeof event.content).toBe("string");
+  });
+});
+
+describe("reviewToNormalizedEvent", () => {
+  const sampleReview = {
+    body: "Please address the comments.",
+    author: { login: "approver1" },
+    state: "CHANGES_REQUESTED",
+    createdAt: "2025-01-04T00:00:00Z",
+  };
+
+  it("should produce correct sourceUri", () => {
+    const event = reviewToNormalizedEvent(sampleReview, 5, "owner", "repo");
+    expect(event.sourceUri).toBe("github://owner/repo/pull/5/reviews");
+  });
+
+  it("should produce correct title", () => {
+    const event = reviewToNormalizedEvent(sampleReview, 5, "owner", "repo");
+    expect(event.title).toBe("Review on PR #5 by approver1 (CHANGES_REQUESTED)");
+  });
+
+  it("should set eventType to discussion", () => {
+    const event = reviewToNormalizedEvent(sampleReview, 5, "owner", "repo");
+    expect(event.eventType).toBe("discussion");
+  });
+
+  it("should set metadata correctly", () => {
+    const event = reviewToNormalizedEvent(sampleReview, 5, "owner", "repo");
+    expect(event.metadata.sourcePlugin).toBe("github");
+    expect(event.metadata.author).toBe("approver1");
+    expect(event.metadata.extra).toMatchObject({
+      type: "review",
+      state: "CHANGES_REQUESTED",
+      prNumber: 5,
+    });
+  });
+
+  it("should set timestamp from createdAt", () => {
+    const event = reviewToNormalizedEvent(sampleReview, 5, "owner", "repo");
+    expect(event.timestamp).toEqual(new Date("2025-01-04T00:00:00Z"));
+  });
+
+  it("should handle empty review body", () => {
+    const emptyReview = { ...sampleReview, body: "" };
+    const event = reviewToNormalizedEvent(emptyReview, 5, "owner", "repo");
+    expect(event.content).toBeDefined();
+    expect(typeof event.content).toBe("string");
   });
 });
 

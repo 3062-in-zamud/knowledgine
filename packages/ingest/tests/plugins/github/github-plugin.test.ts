@@ -92,15 +92,20 @@ describe("GitHubPlugin", () => {
     it("should yield PR and issue events from fixture data", async () => {
       const prFixture = loadFixture("prs.json");
       const issueFixture = loadFixture("issues.json");
+      const emptyDetail = '{"comments":[],"reviews":[]}';
 
-      mockedExecGh.mockResolvedValueOnce(prFixture).mockResolvedValueOnce(issueFixture);
+      mockedExecGh
+        .mockResolvedValueOnce(prFixture)
+        .mockResolvedValueOnce(emptyDetail) // PR #1 detail
+        .mockResolvedValueOnce(emptyDetail) // PR #2 detail
+        .mockResolvedValueOnce(issueFixture);
 
       const events = [];
       for await (const event of plugin.ingestAll("github://owner/repo")) {
         events.push(event);
       }
 
-      // 2 PRs + 1 issue = 3 events
+      // 2 PRs + 1 issue = 3 events (no comments/reviews in detail)
       expect(events).toHaveLength(3);
       expect(events[0].title).toBe("PR #1: Add feature X");
       expect(events[0].eventType).toBe("discussion");
@@ -131,6 +136,7 @@ describe("GitHubPlugin", () => {
         events.push(event);
       }
 
+      // PRs list + issues list (no PRs so no detail fetches)
       expect(mockedExecGh).toHaveBeenCalledTimes(2);
       const prCall = mockedExecGh.mock.calls[0][0];
       expect(prCall).toContain("pr");
@@ -152,6 +158,7 @@ describe("GitHubPlugin", () => {
         events.push(event);
       }
 
+      // empty PRs -> no detail fetches -> issues list
       expect(mockedExecGh).toHaveBeenCalledTimes(2);
       // checkpoint を1分前にオフセットしたものが --search に含まれる
       const prCall = mockedExecGh.mock.calls[0][0];
@@ -165,6 +172,7 @@ describe("GitHubPlugin", () => {
       const prFixture = loadFixture("prs.json");
       const issueFixture = loadFixture("issues.json");
 
+      // ingestIncremental does not fetch PR details
       mockedExecGh.mockResolvedValueOnce(prFixture).mockResolvedValueOnce(issueFixture);
 
       const events = [];
@@ -197,13 +205,16 @@ describe("GitHubPlugin", () => {
   });
 
   describe("retry behavior", () => {
-    it("should retry on execGh failure and succeed on second attempt", async () => {
+    it("should retry on rate limit error and succeed on second attempt", async () => {
       const prFixture = loadFixture("prs.json");
       const emptyFixture = loadFixture("empty.json");
 
       mockedExecGh
-        .mockRejectedValueOnce(new Error("network error"))
+        .mockRejectedValueOnce(new Error("API rate limit exceeded"))
         .mockResolvedValueOnce(prFixture)
+        // PR detail requests for 2 PRs
+        .mockResolvedValueOnce('{"comments":[],"reviews":[]}')
+        .mockResolvedValueOnce('{"comments":[],"reviews":[]}')
         .mockResolvedValueOnce(emptyFixture);
 
       const events = [];
@@ -212,20 +223,117 @@ describe("GitHubPlugin", () => {
       }
 
       expect(events).toHaveLength(2); // 2 PRs from fixture
-      expect(mockedExecGh).toHaveBeenCalledTimes(3); // 1 fail + 1 success for PRs + 1 success for issues
+      expect(mockedExecGh).toHaveBeenCalledTimes(5); // 1 rate limit fail + 1 success PRs + 2 PR details + 1 issues
     }, 15_000);
 
-    it("should throw after max retries exhausted", async () => {
-      mockedExecGh
-        .mockRejectedValueOnce(new Error("fail 1"))
-        .mockRejectedValueOnce(new Error("fail 2"))
-        .mockRejectedValueOnce(new Error("fail 3"));
+    it("should not retry on non-rate-limit errors", async () => {
+      mockedExecGh.mockRejectedValueOnce(new Error("network error"));
 
       await expect(async () => {
         for await (const _ of plugin.ingestAll("github://owner/repo")) {
           // consume
         }
-      }).rejects.toThrow("fail 3");
+      }).rejects.toThrow("network error");
+
+      // Should only be called once (no retry)
+      expect(mockedExecGh).toHaveBeenCalledTimes(1);
+    });
+
+    it("should throw after max rate limit retries exhausted", async () => {
+      mockedExecGh
+        .mockRejectedValueOnce(new Error("API rate limit exceeded"))
+        .mockRejectedValueOnce(new Error("API rate limit exceeded"))
+        .mockRejectedValueOnce(new Error("API rate limit exceeded"));
+
+      await expect(async () => {
+        for await (const _ of plugin.ingestAll("github://owner/repo")) {
+          // consume
+        }
+      }).rejects.toThrow("rate limit");
     }, 30_000);
+  });
+
+  describe("PR detail fetching", () => {
+    it("should yield comment events from PR details", async () => {
+      const prFixture = loadFixture("prs.json");
+      const emptyFixture = loadFixture("empty.json");
+      const detailFixture = JSON.stringify({
+        comments: [
+          { body: "LGTM!", author: { login: "reviewer1" }, createdAt: "2025-01-03T00:00:00Z" },
+        ],
+        reviews: [],
+      });
+
+      mockedExecGh
+        .mockResolvedValueOnce(prFixture)
+        .mockResolvedValueOnce(detailFixture) // PR #1 detail
+        .mockResolvedValueOnce('{"comments":[],"reviews":[]}') // PR #2 detail
+        .mockResolvedValueOnce(emptyFixture);
+
+      const events = [];
+      for await (const event of plugin.ingestAll("github://owner/repo")) {
+        events.push(event);
+      }
+
+      // 2 PRs + 1 comment = 3 events
+      expect(events).toHaveLength(3);
+      const commentEvent = events.find((e) => e.title.includes("Comment on PR #1"));
+      expect(commentEvent).toBeDefined();
+      expect(commentEvent!.eventType).toBe("discussion");
+      expect(commentEvent!.metadata.author).toBe("reviewer1");
+    });
+
+    it("should yield review events from PR details", async () => {
+      const prFixture = loadFixture("prs.json");
+      const emptyFixture = loadFixture("empty.json");
+      const detailFixture = JSON.stringify({
+        comments: [],
+        reviews: [
+          {
+            body: "Approved!",
+            author: { login: "approver1" },
+            state: "APPROVED",
+            createdAt: "2025-01-03T00:00:00Z",
+          },
+        ],
+      });
+
+      mockedExecGh
+        .mockResolvedValueOnce(prFixture)
+        .mockResolvedValueOnce(detailFixture) // PR #1 detail
+        .mockResolvedValueOnce('{"comments":[],"reviews":[]}') // PR #2 detail
+        .mockResolvedValueOnce(emptyFixture);
+
+      const events = [];
+      for await (const event of plugin.ingestAll("github://owner/repo")) {
+        events.push(event);
+      }
+
+      // 2 PRs + 1 review = 3 events
+      expect(events).toHaveLength(3);
+      const reviewEvent = events.find((e) => e.title.includes("Review on PR #1"));
+      expect(reviewEvent).toBeDefined();
+      expect(reviewEvent!.eventType).toBe("discussion");
+      expect(reviewEvent!.metadata.author).toBe("approver1");
+    });
+
+    it("should continue when PR detail fetch fails", async () => {
+      const prFixture = loadFixture("prs.json");
+      const emptyFixture = loadFixture("empty.json");
+
+      mockedExecGh
+        .mockResolvedValueOnce(prFixture)
+        .mockRejectedValueOnce(new Error("not found")) // PR #1 detail fails
+        .mockRejectedValueOnce(new Error("not found")) // PR #2 detail fails
+        .mockResolvedValueOnce(emptyFixture);
+
+      const events = [];
+      for await (const event of plugin.ingestAll("github://owner/repo")) {
+        events.push(event);
+      }
+
+      // 2 PRs only (detail fetch failures are swallowed)
+      expect(events).toHaveLength(2);
+    });
   });
 });
