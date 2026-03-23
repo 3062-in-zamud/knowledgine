@@ -50,4 +50,4 @@ jobs:
 
       - name: Security audit
         if: matrix.node-version == 22
-        run: pnpm audit --audit-level=moderate
+        run: pnpm audit --audit-level=moderate --prod
