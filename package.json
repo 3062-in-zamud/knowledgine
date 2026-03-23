@@ -3,6 +3,9 @@
   "version": "0.2.1",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "description": "Developer Knowledge Infrastructure - Extract structured knowledge from your codebase for AI coding tools",
   "scripts": {
     "build": "pnpm -r run build",
