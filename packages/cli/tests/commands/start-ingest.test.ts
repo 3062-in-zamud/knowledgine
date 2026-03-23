@@ -114,6 +114,61 @@ describe("IngestWatcher", () => {
     // Should complete without error
   });
 
+  it("should handle stop() gracefully during ingest", async () => {
+    const plugins = [createMockPlugin("a"), createMockPlugin("b"), createMockPlugin("c")];
+    const registry = createMockRegistry(plugins);
+
+    let resolveIngest: () => void;
+    const ingestPromise = new Promise<void>((resolve) => {
+      resolveIngest = resolve;
+    });
+
+    const summaryA: IngestSummary = {
+      pluginId: "a",
+      processed: 2,
+      errors: 0,
+      deleted: 0,
+      skipped: 0,
+      elapsedMs: 50,
+    };
+
+    const mockEngine = {
+      ingest: vi
+        .fn()
+        .mockResolvedValueOnce(summaryA)
+        .mockImplementationOnce(async () => {
+          // plugin "b" の ingest 中に stop() が呼ばれることをシミュレート
+          await ingestPromise;
+          return { pluginId: "b", processed: 0, errors: 0, deleted: 0, skipped: 0, elapsedMs: 0 };
+        }),
+    } as unknown as IngestEngine;
+
+    const onComplete = vi.fn();
+    const watcher = new IngestWatcher({
+      engine: mockEngine,
+      registry,
+      rootPath: "/tmp/test",
+      onComplete,
+    });
+
+    // 非同期で ingest を開始し、途中で stop() を呼ぶ
+    const ingestTask = watcher.runInitialIngest();
+
+    // plugin "a" が完了するのを待ってから stop() を呼ぶ
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await watcher.stop();
+    resolveIngest!();
+
+    const result = await ingestTask;
+
+    // stop() が呼ばれた後は残りのプラグイン ("c") は実行されない
+    // "a" は完了済み、"b" は ingest 中に stop されても完了する（現在の実装では running フラグを確認するのはループ先頭）
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    // plugin "c" は実行されないはず
+    const pluginCResult = result.find((s) => s.pluginId === "c");
+    expect(pluginCResult).toBeUndefined();
+  });
+
   it("should call onComplete callback with all summaries", async () => {
     const plugins = [createMockPlugin("a")];
     const registry = createMockRegistry(plugins);
