@@ -1,6 +1,12 @@
 import { resolve } from "path";
 import { mkdirSync } from "fs";
-import { defineConfig, resolveDefaultPath, createDatabase, Migrator, ALL_MIGRATIONS } from "@knowledgine/core";
+import {
+  defineConfig,
+  resolveDefaultPath,
+  createDatabase,
+  Migrator,
+  ALL_MIGRATIONS,
+} from "@knowledgine/core";
 import { CursorStore } from "@knowledgine/ingest";
 import { createDefaultRegistry } from "../lib/plugin-loader.js";
 import { createTable } from "../lib/ui/index.js";

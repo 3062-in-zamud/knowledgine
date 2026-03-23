@@ -9,9 +9,7 @@ export interface StructuredError {
 }
 
 export function formatStructuredError(err: StructuredError): string {
-  const lines: string[] = [
-    `${symbols.error} ${colors.error(colors.bold(err.message))}`,
-  ];
+  const lines: string[] = [`${symbols.error} ${colors.error(colors.bold(err.message))}`];
   if (err.cause) {
     lines.push("", `${colors.dim("Cause:")} ${err.cause}`);
   }

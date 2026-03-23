@@ -97,10 +97,6 @@ export function formatEntities(result: SearchEntitiesResult, format: OutputForma
   }
   // table
   if (result.entities.length === 0) return "";
-  const rows = result.entities.map((e) => [
-    String(e.id),
-    colors.accent(e.entityType),
-    e.name,
-  ]);
+  const rows = result.entities.map((e) => [String(e.id), colors.accent(e.entityType), e.name]);
   return createTable({ head: ["ID", "Type", "Name"], rows });
 }

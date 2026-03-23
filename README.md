@@ -94,20 +94,20 @@ knowledgine status --path ./my-notes
 
 ## Commands
 
-| Command    | Description                                                                               |
-|------------|-------------------------------------------------------------------------------------------|
-| `init`     | Scan and index markdown files (FTS5 full-text search by default)                          |
-| `start`    | Start MCP server with file watching for incremental updates                               |
-| `setup`    | Generate MCP configuration for AI tools (Claude Desktop, Cursor, Claude Code)            |
-| `status`   | Check setup status (database, model, MCP config)                                          |
-| `upgrade`  | Enable additional capabilities (e.g., semantic search)                                    |
-| `search`   | Search indexed notes (keyword, semantic, or hybrid mode)                                  |
-| `capture`  | Capture and manage knowledge snippets from text, URL, or file                             |
-| `ingest`   | Ingest knowledge from external sources (Git, GitHub, Obsidian, Claude Sessions)           |
-| `feedback` | Manage entity extraction feedback (list, apply, dismiss, report)                          |
-| `plugins`  | Manage ingest plugins (list, status)                                                      |
-| `tool`     | Execute MCP tools from CLI (search, related, stats, entities)                             |
-| `demo`     | Initialize demo environment or clean up demo files                                        |
+| Command    | Description                                                                     |
+| ---------- | ------------------------------------------------------------------------------- |
+| `init`     | Scan and index markdown files (FTS5 full-text search by default)                |
+| `start`    | Start MCP server with file watching for incremental updates                     |
+| `setup`    | Generate MCP configuration for AI tools (Claude Desktop, Cursor, Claude Code)   |
+| `status`   | Check setup status (database, model, MCP config)                                |
+| `upgrade`  | Enable additional capabilities (e.g., semantic search)                          |
+| `search`   | Search indexed notes (keyword, semantic, or hybrid mode)                        |
+| `capture`  | Capture and manage knowledge snippets from text, URL, or file                   |
+| `ingest`   | Ingest knowledge from external sources (Git, GitHub, Obsidian, Claude Sessions) |
+| `feedback` | Manage entity extraction feedback (list, apply, dismiss, report)                |
+| `plugins`  | Manage ingest plugins (list, status)                                            |
+| `tool`     | Execute MCP tools from CLI (search, related, stats, entities)                   |
+| `demo`     | Initialize demo environment or clean up demo files                              |
 
 ### init
 
@@ -183,15 +183,15 @@ knowledgine ingest --all --path ./my-notes
 
 ## Comparison
 
-| Feature           | knowledgine      | Mem0             | Obsidian Search  |
-|-------------------|------------------|------------------|------------------|
-| Cost              | Free (local)     | API costs        | Plugin costs     |
-| Data Privacy      | 100% local       | Cloud            | Local            |
-| Offline           | Yes              | No               | Yes              |
-| AI Integration    | MCP native       | REST API         | Limited          |
-| Setup             | 1 command        | Account + API key| App + plugins    |
-| Auto-extraction   | Patterns, entities | Manual         | Manual           |
-| Search            | FTS5 + semantic  | Vector           | Basic text       |
+| Feature         | knowledgine        | Mem0              | Obsidian Search |
+| --------------- | ------------------ | ----------------- | --------------- |
+| Cost            | Free (local)       | API costs         | Plugin costs    |
+| Data Privacy    | 100% local         | Cloud             | Local           |
+| Offline         | Yes                | No                | Yes             |
+| AI Integration  | MCP native         | REST API          | Limited         |
+| Setup           | 1 command          | Account + API key | App + plugins   |
+| Auto-extraction | Patterns, entities | Manual            | Manual          |
+| Search          | FTS5 + semantic    | Vector            | Basic text      |
 
 ---
 
@@ -290,10 +290,10 @@ Create a `.knowledginerc.json` file in your project root for persistent configur
 }
 ```
 
-| Field         | Default | Description                              |
-| ------------- | ------- | ---------------------------------------- |
-| `semantic`    | `false` | Enable semantic search                   |
-| `defaultPath` | —       | Default `--path` value when omitted      |
+| Field         | Default | Description                         |
+| ------------- | ------- | ----------------------------------- |
+| `semantic`    | `false` | Enable semantic search              |
+| `defaultPath` | —       | Default `--path` value when omitted |
 
 ---
 

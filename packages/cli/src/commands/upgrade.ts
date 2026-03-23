@@ -36,7 +36,9 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
   // Check initialization
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {
-    console.error(colors.error(`Error: Not initialized. Run 'knowledgine init --path ${rootPath}' first.`));
+    console.error(
+      colors.error(`Error: Not initialized. Run 'knowledgine init --path ${rootPath}' first.`),
+    );
     process.exitCode = 1;
     return;
   }
@@ -121,7 +123,9 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
       console.error(`${symbols.success} ${colors.success("Model download complete.")}`);
     } catch (error) {
       console.error(
-        colors.error(`\nModel download failed: ${error instanceof Error ? error.message : String(error)}`),
+        colors.error(
+          `\nModel download failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
       );
       console.error(colors.error("Semantic search upgrade aborted."));
       db.close();
@@ -158,7 +162,9 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
     }
 
     embProgress.finish();
-    console.error(`  ${symbols.success} ${colors.success(`Generated: ${generated}`)}, Failed: ${failed}`);
+    console.error(
+      `  ${symbols.success} ${colors.success(`Generated: ${generated}`)}, Failed: ${failed}`,
+    );
   } else {
     console.error(`${symbols.success} ${colors.success("All notes already have embeddings.")}`);
   }

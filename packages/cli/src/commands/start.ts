@@ -40,7 +40,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
     const modelManager = new ModelManager();
     if (modelManager.isModelAvailable(config.embedding.modelName)) {
       config.embedding.enabled = true;
-      console.error(`${symbols.success} ${colors.success("Semantic search enabled (model detected)")}`);
+      console.error(
+        `${symbols.success} ${colors.success("Semantic search enabled (model detected)")}`,
+      );
     }
   }
 
@@ -60,7 +62,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
   // Warn if no notes indexed (H-8)
   const stats = repository.getStats();
   if (stats.totalNotes === 0) {
-    console.error(`${symbols.warning} ${colors.warning("No notes indexed. Run `knowledgine init` first.")}`);
+    console.error(
+      `${symbols.warning} ${colors.warning("No notes indexed. Run `knowledgine init` first.")}`,
+    );
   }
 
   // Initialize embedding provider if model is available and semantic is enabled
@@ -74,8 +78,10 @@ export async function startCommand(options: StartOptions): Promise<void> {
       const notesWithout = repository.getNotesWithoutEmbeddings();
       if (notesWithout.length > 0) {
         console.error(
-          `${symbols.warning} ${colors.warning(`${notesWithout.length} notes have no embeddings. ` +
-            "Semantic search unavailable. Run 'knowledgine upgrade --semantic' to download the model and generate embeddings.")}`,
+          `${symbols.warning} ${colors.warning(
+            `${notesWithout.length} notes have no embeddings. ` +
+              "Semantic search unavailable. Run 'knowledgine upgrade --semantic' to download the model and generate embeddings.",
+          )}`,
         );
       }
     }
@@ -123,7 +129,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
     // Warn about failed plugins but continue
     for (const [pluginId, result] of initResults) {
       if (!result.ok) {
-        console.error(`${symbols.warning} ${colors.warning(`Plugin "${pluginId}" failed to initialize: ${result.error}`)}`);
+        console.error(
+          `${symbols.warning} ${colors.warning(`Plugin "${pluginId}" failed to initialize: ${result.error}`)}`,
+        );
       }
     }
 
@@ -135,10 +143,14 @@ export async function startCommand(options: StartOptions): Promise<void> {
       onComplete: (summaries) => {
         const total = summaries.reduce((acc, s) => acc + s.processed, 0);
         const errors = summaries.reduce((acc, s) => acc + s.errors, 0);
-        console.error(`${symbols.success} ${colors.success(`Ingest complete: ${total} events processed, ${errors} errors`)}`);
+        console.error(
+          `${symbols.success} ${colors.success(`Ingest complete: ${total} events processed, ${errors} errors`)}`,
+        );
       },
       onError: (pluginId, error) => {
-        console.error(`${symbols.error} ${colors.error(`Ingest error (${pluginId}): ${error.message}`)}`);
+        console.error(
+          `${symbols.error} ${colors.error(`Ingest error (${pluginId}): ${error.message}`)}`,
+        );
       },
     });
 
@@ -182,7 +194,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
       }
       console.error(`${symbols.arrow} ${colors.info(`Indexed: ${filePath}`)}`);
     } catch (error) {
-      console.error(`${symbols.error} ${colors.error(`Error indexing ${filePath}: ${error instanceof Error ? error.message : error}`)}`);
+      console.error(
+        `${symbols.error} ${colors.error(`Error indexing ${filePath}: ${error instanceof Error ? error.message : error}`)}`,
+      );
     }
   });
 
@@ -216,7 +230,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
       repository.deleteNoteByPath(filePath);
       console.error(`${symbols.arrow} ${colors.info(`Removed: ${filePath}`)}`);
     } catch (error) {
-      console.error(`${symbols.error} ${colors.error(`Error removing ${filePath}: ${error instanceof Error ? error.message : error}`)}`);
+      console.error(
+        `${symbols.error} ${colors.error(`Error removing ${filePath}: ${error instanceof Error ? error.message : error}`)}`,
+      );
     }
   });
 

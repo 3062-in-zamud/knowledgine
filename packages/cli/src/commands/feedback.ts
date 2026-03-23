@@ -53,12 +53,7 @@ export async function feedbackListCommand(options: FeedbackListOptions): Promise
     return;
   }
 
-  const rows = records.map((r) => [
-    String(r.id),
-    r.errorType,
-    r.entityName,
-    statusColor(r.status),
-  ]);
+  const rows = records.map((r) => [String(r.id), r.errorType, r.entityName, statusColor(r.status)]);
 
   console.log(createTable({ head: ["ID", "Error Type", "Entity", "Status"], rows }));
 }
@@ -83,7 +78,9 @@ export async function feedbackApplyCommand(
 
   try {
     feedbackLearner.applyFeedback(id);
-    console.log(`${symbols.success} Feedback #${id} applied successfully. Extraction rules updated.`);
+    console.log(
+      `${symbols.success} Feedback #${id} applied successfully. Extraction rules updated.`,
+    );
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;

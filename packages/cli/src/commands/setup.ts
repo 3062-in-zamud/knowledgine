@@ -48,7 +48,13 @@ export function getConfigPath(target: string): string {
     case "claude-desktop":
       switch (process.platform) {
         case "darwin":
-          return join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+          return join(
+            home,
+            "Library",
+            "Application Support",
+            "Claude",
+            "claude_desktop_config.json",
+          );
         case "win32":
           return join(appdata, "Claude", "claude_desktop_config.json");
         default:
@@ -168,7 +174,9 @@ function writeConfig(configPath: string, config: McpConfig, target?: string): vo
     if (existsSync(configPath)) {
       try {
         existing = TOML.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
-      } catch { /* start fresh */ }
+      } catch {
+        /* start fresh */
+      }
     }
     existing["mcp_servers"] = {
       ...((existing["mcp_servers"] as Record<string, unknown>) ?? {}),
@@ -177,7 +185,8 @@ function writeConfig(configPath: string, config: McpConfig, target?: string): vo
     writeFileSync(configPath, TOML.stringify(existing) + "\n", "utf-8");
   } else {
     const mcpKey = getMcpKey(target ?? "");
-    const isEmbeddedSettings = mcpKey !== "mcpServers" || target === "vscode" || target === "gemini";
+    const isEmbeddedSettings =
+      mcpKey !== "mcpServers" || target === "vscode" || target === "gemini";
 
     if (isEmbeddedSettings) {
       // Zed/VS Code: merge into existing settings.json
@@ -185,7 +194,9 @@ function writeConfig(configPath: string, config: McpConfig, target?: string): vo
       if (existsSync(configPath)) {
         try {
           existing = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
-        } catch { /* start fresh */ }
+        } catch {
+          /* start fresh */
+        }
       }
       existing[mcpKey] = {
         ...((existing[mcpKey] as Record<string, unknown>) ?? {}),
@@ -275,8 +286,13 @@ async function interactiveSetup(rootPath: string): Promise<void> {
 
   // Step 3: Configure each tool
   const s = p.spinner();
-  const results: { target: string; status: "ok" | "fail"; configPath: string; error?: string; note?: string }[] =
-    [];
+  const results: {
+    target: string;
+    status: "ok" | "fail";
+    configPath: string;
+    error?: string;
+    note?: string;
+  }[] = [];
 
   for (const target of targets) {
     const targetLabel = getTargetLabel(target);
@@ -290,7 +306,10 @@ async function interactiveSetup(rootPath: string): Promise<void> {
       const mergedConfig = mergeConfig(existingConfig, rootPath);
       writeConfig(configPath, mergedConfig, target);
       s.stop(`${symbols.success} ${colors.success(targetLabel)} configured (${actualScope})`);
-      const note = !useProject && scope === "project" ? "project config not supported, used global" : undefined;
+      const note =
+        !useProject && scope === "project"
+          ? "project config not supported, used global"
+          : undefined;
       results.push({ target, status: "ok", configPath, note });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -318,9 +337,7 @@ async function interactiveSetup(rootPath: string): Promise<void> {
     p.note(lines.join("\n"), "Failed");
   }
 
-  p.outro(
-    `${colors.success("Setup complete!")} Restart your AI tools to activate knowledgine.`,
-  );
+  p.outro(`${colors.success("Setup complete!")} Restart your AI tools to activate knowledgine.`);
 }
 
 export interface SetupIO {
@@ -329,7 +346,10 @@ export interface SetupIO {
   isTTY: boolean;
 }
 
-export async function setupCommand(options: SetupOptions, ioOrCommand?: SetupIO | unknown): Promise<void> {
+export async function setupCommand(
+  options: SetupOptions,
+  ioOrCommand?: SetupIO | unknown,
+): Promise<void> {
   // Commander.js passes (options, Command) — detect and ignore the Command object
   const io =
     ioOrCommand && typeof (ioOrCommand as SetupIO).isTTY === "boolean"

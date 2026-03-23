@@ -158,10 +158,7 @@ export async function captureAddCommand(
         }),
       );
     } else {
-      const lines = [
-        `${symbols.success} Captured (id: ${result.id})`,
-        `  Title: ${title}`,
-      ];
+      const lines = [`${symbols.success} Captured (id: ${result.id})`, `  Title: ${title}`];
       if (tags.length > 0) {
         lines.push(`  Tags:  ${tags.join(", ")}`);
       }
@@ -213,12 +210,7 @@ export async function captureListCommand(options: CaptureListOptions): Promise<v
         console.error("No captured notes found.");
         return;
       }
-      const rows = notes.map((n) => [
-        String(n.id),
-        n.title,
-        n.file_path,
-        n.created_at,
-      ]);
+      const rows = notes.map((n) => [String(n.id), n.title, n.file_path, n.created_at]);
       console.error(createTable({ head: ["ID", "Title", "Source", "Created"], rows }));
     }
   } finally {

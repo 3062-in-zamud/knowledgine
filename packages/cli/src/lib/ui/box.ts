@@ -10,7 +10,10 @@ const borderColors: Record<BoxType, string> = {
   default: "gray",
 };
 
-export function createBox(content: string, options?: { title?: string; type?: BoxType; padding?: number }): string {
+export function createBox(
+  content: string,
+  options?: { title?: string; type?: BoxType; padding?: number },
+): string {
   const type = options?.type ?? "default";
   return boxen(content, {
     title: options?.title,

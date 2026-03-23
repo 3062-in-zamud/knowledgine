@@ -69,7 +69,9 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
 
     const initResult = initResults.get(options.source);
     if (initResult && !initResult.ok) {
-      console.error(colors.error(`Error: Plugin "${options.source}" failed to initialize: ${initResult.error}`));
+      console.error(
+        colors.error(`Error: Plugin "${options.source}" failed to initialize: ${initResult.error}`),
+      );
       process.exitCode = 1;
       db.close();
       return;
@@ -184,7 +186,9 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       console.error("\n" + report);
     }
   } catch (error) {
-    console.error(colors.error(`Ingest failed: ${error instanceof Error ? error.message : String(error)}`));
+    console.error(
+      colors.error(`Ingest failed: ${error instanceof Error ? error.message : String(error)}`),
+    );
     process.exitCode = 1;
   } finally {
     db.close();

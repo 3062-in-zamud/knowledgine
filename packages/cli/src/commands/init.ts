@@ -18,11 +18,7 @@ import {
 } from "@knowledgine/core";
 import { IngestEngine, PluginRegistry, MarkdownPlugin } from "@knowledgine/ingest";
 import { postIngestProcessing } from "../lib/entity-extractor.js";
-import {
-  createProgress,
-  createStepProgress,
-  formatDuration,
-} from "../lib/progress.js";
+import { createProgress, createStepProgress, formatDuration } from "../lib/progress.js";
 import { copyDemoFixtures } from "../lib/demo-manager.js";
 import { getDemoNotesPath } from "./demo.js";
 import { colors, symbols } from "../lib/ui/index.js";
@@ -294,10 +290,14 @@ export async function initCommand(options: InitOptions): Promise<void> {
         const message = lastError instanceof Error ? lastError.message : "unknown error";
         stepProgress.failStep("Downloading embedding model", message);
         console.error("");
-        console.error(colors.error("Semantic search unavailable. Text search (FTS5) works without embeddings."));
+        console.error(
+          colors.error("Semantic search unavailable. Text search (FTS5) works without embeddings."),
+        );
         console.error(colors.error(`To retry: knowledgine init --path ${rootPath} --semantic`));
         console.error("");
-        console.error(`${symbols.info} ${colors.info("Offline alternative: Copy the model files manually to:")}`);
+        console.error(
+          `${symbols.info} ${colors.info("Offline alternative: Copy the model files manually to:")}`,
+        );
         console.error(`  ${modelManager.getModelDir()}`);
         console.error("  Then re-run the init command.");
 
@@ -308,7 +308,9 @@ export async function initCommand(options: InitOptions): Promise<void> {
         console.error(`  Patterns:   ${postSummary.totalEntities} entities extracted`);
         console.error(`  Embeddings: skipped (model download failed)`);
         console.error("");
-        console.error(`${symbols.arrow} ${colors.hint("Next: Run 'knowledgine setup' to connect your AI tool.")}`);
+        console.error(
+          `${symbols.arrow} ${colors.hint("Next: Run 'knowledgine setup' to connect your AI tool.")}`,
+        );
         db.close();
         return;
       }
@@ -397,9 +399,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
     { label: "Duration:", value: elapsed },
   ];
   // Summary as clack note for visual consistency
-  const summaryLines = summaryEntries.map(
-    (e) => `${colors.dim(e.label.padEnd(12))} ${e.value}`,
-  );
+  const summaryLines = summaryEntries.map((e) => `${colors.dim(e.label.padEnd(12))} ${e.value}`);
   p.note(summaryLines.join("\n"), "knowledgine init");
 
   if (options.demo) {
@@ -409,7 +409,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
         `${symbols.arrow} ${colors.info('knowledgine search "typescript" --demo')}`,
         `${symbols.arrow} ${colors.info('knowledgine search "docker" --demo')}`,
         "",
-        `${colors.dim('knowledgine demo --clean  to remove demo files')}`,
+        `${colors.dim("knowledgine demo --clean  to remove demo files")}`,
       ].join("\n"),
       "Try these searches",
     );
@@ -423,7 +423,6 @@ export async function initCommand(options: InitOptions): Promise<void> {
     );
   }
   p.outro(`${colors.success("Your knowledge is now searchable!")} ${colors.dim(`(${elapsed})`)}`);
-
 
   db.close();
 }

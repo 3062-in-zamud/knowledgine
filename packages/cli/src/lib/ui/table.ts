@@ -22,7 +22,7 @@ export function createTable(
   }
 
   const tableOptions: ConstructorParameters<typeof Table>[0] = {
-    head: config.head.map(h => colors.bold(h)),
+    head: config.head.map((h) => colors.bold(h)),
     style: {
       head: [],
       border: ["gray"],

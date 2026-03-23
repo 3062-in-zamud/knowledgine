@@ -46,9 +46,7 @@ export interface SummaryEntry {
 
 export function createSummaryReport(title: string, entries: SummaryEntry[]): string {
   const maxLabelLen = entries.length > 0 ? Math.max(...entries.map((e) => e.label.length)) : 0;
-  const lines = entries.map(
-    (e) => `${colors.label(e.label.padEnd(maxLabelLen))}  ${e.value}`,
-  );
+  const lines = entries.map((e) => `${colors.label(e.label.padEnd(maxLabelLen))}  ${e.value}`);
   const content = lines.join("\n");
   return createBox(content, { type: "success", title });
 }
