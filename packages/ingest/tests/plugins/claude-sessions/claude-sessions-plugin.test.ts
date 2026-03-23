@@ -3,6 +3,7 @@ import { writeFile, mkdir, rm, utimes } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { ClaudeSessionsPlugin } from "../../../src/plugins/claude-sessions/index.js";
+import type { NormalizedEvent } from "../../../src/types.js";
 
 function makeEntry(
   type: "user" | "assistant" | "system",
@@ -91,7 +92,7 @@ describe("ClaudeSessionsPlugin", () => {
       expect(events).toHaveLength(2);
 
       // All events are session type summaries
-      expect(events.every((e) => e.eventType === "session")).toBe(true);
+      expect(events.every((e) => e.eventType === "capture")).toBe(true);
 
       // セッションサマリーの確認
       const sess1 = events.find((e) => e.sourceUri.includes("session-abc"));
@@ -139,7 +140,7 @@ describe("ClaudeSessionsPlugin", () => {
 
       // 1 session file → 1 summary event
       expect(events).toHaveLength(1);
-      expect(events[0].eventType).toBe("session");
+      expect(events[0].eventType).toBe("capture");
       // Summary should contain the valid user message
       expect(events[0].content).toContain("Valid message");
       // Summary should not contain "hmm" (thinking block was skipped by parser)
@@ -163,7 +164,7 @@ describe("ClaudeSessionsPlugin", () => {
 
       // 1 session file → 1 summary event (corrupted line skipped)
       expect(events).toHaveLength(1);
-      expect(events[0].eventType).toBe("session");
+      expect(events[0].eventType).toBe("capture");
       expect(events[0].content).toContain("OK message");
       expect(events[0].content).toContain("Messages: 2");
     });
@@ -199,7 +200,7 @@ describe("ClaudeSessionsPlugin", () => {
         events.push(event);
       }
 
-      const sessionIds = events.filter((e) => e.eventType === "session").map((e) => e.sourceUri);
+      const sessionIds = events.filter((e) => e.eventType === "capture").map((e) => e.sourceUri);
 
       expect(sessionIds.some((u) => u.includes("new-session"))).toBe(true);
       expect(sessionIds.some((u) => u.includes("old-session"))).toBe(false);
@@ -234,6 +235,31 @@ describe("ClaudeSessionsPlugin", () => {
       }
 
       expect(events).toHaveLength(0);
+    });
+  });
+
+  describe("sanitization", () => {
+    it("should sanitize API keys from session content", async () => {
+      const sessionDir = join(testDir, ".claude", "projects", "test-project");
+      await mkdir(sessionDir, { recursive: true });
+      const content = JSON.stringify({
+        type: "user",
+        message: { content: "My API key is sk-abc1234567890123456789012345678901234567" },
+        uuid: "test-uuid",
+        timestamp: new Date().toISOString(),
+        cwd: "/home/user",
+      });
+      await writeFile(join(sessionDir, "test.jsonl"), content);
+
+      const events: NormalizedEvent[] = [];
+      for await (const event of plugin.ingestAll(testDir)) {
+        events.push(event);
+      }
+
+      expect(events.length).toBeGreaterThan(0);
+      expect(events[0].content).not.toContain("sk-abc1234567890123456789012345678901234567");
+      expect(events[0].content).toContain("[REDACTED]");
+      expect(events[0].eventType).toBe("capture");
     });
   });
 });

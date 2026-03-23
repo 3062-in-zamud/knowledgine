@@ -10,6 +10,7 @@ import type {
   SourceURI,
 } from "../../types.js";
 import { parseSessionFile } from "./session-parser.js";
+import { sanitizeContent } from "../../normalizer.js";
 
 /**
  * Maximum number of messages to include in a session summary.
@@ -126,9 +127,9 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
 
     return {
       sourceUri: `claude-session://${projectName}/${sessionId}`,
-      eventType: "session",
+      eventType: "capture",
       title: `Session: ${projectName}/${sessionId.slice(0, 8)}`,
-      content: summaryContent,
+      content: sanitizeContent(summaryContent),
       timestamp: firstMessage.timestamp,
       metadata: {
         sourcePlugin: "claude-sessions",
