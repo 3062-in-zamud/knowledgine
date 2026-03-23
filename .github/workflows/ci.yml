@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main]
   pull_request:
-    branches: [main]
+    branches: [develop, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
@@ -28,9 +32,7 @@ jobs:
 
       - run: pnpm run typecheck
 
-      - name: Lint
-        if: matrix.node-version == 22
-        run: pnpm run lint
+      - run: pnpm run lint
 
       - run: pnpm run format:check
 

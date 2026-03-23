@@ -33,7 +33,7 @@ are expected to uphold this code. Please report unacceptable behavior by opening
 
 Before you begin, make sure you have the following installed:
 
-- **Node.js** >= 18.17.0 (LTS recommended)
+- **Node.js** >= 20 (LTS recommended)
 - **pnpm** >= 9
 - **Git**
 - **C++ build tools** (required for `better-sqlite3`):
@@ -129,12 +129,27 @@ Use descriptive branch names with a category prefix:
 - `test/short-description` -- test improvements
 - `chore/short-description` -- maintenance tasks
 
+### Branch Strategy
+
+This project uses a **develop/main** branching model:
+
+- `develop` — Default branch for daily development. Feature branches merge here.
+- `main` — Release branch. Only receives merges from `develop` via release PRs. Merging to `main` automatically triggers npm publish and GitHub Release creation.
+
+```
+feature branches → develop (default, daily development)
+                     ↓ release PR
+                   main (releases only)
+                     ↓ automatic
+                   npm publish + GitHub Release
+```
+
 ### Working on a Change
 
-1. **Create a branch** from `main`:
+1. **Create a branch** from `develop`:
 
    ```bash
-   git checkout -b feat/my-feature main
+   git checkout -b feat/my-feature develop
    ```
 
 2. **Make your changes** in small, focused commits.
@@ -145,13 +160,21 @@ Use descriptive branch names with a category prefix:
    pnpm run verify
    ```
 
-4. **Push and open a Pull Request** against `main`.
+   Pre-commit hooks (husky + lint-staged) will also auto-fix lint and formatting issues on each commit.
+
+4. **Push and open a Pull Request** against `develop`.
+
+### Releasing
+
+1. Create a release PR from `develop` to `main`.
+2. Update version numbers in all `package.json` files and `CHANGELOG.md`.
+3. Merge the PR. The CI will automatically create a git tag, publish to npm, and create a GitHub Release.
 
 ### Keeping Your Branch Up to Date
 
 ```bash
 git fetch origin
-git rebase origin/main
+git rebase origin/develop
 ```
 
 ## Coding Standards
