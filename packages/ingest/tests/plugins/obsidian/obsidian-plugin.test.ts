@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, cp, rm, utimes } from "fs/promises";
-import { join } from "path";
+import { join, basename } from "path";
 import { tmpdir } from "os";
 import { ObsidianPlugin } from "../../../src/plugins/obsidian/index.js";
+import { MarkdownPlugin } from "../../../src/plugins/markdown/index.js";
 
 const FIXTURE_PATH = join(__dirname, "../../fixtures/obsidian-vault");
 
@@ -61,13 +62,13 @@ describe("ObsidianPlugin", () => {
       expect(events.length).toBe(4);
     });
 
-    it("generates correct sourceUri as relative path", async () => {
+    it("generates correct sourceUri as obsidian:// URI", async () => {
       const events: { sourceUri: string }[] = [];
       for await (const event of plugin.ingestAll(tmpDir)) {
         events.push(event);
       }
       for (const event of events) {
-        expect(event.sourceUri).not.toContain("://");
+        expect(event.sourceUri).toMatch(/^obsidian:\/\//);
         expect(event.sourceUri).toMatch(/\.md$/);
       }
     });
@@ -191,6 +192,50 @@ describe("ObsidianPlugin", () => {
       const checkpoint = await plugin.getCurrentCheckpoint(tmpDir);
       expect(() => new Date(checkpoint)).not.toThrow();
       expect(new Date(checkpoint).toISOString()).toBe(checkpoint);
+    });
+  });
+
+  describe("sourceUri format", () => {
+    it("sourceUri includes vault name and relative path", async () => {
+      const vaultName = basename(tmpDir);
+      const events: { sourceUri: string }[] = [];
+      for await (const event of plugin.ingestAll(tmpDir)) {
+        events.push(event);
+      }
+      for (const event of events) {
+        expect(event.sourceUri).toMatch(new RegExp(`^obsidian://${vaultName}/`));
+      }
+    });
+  });
+
+  describe("coexistence with MarkdownPlugin", () => {
+    it("should coexist with MarkdownPlugin processing same files", async () => {
+      const markdownPlugin = new MarkdownPlugin();
+
+      // Both can process the same directory independently
+      const obsidianEvents: { sourceUri: string }[] = [];
+      for await (const event of plugin.ingestAll(tmpDir)) {
+        obsidianEvents.push(event);
+      }
+
+      const markdownEvents: { sourceUri: string }[] = [];
+      for await (const event of markdownPlugin.ingestAll(tmpDir)) {
+        markdownEvents.push(event);
+      }
+
+      // ObsidianPlugin uses obsidian:// scheme
+      for (const event of obsidianEvents) {
+        expect(event.sourceUri).toMatch(/^obsidian:\/\//);
+      }
+
+      // MarkdownPlugin uses relative paths (no scheme)
+      for (const event of markdownEvents) {
+        expect(event.sourceUri).not.toMatch(/^obsidian:\/\//);
+      }
+
+      // Both yield the same number of markdown files
+      expect(obsidianEvents.length).toBeGreaterThan(0);
+      expect(markdownEvents.length).toBeGreaterThan(0);
     });
   });
 });

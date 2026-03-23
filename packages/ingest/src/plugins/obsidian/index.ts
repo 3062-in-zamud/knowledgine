@@ -88,7 +88,7 @@ export class ObsidianPlugin implements IngestPlugin {
   private async processFile(
     filePath: string,
     vaultPath: string,
-    _vaultName: string,
+    vaultName: string,
   ): Promise<NormalizedEvent | null> {
     try {
       const processed = await this.fileProcessor.processFile(filePath);
@@ -118,7 +118,7 @@ export class ObsidianPlugin implements IngestPlugin {
       }
 
       return {
-        sourceUri: relativePath,
+        sourceUri: `obsidian://${vaultName}/${relativePath}`,
         eventType: "document",
         title,
         content: sanitizeContent(processed.content),
