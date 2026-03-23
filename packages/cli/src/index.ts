@@ -19,6 +19,7 @@ import { demoCommand } from "./commands/demo.js";
 import { searchCommand } from "./commands/search.js";
 import { captureAddCommand, captureListCommand, captureDeleteCommand } from "./commands/capture.js";
 import { registerToolCommands } from "./commands/tool.js";
+import { registerRecallCommand } from "./commands/recall.js";
 import { createOutputErrorHandler } from "./lib/unknown-command-handler.js";
 
 const program = new Command();
@@ -254,6 +255,7 @@ captureCmd
   .action(captureDeleteCommand);
 
 registerToolCommands(program);
+registerRecallCommand(program);
 
 program.showSuggestionAfterError(true);
 program.configureOutput({
