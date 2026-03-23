@@ -59,15 +59,34 @@ export function createDatabase(
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
 
-  // Legacy support: load sqlite-vec synchronously if enableVec is explicitly true
-  // New code should use loadSqliteVecExtension() instead
+  // Load sqlite-vec if requested
+  let vec0Loaded = false;
   if (options.enableVec === true) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const sqliteVec = require("sqlite-vec");
       sqliteVec.load(db);
+      vec0Loaded = true;
     } catch {
       // sqlite-vec not available — graceful degradation
+    }
+  }
+
+  // Drop vec0-dependent triggers if vec0 is not loaded to prevent cascade errors
+  if (!vec0Loaded) {
+    try {
+      const trigger = db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='trigger' AND name='note_embeddings_ad'",
+        )
+        .get() as { name: string } | undefined;
+      if (trigger) {
+        db.exec("DROP TRIGGER IF EXISTS note_embeddings_ad");
+        db.exec("DROP TRIGGER IF EXISTS note_embeddings_au");
+        db.exec("DROP TRIGGER IF EXISTS note_embeddings_ai");
+      }
+    } catch {
+      // DB may not have the table yet — ignore
     }
   }
 

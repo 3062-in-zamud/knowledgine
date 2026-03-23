@@ -44,7 +44,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   mkdirSync(knowledgineDir, { recursive: true });
   const config = defineConfig({ rootPath });
-  const db = createDatabase(config.dbPath, { enableVec: true });
+  const db = createDatabase(config.dbPath);
   new Migrator(db, ALL_MIGRATIONS).migrate();
   const repository = new KnowledgeRepository(db);
 
