@@ -1,7 +1,27 @@
 import Database from "better-sqlite3";
-import { mkdirSync } from "fs";
-import { dirname } from "path";
+import { mkdirSync, existsSync } from "fs";
+import { dirname, join } from "path";
 import { DatabaseError } from "../errors.js";
+
+function detectPackageManager(cwd: string = process.cwd()): string {
+  if (process.env.VOLTA_HOME) return "volta";
+  if (existsSync(join(cwd, "pnpm-lock.yaml"))) return "pnpm";
+  if (existsSync(join(cwd, "yarn.lock"))) return "yarn";
+  return "npm";
+}
+
+function getRebuildCommand(pm: string): string {
+  switch (pm) {
+    case "volta":
+      return "volta run npm rebuild better-sqlite3";
+    case "pnpm":
+      return "pnpm rebuild better-sqlite3";
+    case "yarn":
+      return "yarn rebuild";
+    default:
+      return "npm rebuild better-sqlite3";
+  }
+}
 
 export interface CreateDatabaseOptions {
   enableVec?: boolean;
@@ -22,11 +42,13 @@ export function createDatabase(
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     if (/MODULE_NOT_FOUND|DLOPEN|NODE_MODULE_VERSION|NAPI/i.test(msg)) {
+      const pm = detectPackageManager();
+      const rebuildCmd = getRebuildCommand(pm);
       throw new DatabaseError(
         `initialization - Native module error detected.\n\n` +
           `Resolution:\n` +
-          `  1. npm rebuild better-sqlite3\n` +
-          `  2. Or: rm -rf node_modules && npm install\n` +
+          `  1. ${rebuildCmd}\n` +
+          `  2. Or: rm -rf node_modules && ${pm === "pnpm" ? "pnpm install" : pm === "yarn" ? "yarn install" : "npm install"}\n` +
           `  3. Current Node.js: ${process.version}`,
         error,
         { dbPath },

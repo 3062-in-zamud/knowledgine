@@ -32,8 +32,22 @@ describe("IngestWatcher", () => {
   it("should run initial ingest for all plugins", async () => {
     const plugins = [createMockPlugin("a"), createMockPlugin("b")];
     const registry = createMockRegistry(plugins);
-    const summaryA: IngestSummary = { pluginId: "a", processed: 5, errors: 0, elapsedMs: 100 };
-    const summaryB: IngestSummary = { pluginId: "b", processed: 3, errors: 0, elapsedMs: 50 };
+    const summaryA: IngestSummary = {
+      pluginId: "a",
+      processed: 5,
+      errors: 0,
+      deleted: 0,
+      skipped: 0,
+      elapsedMs: 100,
+    };
+    const summaryB: IngestSummary = {
+      pluginId: "b",
+      processed: 3,
+      errors: 0,
+      deleted: 0,
+      skipped: 0,
+      elapsedMs: 50,
+    };
 
     const mockEngine = {
       ingest: vi.fn().mockResolvedValueOnce(summaryA).mockResolvedValueOnce(summaryB),
@@ -57,7 +71,14 @@ describe("IngestWatcher", () => {
   it("should continue when one plugin fails", async () => {
     const plugins = [createMockPlugin("a"), createMockPlugin("b")];
     const registry = createMockRegistry(plugins);
-    const summaryB: IngestSummary = { pluginId: "b", processed: 3, errors: 0, elapsedMs: 50 };
+    const summaryB: IngestSummary = {
+      pluginId: "b",
+      processed: 3,
+      errors: 0,
+      deleted: 0,
+      skipped: 0,
+      elapsedMs: 50,
+    };
 
     const mockEngine = {
       ingest: vi
@@ -96,7 +117,14 @@ describe("IngestWatcher", () => {
   it("should call onComplete callback with all summaries", async () => {
     const plugins = [createMockPlugin("a")];
     const registry = createMockRegistry(plugins);
-    const summary: IngestSummary = { pluginId: "a", processed: 10, errors: 0, elapsedMs: 200 };
+    const summary: IngestSummary = {
+      pluginId: "a",
+      processed: 10,
+      errors: 0,
+      deleted: 0,
+      skipped: 0,
+      elapsedMs: 200,
+    };
 
     const mockEngine = {
       ingest: vi.fn().mockResolvedValue(summary),

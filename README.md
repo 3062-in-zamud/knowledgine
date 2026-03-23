@@ -37,7 +37,7 @@ npx @knowledgine/cli search "React performance" --path /tmp/knowledgine-demo/kno
 
 ## Prerequisites
 
-- **Node.js** >= 18.17.0
+- **Node.js** >= 18.17.0 (managed via [Volta](https://volta.sh/) or [fnm](https://github.com/Schniz/fnm) recommended)
 - **pnpm** >= 9 (for contributing / local builds)
 - **Native build tools** for `better-sqlite3`:
   - macOS: `xcode-select --install`
@@ -294,6 +294,8 @@ Create a `.knowledginerc.json` file in your project root for persistent configur
 | ------------- | ------- | ----------------------------------- |
 | `semantic`    | `false` | Enable semantic search              |
 | `defaultPath` | —       | Default `--path` value when omitted |
+
+When `defaultPath` is set, the `--path` option can be omitted from all commands (`init`, `start`, `search`, `ingest`, etc.). `knowledgine init` automatically writes `defaultPath` to `.knowledginerc.json` after the first run.
 
 ---
 

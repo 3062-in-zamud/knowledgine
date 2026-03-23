@@ -179,6 +179,42 @@ describe("setup command", () => {
     }
   });
 
+  it("KNOW-296: opencode target generates valid MCP config", async () => {
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await setupCommand({ target: "opencode", path: testDir });
+
+    const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("OpenCode");
+    expect(output).toContain('"knowledgine"');
+    expect(output).toContain('"command"');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("KNOW-296: cline target generates valid MCP config", async () => {
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await setupCommand({ target: "cline", path: testDir });
+
+    const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("Cline");
+    expect(output).toContain('"knowledgine"');
+    expect(output).toContain('"command"');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("KNOW-296: continue target generates valid MCP config", async () => {
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await setupCommand({ target: "continue", path: testDir });
+
+    const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("Continue");
+    expect(output).toContain('"knowledgine"');
+    expect(output).toContain('"command"');
+    expect(process.exitCode).toBeUndefined();
+  });
+
   it("KNOW-296: claude-code target uses correct config path", async () => {
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { homedir } = await import("os");

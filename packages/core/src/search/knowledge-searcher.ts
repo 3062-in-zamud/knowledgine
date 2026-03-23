@@ -16,6 +16,7 @@ export interface SearchResult {
   note: KnowledgeNote;
   score: number;
   matchReason: string[];
+  fellBack?: boolean;
 }
 
 export class KnowledgeSearcher {
@@ -80,6 +81,7 @@ export class KnowledgeSearcher {
         note,
         score,
         matchReason: reasons,
+        fellBack,
       };
     });
   }

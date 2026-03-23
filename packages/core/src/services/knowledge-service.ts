@@ -19,6 +19,7 @@ export interface KnowledgeServiceOptions {
 export interface SearchKnowledgeResult {
   query: string;
   mode: "keyword" | "semantic" | "hybrid";
+  actualMode: "keyword" | "semantic" | "hybrid";
   totalResults: number;
   results: Array<{
     noteId: number;
@@ -140,9 +141,14 @@ export class KnowledgeService {
   async search(input: SearchInput): Promise<SearchKnowledgeResult> {
     const { query, limit = 20, mode = "keyword" } = input;
     const results = await this.searcher.search({ query, limit, mode });
+    // フォールバック判定: semantic/hybrid 要求時にプロバイダーが利用不可なら発生
+    const didFallBack =
+      (mode === "semantic" || mode === "hybrid") && !this.options.embeddingProvider;
+    const actualMode: "keyword" | "semantic" | "hybrid" = didFallBack ? "keyword" : mode;
     return {
       query,
       mode,
+      actualMode,
       totalResults: results.length,
       results: results.map((r) => ({
         noteId: r.note.id,

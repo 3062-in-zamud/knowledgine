@@ -25,6 +25,8 @@ export interface StepProgress {
   failStep(name: string, reason?: string): void;
   /** Mark the named step as skipped with an optional reason. */
   skipStep(name: string, reason?: string): void;
+  /** Print an informational message associated with the current step. */
+  info(message: string): void;
   /** Print a warning message associated with the current step. */
   warn(message: string): void;
   /** Finalize and print the overall summary. */
@@ -248,6 +250,10 @@ export function createStepProgress(totalSteps: number, title?: string): StepProg
     printStepLine(step);
   }
 
+  function info(message: string): void {
+    write(`  i ${message}\n`);
+  }
+
   function warn(message: string): void {
     warnCount++;
     write(`  ! ${message}\n`);
@@ -273,7 +279,7 @@ export function createStepProgress(totalSteps: number, title?: string): StepProg
     }
   }
 
-  return { startStep, completeStep, failStep, skipStep, warn, finish };
+  return { startStep, completeStep, failStep, skipStep, info, warn, finish };
 }
 
 // Re-export spinner for convenience in commands

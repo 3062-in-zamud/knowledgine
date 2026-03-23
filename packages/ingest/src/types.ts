@@ -114,5 +114,6 @@ export interface IngestSummary {
   processed: number;
   errors: number;
   deleted: number;
+  skipped: number;
   elapsedMs: number;
 }

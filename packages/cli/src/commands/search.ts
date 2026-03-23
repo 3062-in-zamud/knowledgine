@@ -31,9 +31,11 @@ export interface SearchCommandOptions {
   related?: string;
   relatedFile?: string;
   path?: string;
+  fallback?: boolean;
 }
 
 export async function searchCommand(query: string, options: SearchCommandOptions): Promise<void> {
+  const fallbackAllowed = options.fallback !== false;
   const rootPath = options.demo ? getDemoNotesPath() : resolveDefaultPath(options.path);
 
   const knowledgineDir = resolve(rootPath, ".knowledgine");
@@ -99,6 +101,20 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       }
     }
 
+    // --no-fallback: semantic/hybrid が利用できない場合はエラー終了
+    const semanticUnavailable =
+      mode !== "keyword" && (!config.embedding?.enabled || !embeddingProvider);
+    if (!fallbackAllowed && semanticUnavailable) {
+      console.error(
+        `${symbols.error} ${colors.error(`${mode} search is not available and --no-fallback was specified.`)}`,
+      );
+      console.error(
+        `${symbols.arrow} ${colors.hint("Run 'knowledgine upgrade --semantic' to enable semantic search.")}`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+
     // 通常の検索モード
     const service = new KnowledgeService({
       repository,
@@ -115,8 +131,8 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       console.error(`\n${symbols.warning} ${colors.warning(warnings[0])}\n`);
     }
 
-    // セマンティック検索が要求されたが利用不可の場合の警告
-    if (mode !== "keyword" && (!config.embedding?.enabled || !embeddingProvider)) {
+    // セマンティック検索が要求されたが利用不可の場合の警告（フォールバック許可時のみ）
+    if (semanticUnavailable) {
       console.error(
         `${symbols.warning} ${colors.warning("Semantic search is not configured. Falling back to FTS5.")}`,
       );
@@ -124,6 +140,13 @@ export async function searchCommand(query: string, options: SearchCommandOptions
         `${symbols.arrow} ${colors.hint("Run 'knowledgine upgrade --semantic' to enable semantic search.")}`,
       );
       console.error("");
+    }
+
+    // actualMode が要求モードと異なる場合（フォールバック発生）の通知
+    if (result.actualMode !== result.mode) {
+      console.error(
+        `${symbols.info} ${colors.hint(`Requested mode: ${result.mode}, actual mode used: ${result.actualMode}`)}`,
+      );
     }
 
     if (format === "json") {

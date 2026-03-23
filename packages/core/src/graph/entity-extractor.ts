@@ -8,6 +8,16 @@ export interface ExtractedEntity {
   sourceType: "tag" | "import" | "link" | "code" | "mention" | "frontmatter" | "whitelist";
 }
 
+const SOURCE_PRIORITY: Record<ExtractedEntity["sourceType"], number> = {
+  frontmatter: 1, // YAML frontmatterに明記 → 最も信頼性高
+  whitelist: 2, // ユーザー定義のホワイトリスト
+  import: 3, // import文 → 技術エンティティとして確実
+  tag: 4, // Markdownタグ
+  code: 5, // コードブロック内
+  link: 6, // リンクテキスト
+  mention: 7, // 本文中のメンション → 最も曖昧
+};
+
 /**
  * useState, useEffect などのReact hooks・ノイズキーワードのストップリスト
  */
@@ -126,6 +136,7 @@ export class EntityExtractor {
     results.push(...this.extractOrgRepos(cleanContent));
 
     let deduped = this.deduplicate(results);
+    deduped = this.resolveEntityTypes(deduped);
 
     if (this.rules) {
       deduped = this.applyRules(deduped);
@@ -301,6 +312,20 @@ export class EntityExtractor {
 
   private isStopWord(word: string): boolean {
     return STOP_LIST.has(word.toLowerCase());
+  }
+
+  private resolveEntityTypes(entities: ExtractedEntity[]): ExtractedEntity[] {
+    const byName = new Map<string, ExtractedEntity[]>();
+    for (const e of entities) {
+      const key = e.name.toLowerCase();
+      const group = byName.get(key) ?? [];
+      group.push(e);
+      byName.set(key, group);
+    }
+    return Array.from(byName.values()).map((group) => {
+      if (group.length === 1) return group[0];
+      return group.sort((a, b) => SOURCE_PRIORITY[a.sourceType] - SOURCE_PRIORITY[b.sourceType])[0];
+    });
   }
 
   private deduplicate(entities: ExtractedEntity[]): ExtractedEntity[] {

@@ -53,6 +53,7 @@ program
     "[deprecated] Use default behavior instead (embeddings are now opt-in)",
   )
   .option("--demo", "Initialize with sample demo notes")
+  .option("--force", "Skip confirmation prompts", false)
   .addHelpText(
     "after",
     `
@@ -134,7 +135,10 @@ Examples:
   knowledgine ingest --source github --repo owner/repo --path ~/notes
   knowledgine ingest --source claude-sessions --path ~/notes
   knowledgine ingest --all --path ~/notes
-  knowledgine ingest --source markdown --full --path ~/notes`,
+  knowledgine ingest --source markdown --full --path ~/notes
+
+Source-specific options:
+  --source github --repo owner/repo  Ingest GitHub PRs and issues (requires GITHUB_TOKEN env var)`,
   )
   .action(ingestCommand);
 
@@ -195,6 +199,10 @@ program
   .option("--related <noteId>", "Find related notes by note ID")
   .option("--related-file <path>", "Find related notes by file path")
   .option("--path <dir>", "Root directory")
+  .option(
+    "--no-fallback",
+    "Exit with error if requested search mode is unavailable (instead of falling back to keyword)",
+  )
   .action(
     (
       query: string,
@@ -206,6 +214,7 @@ program
         related?: string;
         relatedFile?: string;
         path?: string;
+        fallback?: boolean;
       },
     ) => {
       return searchCommand(query, {
@@ -216,6 +225,7 @@ program
         related: opts.related,
         relatedFile: opts.relatedFile,
         path: opts.path,
+        fallback: opts.fallback,
       });
     },
   );

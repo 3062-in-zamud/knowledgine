@@ -85,6 +85,25 @@ describe("KnowledgeSearcher", () => {
         "Warning: keyword search is not available. Showing keyword results instead. Run 'knowledgine upgrade --semantic' to enable.",
       );
     });
+
+    it("should set fellBack=true when semantic mode falls back to keyword due to no embeddingProvider", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "semantic" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].fellBack).toBe(true);
+    });
+
+    it("should set fellBack=true when hybrid mode falls back to keyword due to no embeddingProvider", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "hybrid" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].fellBack).toBe(true);
+    });
+
+    it("should set fellBack=false (or undefined) for keyword mode", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "keyword" });
+      expect(results.length).toBeGreaterThan(0);
+      // keyword modeではフォールバックしない
+      expect(results[0].fellBack).toBeFalsy();
+    });
   });
 
   describe("searchByTag", () => {

@@ -76,7 +76,8 @@ describe("init command", () => {
     writeFileSync(join(testDir, "note.md"), "# Test\n\nContent");
 
     await initCommand({ path: testDir });
-    await initCommand({ path: testDir });
+    // Use --force to skip the re-init confirmation prompt in a non-TTY environment
+    await initCommand({ path: testDir, force: true });
 
     const db = createDatabase(join(testDir, ".knowledgine", "index.sqlite"));
     new Migrator(db, ALL_MIGRATIONS).migrate();

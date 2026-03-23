@@ -41,6 +41,7 @@ export class IngestWatcher {
           processed: 0,
           errors: 1,
           deleted: 0,
+          skipped: 0,
           elapsedMs: 0,
         });
         this.onError?.(plugin.manifest.id, err);

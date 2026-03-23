@@ -33,6 +33,9 @@ export const TARGETS = [
   { value: "github-copilot", label: "GitHub Copilot CLI", description: "AI pair programmer CLI" },
   { value: "gemini", label: "Gemini CLI", description: "Google's AI coding agent" },
   { value: "antigravity", label: "Antigravity", description: "Google's AI development platform" },
+  { value: "opencode", label: "OpenCode", description: "opencode.ai MCP configuration" },
+  { value: "cline", label: "Cline", description: "Cline VS Code extension MCP configuration" },
+  { value: "continue", label: "Continue", description: "Continue.dev MCP configuration" },
 ] as const;
 
 type TargetValue = (typeof TARGETS)[number]["value"];
@@ -88,6 +91,46 @@ export function getConfigPath(target: string): string {
       return join(home, ".gemini", "settings.json");
     case "antigravity":
       return join(home, ".gemini", "antigravity", "mcp_config.json");
+    case "opencode":
+      return join(home, ".config", "opencode", "config.json");
+    case "cline":
+      switch (process.platform) {
+        case "darwin":
+          return join(
+            home,
+            "Library",
+            "Application Support",
+            "Code",
+            "User",
+            "globalStorage",
+            "saoudrizwan.claude-dev",
+            "settings",
+            "cline_mcp_settings.json",
+          );
+        case "win32":
+          return join(
+            appdata,
+            "Code",
+            "User",
+            "globalStorage",
+            "saoudrizwan.claude-dev",
+            "settings",
+            "cline_mcp_settings.json",
+          );
+        default:
+          return join(
+            home,
+            ".config",
+            "Code",
+            "User",
+            "globalStorage",
+            "saoudrizwan.claude-dev",
+            "settings",
+            "cline_mcp_settings.json",
+          );
+      }
+    case "continue":
+      return join(home, ".continue", "config.json");
     default:
       throw new Error(
         `Unknown target: ${target}. Supported: ${TARGETS.map((t) => t.value).join(", ")}`,

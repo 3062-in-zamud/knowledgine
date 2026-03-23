@@ -64,6 +64,24 @@ describe("KnowledgeService", () => {
       const result = await service.search({ query: "TypeScript", mode: "semantic" });
       expect(result.totalResults).toBeGreaterThanOrEqual(0);
     });
+
+    it("should set actualMode equal to mode for keyword search", async () => {
+      const result = await service.search({ query: "TypeScript", mode: "keyword" });
+      expect(result.mode).toBe("keyword");
+      expect(result.actualMode).toBe("keyword");
+    });
+
+    it("should set actualMode to keyword when semantic mode falls back due to no embeddingProvider", async () => {
+      const result = await service.search({ query: "TypeScript", mode: "semantic" });
+      expect(result.mode).toBe("semantic");
+      expect(result.actualMode).toBe("keyword");
+    });
+
+    it("should set actualMode to keyword when hybrid mode falls back due to no embeddingProvider", async () => {
+      const result = await service.search({ query: "TypeScript", mode: "hybrid" });
+      expect(result.mode).toBe("hybrid");
+      expect(result.actualMode).toBe("keyword");
+    });
   });
 
   // ── findRelated ──────────────────────────────────────────────

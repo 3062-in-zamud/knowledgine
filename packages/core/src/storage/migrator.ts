@@ -39,13 +39,13 @@ export class Migrator {
     return row?.version ?? 0;
   }
 
-  migrate(): void {
+  migrate(): { executed: number } {
     const currentVersion = this.getCurrentVersion();
     const pending = this.migrations
       .filter((m) => m.version > currentVersion)
       .sort((a, b) => a.version - b.version);
 
-    if (pending.length === 0) return;
+    if (pending.length === 0) return { executed: 0 };
 
     const runMigrations = this.db.transaction(() => {
       for (const migration of pending) {
@@ -57,6 +57,7 @@ export class Migrator {
     });
 
     runMigrations();
+    return { executed: pending.length };
   }
 
   rollback(toVersion: number): void {

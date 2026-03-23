@@ -149,4 +149,46 @@ import { useState } from 'react';
       expect(orgRepo?.sourceType).toBe("code");
     });
   });
+
+  describe("resolveEntityTypes", () => {
+    it("同一名異タイプのエンティティを信頼度の高いソースで統合", () => {
+      // "React" が frontmatter(technology) と mention(framework) の両方で抽出される状況を再現するため、
+      // frontmatter tags で technology として登録し、本文 @react mention で person として登録されるケースを使う。
+      // より直接的に: tags(technology/tag) と @mention(person/mention) で "react" が重複するケース
+      const result = extractor.extract("cc @react please review", { tags: ["react"] });
+      const reactEntities = result.filter((e) => e.name === "react");
+      // resolveEntityTypes により1件に統合される
+      expect(reactEntities.length).toBe(1);
+      // tags(SOURCE_PRIORITY=4) < mention(SOURCE_PRIORITY=7) なので tag が採用される
+      expect(reactEntities[0].sourceType).toBe("tag");
+      expect(reactEntities[0].entityType).toBe("technology");
+    });
+
+    it("名前が異なるエンティティは統合しない", () => {
+      const result = extractor.extract("", { tags: ["react", "typescript"] });
+      const reactEntities = result.filter((e) => e.name === "react");
+      const tsEntities = result.filter((e) => e.name === "typescript");
+      expect(reactEntities.length).toBe(1);
+      expect(tsEntities.length).toBe(1);
+    });
+
+    it("同一名同一タイプは維持される", () => {
+      const content = `
+import React from 'react';
+import { useState } from 'react';
+      `;
+      const result = extractor.extract(content);
+      const reactEntities = result.filter((e) => e.name === "react");
+      expect(reactEntities.length).toBe(1);
+    });
+
+    it("大文字小文字が異なる同一名を統合", () => {
+      // frontmatter tags で "React" と "react" が両方登録された場合に統合される
+      const result = extractor.extract("", { tags: ["React", "react"] });
+      const reactEntities = result.filter((e) => e.name === "react");
+      // deduplicate は "tag:react" で1件に絞るため resolveEntityTypes に来る時点で既に1件
+      // ただし大文字小文字正規化後に同一キーになることを確認
+      expect(reactEntities.length).toBe(1);
+    });
+  });
 });

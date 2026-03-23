@@ -1,5 +1,5 @@
-import { resolve } from "path";
-import { mkdirSync, statSync } from "fs";
+import { resolve, join } from "path";
+import { mkdirSync, statSync, existsSync, readFileSync } from "fs";
 import {
   loadConfig,
   writeRcConfig,
@@ -29,6 +29,7 @@ export interface InitOptions {
   semantic?: boolean;
   skipEmbeddings?: boolean;
   demo?: boolean;
+  force?: boolean;
 }
 
 /**
@@ -135,6 +136,17 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
   const knowledgineDir = resolve(rootPath, ".knowledgine");
 
+  // Prompt for confirmation if the knowledge base already exists
+  if (existsSync(knowledgineDir) && !options.force) {
+    const shouldReinit = await p.confirm({
+      message: "Knowledge base already exists. Reinitialize?",
+    });
+    if (!shouldReinit || p.isCancel(shouldReinit)) {
+      p.cancel("Initialization cancelled.");
+      process.exit(0);
+    }
+  }
+
   stepProgress.startStep("Creating .knowledgine directory");
   try {
     mkdirSync(knowledgineDir, { recursive: true });
@@ -204,7 +216,10 @@ export async function initCommand(options: InitOptions): Promise<void> {
     }
   }
 
-  new Migrator(db, ALL_MIGRATIONS).migrate();
+  const { executed } = new Migrator(db, ALL_MIGRATIONS).migrate();
+  if (executed > 0) {
+    stepProgress.info(`Applied ${executed} database migration(s)`);
+  }
   const repository = new KnowledgeRepository(db);
   const graphRepository = new GraphRepository(db);
   stepProgress.completeStep("Initializing database");
@@ -380,6 +395,9 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const elapsed = formatDuration(Date.now() - initStartTime);
   const summaryEntries = [
     { label: "Notes:", value: `${stats.totalNotes} indexed` },
+    ...(ingestSummary.skipped > 0
+      ? [{ label: "Skipped:", value: `${ingestSummary.skipped} files (empty)` }]
+      : []),
     { label: "Patterns:", value: `${stats.totalPatterns} extracted` },
     { label: "Entities:", value: `${postSummary.totalEntities} extracted` },
     ...(enableSemantic && config.embedding.enabled
@@ -422,6 +440,24 @@ export async function initCommand(options: InitOptions): Promise<void> {
       "Next steps",
     );
   }
+
+  // Suggest adding .knowledgine/ to .gitignore
+  const gitignorePath = join(rootPath, ".gitignore");
+  if (existsSync(gitignorePath)) {
+    const gitignoreContent = readFileSync(gitignorePath, "utf-8");
+    if (!gitignoreContent.includes(".knowledgine")) {
+      p.note(
+        "Add '.knowledgine/' to your .gitignore to exclude the knowledge base from version control.",
+        ".gitignore suggestion",
+      );
+    }
+  } else {
+    p.note(
+      "Consider creating a .gitignore file with '.knowledgine/' to exclude the knowledge base from version control.",
+      ".gitignore suggestion",
+    );
+  }
+
   p.outro(`${colors.success("Your knowledge is now searchable!")} ${colors.dim(`(${elapsed})`)}`);
 
   db.close();

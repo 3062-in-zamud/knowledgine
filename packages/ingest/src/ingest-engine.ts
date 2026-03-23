@@ -33,6 +33,7 @@ export class IngestEngine {
     let processed = 0;
     let errors = 0;
     let deleted = 0;
+    let skipped = 0;
 
     const cursor = options?.full ? undefined : this.cursorStore.getCursor(pluginId, sourcePath);
     const generator = cursor
@@ -42,6 +43,10 @@ export class IngestEngine {
     const processedPaths = new Set<string>();
     let batch: NormalizedEvent[] = [];
     for await (const event of generator) {
+      if (!event.content || event.content.trim() === "") {
+        skipped++;
+        continue;
+      }
       batch.push(event);
       processedPaths.add(event.sourceUri);
       if (batch.length >= BATCH_SIZE) {
@@ -71,7 +76,7 @@ export class IngestEngine {
       lastIngestAt: new Date(),
     });
 
-    return { pluginId, processed, errors, deleted, elapsedMs: Date.now() - start };
+    return { pluginId, processed, errors, deleted, skipped, elapsedMs: Date.now() - start };
   }
 
   async ingestAll(sourcePath: string, options?: { full?: boolean }): Promise<IngestSummary[]> {
