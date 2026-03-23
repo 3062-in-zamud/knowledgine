@@ -7,26 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-23
+
 ### Added
 
 #### CLI (`@knowledgine/cli`)
 
-- **KNOW-241**: Step-based progress display for the `init` command
-  - `createStepProgress()` function added to `packages/cli/src/lib/progress.ts`
-  - Named steps (startStep/completeStep/failStep/skipStep) with status icons
-  - Structured warnings via `warn()` method
-  - Text-only icons when `NO_COLOR` is set (CI-friendly)
-- **KNOW-241**: Enhanced error handling in `knowledgine init`
-  - File read failures are non-fatal: files are skipped with a warning, init continues
-  - Disk-full detection (`ENOSPC`) with required-capacity guidance (FTS5: source x2; semantic: +23 MB model + vector index)
-  - Network errors during model download: exponential backoff (1 s / 2 s / 4 s), up to 3 retries, then offline alternative instructions
+- Documentation, TUI, and setup experience overhaul
+- Step-based progress display for the `init` command
+- Enhanced error handling in `knowledgine init` — ENOSPC detection, network retry with exponential backoff
 
 #### Infrastructure
 
-- **KNOW-271**: KPI alert automation for withdrawal criteria (撤退基準)
-  - `.github/kpi-thresholds.yml` — threshold configuration file for npm downloads, GitHub stars, open issues, and issue response time
-  - `scripts/check-kpi-thresholds.ts` — fetches live npm/GitHub API data, compares against thresholds, and opens labelled GitHub Issues for violations
-  - `.github/workflows/kpi-alert.yml` — weekly cron (Monday 09:00 UTC) workflow; supports manual `dry_run` trigger
+- KPI alert automation for withdrawal criteria
+
+### Fixed
+
+#### Ingest (`@knowledgine/ingest`)
+
+- Resolve init/ingest duplicate command registration
+- Normalize path schemes for cross-platform compatibility
+
+#### Core (`@knowledgine/core`)
+
+- Security and DX improvements
+- Model downloader: fix temporal dead zone error, platform-specific ONNX model selection
+- Semantic search: proper sqlite-vec extension loading, vector table backfill with INTEGER cast
+
+#### CLI (`@knowledgine/cli`)
+
+- Search command: initialize embedding provider and load sqlite-vec for semantic mode
+- ONNX model warmup step before batch embedding generation
+
+### Changed
+
+- Test improvements and code formatting unification
+- `.gitignore`: allow root `CLAUDE.md` while ignoring nested ones
 
 ## [0.2.0] - 2026-03-20
 
@@ -82,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Integration issues from parallel agent work resolved
 
+[0.2.1]: https://github.com/3062-in-zamud/knowledgine/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/3062-in-zamud/knowledgine/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/3062-in-zamud/knowledgine/compare/v0.0.1...v0.1.0
 
