@@ -7,6 +7,9 @@ import type { KnowledgineConfig } from "../config.js";
 export interface RcConfig {
   semantic?: boolean;
   defaultPath?: string;
+  plugins?: { enabled?: string[]; [pluginId: string]: unknown };
+  search?: { defaultMode?: "keyword" | "semantic" | "hybrid"; defaultLimit?: number };
+  serve?: { defaultPort?: number; host?: string };
   [key: string]: unknown;
 }
 
@@ -32,21 +35,27 @@ export function loadConfig(rootPath: string): KnowledgineConfig {
   });
 }
 
-function loadRcFile(rootPath: string): RcConfig | null {
-  const jsonPath = resolve(rootPath, ".knowledginerc.json");
-  const ymlPath = resolve(rootPath, ".knowledginerc.yml");
-
-  try {
-    if (existsSync(jsonPath)) {
-      return JSON.parse(readFileSync(jsonPath, "utf-8")) as RcConfig;
+function loadRcFile(startDir: string): RcConfig | null {
+  let dir = startDir;
+  for (let i = 0; i < 5; i++) {
+    const jsonPath = resolve(dir, ".knowledginerc.json");
+    const ymlPath = resolve(dir, ".knowledginerc.yml");
+    try {
+      if (existsSync(jsonPath)) {
+        return JSON.parse(readFileSync(jsonPath, "utf-8")) as RcConfig;
+      }
+      if (existsSync(ymlPath)) {
+        return parseYaml(readFileSync(ymlPath, "utf-8")) as RcConfig;
+      }
+    } catch (error) {
+      console.error(
+        `Warning: Failed to parse config file: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
     }
-    if (existsSync(ymlPath)) {
-      return parseYaml(readFileSync(ymlPath, "utf-8")) as RcConfig;
-    }
-  } catch (error) {
-    console.error(
-      `Warning: Failed to parse config file: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    const parent = resolve(dir, "..");
+    if (parent === dir) break; // ルートに到達
+    dir = parent;
   }
   return null;
 }

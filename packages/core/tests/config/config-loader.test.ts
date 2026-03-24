@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
 import { loadConfig, writeRcConfig, resolveDefaultPath } from "../../src/config/config-loader.js";
@@ -159,6 +159,53 @@ describe("resolveDefaultPath", () => {
       process.cwd = originalCwd;
       rmSync(tempCwd, { recursive: true, force: true });
     }
+  });
+});
+
+describe("loadConfig: hierarchical RC file search", () => {
+  let rootDir: string;
+
+  beforeEach(() => {
+    rootDir = mkdtempSync(join(tmpdir(), "knowledgine-hierarchy-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it("should find .knowledginerc.json in a parent directory", () => {
+    // 親ディレクトリに設定ファイルを置く
+    writeFileSync(join(rootDir, ".knowledginerc.json"), JSON.stringify({ semantic: true }));
+    // 子ディレクトリから loadConfig を呼ぶ
+    const childDir = join(rootDir, "child");
+    mkdirSync(childDir, { recursive: true });
+    const config = loadConfig(childDir);
+    expect(config.embedding.enabled).toBe(true);
+  });
+
+  it("should not traverse more than 5 levels up", () => {
+    // 6階層上に設定ファイルを置く（探索範囲外）
+    writeFileSync(join(rootDir, ".knowledginerc.json"), JSON.stringify({ semantic: true }));
+    // 6階層深い子ディレクトリを作成
+    const deepDir = join(rootDir, "a", "b", "c", "d", "e", "f");
+    mkdirSync(deepDir, { recursive: true });
+    const config = loadConfig(deepDir);
+    // 6階層上は探索しないのでデフォルト値になる
+    expect(config.embedding.enabled).toBe(false);
+  });
+
+  it("should use the nearest .knowledginerc.json when multiple exist", () => {
+    // 親ディレクトリに semantic: false
+    writeFileSync(join(rootDir, ".knowledginerc.json"), JSON.stringify({ semantic: false }));
+    // 子ディレクトリに semantic: true（より近い）
+    const childDir = join(rootDir, "child");
+    mkdirSync(childDir, { recursive: true });
+    writeFileSync(join(childDir, ".knowledginerc.json"), JSON.stringify({ semantic: true }));
+    // 孫ディレクトリから探索 → 子の設定が使われるべき
+    const grandChildDir = join(childDir, "grandchild");
+    mkdirSync(grandChildDir, { recursive: true });
+    const config = loadConfig(grandChildDir);
+    expect(config.embedding.enabled).toBe(true);
   });
 });
 

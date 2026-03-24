@@ -30,6 +30,7 @@ export interface InitOptions {
   skipEmbeddings?: boolean;
   demo?: boolean;
   force?: boolean;
+  saveConfig?: boolean;
 }
 
 /**
@@ -385,6 +386,11 @@ export async function initCommand(options: InitOptions): Promise<void> {
     writeRcConfig(rootPath, { semantic: true });
   }
 
+  // --save-config: write defaultPath to .knowledginerc.json in cwd
+  if (options.saveConfig) {
+    writeRcConfig(process.cwd(), { defaultPath: rootPath });
+  }
+
   // ---------------------------------------------------------------------------
   // Final summary
   // ---------------------------------------------------------------------------
@@ -439,6 +445,15 @@ export async function initCommand(options: InitOptions): Promise<void> {
       ].join("\n"),
       "Next steps",
     );
+    if (options.saveConfig) {
+      p.note(
+        [
+          `${symbols.arrow} ${colors.info(`knowledgine setup --target claude-code --path ${rootPath} --write`)}`,
+          `${symbols.arrow} ${colors.info(`knowledgine start --path ${rootPath}`)}`,
+        ].join("\n"),
+        "Next steps",
+      );
+    }
   }
 
   // Suggest adding .knowledgine/ to .gitignore

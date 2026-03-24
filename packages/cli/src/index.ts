@@ -32,7 +32,7 @@ program
   .description(
     "Developer Knowledge Infrastructure - Extract structured knowledge from your codebase",
   )
-  .version(VERSION)
+  .version(`v${VERSION} (node ${process.version})`)
   .addHelpText(
     "after",
     `
@@ -58,6 +58,7 @@ program
   )
   .option("--demo", "Initialize with sample demo notes")
   .option("--force", "Skip confirmation prompts", false)
+  .option("--save-config", "Save defaultPath to .knowledginerc.json in current directory")
   .addHelpText(
     "after",
     `
