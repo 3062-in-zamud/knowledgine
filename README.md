@@ -1,5 +1,9 @@
 # knowledgine
 
+<p align="center">
+  <img src="docs/assets/logo.png" alt="knowledgine logo" width="400">
+</p>
+
 Developer Knowledge Infrastructure — extract structured knowledge from your markdown notes for AI coding tools.
 
 [日本語](./docs/README.ja.md)

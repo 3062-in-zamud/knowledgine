@@ -2,6 +2,10 @@
 
 # knowledgine
 
+<p align="center">
+  <img src="./assets/logo.png" alt="knowledgine logo" width="400">
+</p>
+
 開発者のナレッジインフラ — マークダウンノートから構造化された知識を抽出し、AI コーディングツールで活用できるようにします。
 
 ![CI](https://github.com/3062-in-zamud/knowledgine/actions/workflows/ci.yml/badge.svg)

@@ -101,6 +101,9 @@ export interface SearchInput {
   query: string;
   limit?: number;
   mode?: "keyword" | "semantic" | "hybrid";
+  /** エージェントモード: deprecated ノートも含む (includeDeprecated の糖衣構文) */
+  agentic?: boolean;
+  includeDeprecated?: boolean;
 }
 
 export interface FindRelatedInput {
@@ -140,7 +143,8 @@ export class KnowledgeService {
 
   async search(input: SearchInput): Promise<SearchKnowledgeResult> {
     const { query, limit = 20, mode = "keyword" } = input;
-    const results = await this.searcher.search({ query, limit, mode });
+    const includeDeprecated = input.agentic === true || input.includeDeprecated === true;
+    const results = await this.searcher.search({ query, limit, mode, includeDeprecated });
     // フォールバック判定: semantic/hybrid 要求時にプロバイダーが利用不可なら発生
     const didFallBack =
       (mode === "semantic" || mode === "hybrid") && !this.options.embeddingProvider;

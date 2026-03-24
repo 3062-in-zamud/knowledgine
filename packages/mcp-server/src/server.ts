@@ -24,7 +24,7 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
     "search_knowledge",
     {
       description:
-        "Full-text and semantic search across notes in the knowledge base. Use mode='keyword' for exact matches, 'semantic' for conceptual similarity, or 'hybrid' to combine both.",
+        "Full-text and semantic search across notes in the knowledge base. Use mode='keyword' for exact matches, 'semantic' for conceptual similarity, or 'hybrid' to combine both. Set agentic=true (or includeDeprecated=true) to include deprecated notes.",
       inputSchema: {
         query: z.string().describe("Search query"),
         limit: z.number().int().positive().optional().describe("Maximum number of results"),
@@ -32,6 +32,14 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           .enum(["keyword", "semantic", "hybrid"])
           .optional()
           .describe("Search mode (default: keyword)"),
+        agentic: z
+          .boolean()
+          .optional()
+          .describe("Include deprecated notes (agentic mode, default: false)"),
+        includeDeprecated: z
+          .boolean()
+          .optional()
+          .describe("Include deprecated notes (default: false)"),
       },
     },
     async (input) => {
@@ -40,6 +48,8 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           query: input.query,
           limit: input.limit ?? 20,
           mode: input.mode ?? "keyword",
+          agentic: input.agentic,
+          includeDeprecated: input.includeDeprecated,
         });
         const warningMsg = result.results
           ?.find((r) => r.matchReason?.some((m) => m.startsWith("Warning:")))
