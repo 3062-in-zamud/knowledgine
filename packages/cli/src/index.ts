@@ -22,6 +22,7 @@ import { registerToolCommands } from "./commands/tool.js";
 import { registerRecallCommand } from "./commands/recall.js";
 import { registerExplainCommand } from "./commands/explain.js";
 import { registerSuggestCommand } from "./commands/suggest.js";
+import { registerFeedbackSuggestCommand } from "./commands/feedback-suggest.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { deprecationCheckCommand } from "./commands/deprecation-check.js";
 import { undeprecateCommand } from "./commands/undeprecate.js";
@@ -273,6 +274,7 @@ registerToolCommands(program);
 registerRecallCommand(program);
 registerExplainCommand(program);
 registerSuggestCommand(program);
+registerFeedbackSuggestCommand(program);
 registerServeCommand(program);
 
 program
