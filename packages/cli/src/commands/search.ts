@@ -32,6 +32,8 @@ export interface SearchCommandOptions {
   relatedFile?: string;
   path?: string;
   fallback?: boolean;
+  agentic?: boolean;
+  includeDeprecated?: boolean;
 }
 
 export async function searchCommand(query: string, options: SearchCommandOptions): Promise<void> {
@@ -122,7 +124,13 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       graphRepository,
       embeddingProvider,
     });
-    const result = await service.search({ query, limit, mode });
+    const result = await service.search({
+      query,
+      limit,
+      mode,
+      agentic: options.agentic,
+      includeDeprecated: options.includeDeprecated,
+    });
 
     const warnings = result.results.flatMap((r) =>
       r.matchReason.filter((m) => m.startsWith("Warning:")),

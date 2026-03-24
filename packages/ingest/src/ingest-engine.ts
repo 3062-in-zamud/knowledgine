@@ -34,6 +34,7 @@ export class IngestEngine {
     let errors = 0;
     let deleted = 0;
     let skipped = 0;
+    const allNoteIds: number[] = [];
 
     const cursor = options?.full ? undefined : this.cursorStore.getCursor(pluginId, sourcePath);
     const generator = cursor
@@ -53,6 +54,7 @@ export class IngestEngine {
         const result = this.processBatch(batch);
         processed += result.processed;
         errors += result.errors;
+        allNoteIds.push(...result.noteIds);
         batch = [];
       }
     }
@@ -61,6 +63,7 @@ export class IngestEngine {
       const result = this.processBatch(batch);
       processed += result.processed;
       errors += result.errors;
+      allNoteIds.push(...result.noteIds);
     }
 
     // Cleanup stale notes for file-based plugins on --full ingest
@@ -76,7 +79,15 @@ export class IngestEngine {
       lastIngestAt: new Date(),
     });
 
-    return { pluginId, processed, errors, deleted, skipped, elapsedMs: Date.now() - start };
+    return {
+      pluginId,
+      processed,
+      errors,
+      deleted,
+      skipped,
+      elapsedMs: Date.now() - start,
+      noteIds: allNoteIds,
+    };
   }
 
   async ingestAll(sourcePath: string, options?: { full?: boolean }): Promise<IngestSummary[]> {
@@ -89,7 +100,11 @@ export class IngestEngine {
     return results;
   }
 
-  private processBatch(batch: NormalizedEvent[]): { processed: number; errors: number } {
+  private processBatch(batch: NormalizedEvent[]): {
+    processed: number;
+    errors: number;
+    noteIds: number[];
+  } {
     return this.eventWriter.writeBatch(batch);
   }
 

@@ -22,7 +22,10 @@ import { registerToolCommands } from "./commands/tool.js";
 import { registerRecallCommand } from "./commands/recall.js";
 import { registerExplainCommand } from "./commands/explain.js";
 import { registerSuggestCommand } from "./commands/suggest.js";
+import { registerFeedbackSuggestCommand } from "./commands/feedback-suggest.js";
 import { registerServeCommand } from "./commands/serve.js";
+import { deprecationCheckCommand } from "./commands/deprecation-check.js";
+import { undeprecateCommand } from "./commands/undeprecate.js";
 import { createOutputErrorHandler } from "./lib/unknown-command-handler.js";
 
 const program = new Command();
@@ -211,6 +214,8 @@ program
     "--no-fallback",
     "Exit with error if requested search mode is unavailable (instead of falling back to keyword)",
   )
+  .option("--agentic", "Include deprecated notes in search results (agentic mode)")
+  .option("--include-deprecated", "Include deprecated notes in search results")
   .action(
     (
       query: string,
@@ -223,6 +228,8 @@ program
         relatedFile?: string;
         path?: string;
         fallback?: boolean;
+        agentic?: boolean;
+        includeDeprecated?: boolean;
       },
     ) => {
       return searchCommand(query, {
@@ -234,6 +241,8 @@ program
         relatedFile: opts.relatedFile,
         path: opts.path,
         fallback: opts.fallback,
+        agentic: opts.agentic,
+        includeDeprecated: opts.includeDeprecated,
       });
     },
   );
@@ -265,7 +274,22 @@ registerToolCommands(program);
 registerRecallCommand(program);
 registerExplainCommand(program);
 registerSuggestCommand(program);
+registerFeedbackSuggestCommand(program);
 registerServeCommand(program);
+
+program
+  .command("deprecation-check")
+  .description("Find notes that may be outdated and should be deprecated")
+  .option("--path <dir>", "Root directory")
+  .option("--apply", "Apply deprecation (default: dry-run)")
+  .option("--threshold <n>", "Similarity threshold (0-1, default: 0.8)", "0.8")
+  .action(deprecationCheckCommand);
+
+program
+  .command("undeprecate <noteId>")
+  .description("Restore a deprecated note to active status")
+  .option("--path <dir>", "Root directory")
+  .action(undeprecateCommand);
 
 program.showSuggestionAfterError(true);
 program.configureOutput({

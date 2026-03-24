@@ -1,0 +1,19 @@
+#!/bin/bash
+# knowledgine pre-push hook template
+# Install: cp scripts/knowledgine-pre-push.template .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+
+TIMEOUT=10
+
+diff_output=$(git diff @{push}..HEAD 2>/dev/null || git diff HEAD~1)
+if [ -n "$diff_output" ]; then
+  echo "Checking for past review patterns..."
+  result=$(timeout ${TIMEOUT}s echo "$diff_output" | npx knowledgine suggest --diff --format plain 2>/dev/null)
+  if [ -n "$result" ] && [ "$result" != "No past review patterns found." ]; then
+    echo "$result"
+    echo ""
+    echo "Consider addressing these patterns before pushing."
+  fi
+fi
+
+# Always allow push (hook is advisory only)
+exit 0

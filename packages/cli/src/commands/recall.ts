@@ -18,6 +18,7 @@ export interface RecallCommandOptions {
   format?: string;
   path?: string;
   limit?: string;
+  agentic?: boolean;
 }
 
 function toYaml(obj: unknown, indent = 0): string {
@@ -208,7 +209,12 @@ async function recallAction(
       return;
     }
 
-    const result = await service.search({ query, limit, mode: "keyword" });
+    const result = await service.search({
+      query,
+      limit,
+      mode: "keyword",
+      agentic: options.agentic,
+    });
 
     if (format === "json") {
       console.log(JSON.stringify({ ok: true, command: "recall", result }, null, 2));
@@ -233,5 +239,6 @@ export function registerRecallCommand(program: Command): void {
     .option("--format <format>", "Output format: json, yaml, plain", "plain")
     .option("--path <dir>", "Project root path")
     .option("--limit <n>", "Max results", "10")
+    .option("--agentic", "Include deprecated notes (agentic mode)")
     .action(recallAction);
 }

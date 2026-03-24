@@ -74,6 +74,8 @@ export { migration006 } from "./storage/migrations/006_extraction_feedback.js";
 export { migration005b } from "./storage/migrations/005b_bitemporal.js";
 export { migration005c } from "./storage/migrations/005c_provenance.js";
 export { migration007 } from "./storage/migrations/007_spec_alignment.js";
+export { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
+export { migration009 } from "./storage/migrations/009_extraction_metadata.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -94,6 +96,8 @@ import { migration005b } from "./storage/migrations/005b_bitemporal.js";
 import { migration005c } from "./storage/migrations/005c_provenance.js";
 import { migration006 } from "./storage/migrations/006_extraction_feedback.js";
 import { migration007 } from "./storage/migrations/007_spec_alignment.js";
+import { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
+import { migration009 } from "./storage/migrations/009_extraction_metadata.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -105,6 +109,8 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration005b,
   migration005c,
   migration007,
+  migration008,
+  migration009,
 ];
 
 // Provenance
@@ -123,6 +129,23 @@ export type { ExtractedEntity } from "./graph/entity-extractor.js";
 export { RelationInferrer } from "./graph/relation-inferrer.js";
 export type { InferredRelation } from "./graph/relation-inferrer.js";
 
+// LLM
+export type {
+  LLMCompletionMessage,
+  LLMCompletionOptions,
+  LLMCompletionResult,
+  LLMProvider,
+  OllamaProviderConfig,
+  OpenAIProviderConfig,
+  LLMProviderType,
+  LLMConfig,
+} from "./llm/types.js";
+export { LLMProviderError } from "./llm/errors.js";
+export type { LLMErrorCode } from "./llm/errors.js";
+export { OllamaProvider } from "./llm/ollama-provider.js";
+export { OpenAICompatibleProvider } from "./llm/openai-provider.js";
+export { createLLMProvider } from "./llm/provider-factory.js";
+
 // Embedding
 export type { EmbeddingProvider } from "./embedding/embedding-provider.js";
 export { OnnxEmbeddingProvider } from "./embedding/onnx-embedding-provider.js";
@@ -135,6 +158,10 @@ export { SemanticSearcher } from "./search/semantic-searcher.js";
 export { HybridSearcher } from "./search/hybrid-searcher.js";
 
 // Extraction
+export { CausalLinkDetector } from "./extraction/causal-link-detector.js";
+export type { CausalLinkSummary } from "./extraction/causal-link-detector.js";
+export { IncrementalExtractor } from "./extraction/incremental-extractor.js";
+export type { ExtractionSummary } from "./extraction/incremental-extractor.js";
 export { PatternExtractor } from "./extraction/pattern-extractor.js";
 export { ProblemSolutionDetector } from "./extraction/psp-detector.js";
 export type { DetectedPair } from "./extraction/psp-detector.js";
@@ -152,6 +179,15 @@ export type {
 // Search
 export { KnowledgeSearcher } from "./search/knowledge-searcher.js";
 export type { SearchOptions } from "./search/knowledge-searcher.js";
+export { ReasoningReranker } from "./search/reasoning-reranker.js";
+export type {
+  RerankInput,
+  RerankResult,
+  AxisScores,
+  RerankOptions,
+  RerankerWeights,
+  RerankedResult,
+} from "./search/reasoning-reranker.js";
 export { LocalLinkGenerator } from "./search/link-generator.js";
 export type { RelatedNote } from "./search/link-generator.js";
 

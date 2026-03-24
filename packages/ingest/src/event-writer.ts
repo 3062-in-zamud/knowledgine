@@ -10,8 +10,9 @@ export class EventWriter {
   ) {}
 
   /** 単一イベント書き込み（capture用） */
-  writeEvent(event: NormalizedEvent): { id: number } {
+  writeEvent(event: NormalizedEvent): { id: number; noteId: number } {
     let lastId = 0;
+    let noteId = 0;
     const insertEvent = this.db.prepare(`
       INSERT INTO events (event_type, source_type, source_id, source_uri, actor, content, content_hash, occurred_at, metadata_json, project_id, session_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -34,16 +35,17 @@ export class EventWriter {
       );
       lastId = Number(result.lastInsertRowid);
       const knowledgeData = normalizeToKnowledgeData(event);
-      this.repository.saveNote(knowledgeData);
+      noteId = this.repository.saveNote(knowledgeData);
     })();
 
-    return { id: lastId };
+    return { id: lastId, noteId };
   }
 
   /** バッチ書き込み（IngestEngine用） */
-  writeBatch(events: NormalizedEvent[]): { processed: number; errors: number } {
+  writeBatch(events: NormalizedEvent[]): { processed: number; errors: number; noteIds: number[] } {
     let processed = 0;
     let errors = 0;
+    const noteIds: number[] = [];
 
     const insertEvent = this.db.prepare(`
       INSERT INTO events (event_type, source_type, source_id, source_uri, actor, content, content_hash, occurred_at, metadata_json, project_id, session_id)
@@ -68,7 +70,8 @@ export class EventWriter {
             knowledgeEvent.sessionId ?? null,
           );
           const knowledgeData = normalizeToKnowledgeData(event);
-          this.repository.saveNote(knowledgeData);
+          const noteId = this.repository.saveNote(knowledgeData);
+          noteIds.push(noteId);
           processed++;
         } catch {
           errors++;
@@ -76,6 +79,6 @@ export class EventWriter {
       }
     })();
 
-    return { processed, errors };
+    return { processed, errors, noteIds };
   }
 }

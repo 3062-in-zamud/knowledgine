@@ -1,8 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { KnowledgeService, VERSION } from "@knowledgine/core";
+import {
+  KnowledgeService,
+  VERSION,
+  IncrementalExtractor,
+  GraphRepository,
+} from "@knowledgine/core";
 import type { KnowledgeRepository, EmbeddingProvider, FeedbackErrorType } from "@knowledgine/core";
-import type { GraphRepository, FeedbackRepository } from "@knowledgine/core";
+import type { FeedbackRepository } from "@knowledgine/core";
 import type Database from "better-sqlite3";
 import { formatToolResult, formatToolError } from "./helpers.js";
 
@@ -24,7 +29,7 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
     "search_knowledge",
     {
       description:
-        "Full-text and semantic search across notes in the knowledge base. Use mode='keyword' for exact matches, 'semantic' for conceptual similarity, or 'hybrid' to combine both.",
+        "Full-text and semantic search across notes in the knowledge base. Use mode='keyword' for exact matches, 'semantic' for conceptual similarity, or 'hybrid' to combine both. Set agentic=true (or includeDeprecated=true) to include deprecated notes.",
       inputSchema: {
         query: z.string().describe("Search query"),
         limit: z.number().int().positive().optional().describe("Maximum number of results"),
@@ -32,6 +37,14 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           .enum(["keyword", "semantic", "hybrid"])
           .optional()
           .describe("Search mode (default: keyword)"),
+        agentic: z
+          .boolean()
+          .optional()
+          .describe("Include deprecated notes (agentic mode, default: false)"),
+        includeDeprecated: z
+          .boolean()
+          .optional()
+          .describe("Include deprecated notes (default: false)"),
       },
     },
     async (input) => {
@@ -40,6 +53,8 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           query: input.query,
           limit: input.limit ?? 20,
           mode: input.mode ?? "keyword",
+          agentic: input.agentic,
+          includeDeprecated: input.includeDeprecated,
         });
         const warningMsg = result.results
           ?.find((r) => r.matchReason?.some((m) => m.startsWith("Warning:")))
@@ -242,6 +257,12 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           },
         };
         const result = writer.writeEvent(event);
+
+        // 増分抽出（capture したノートのみ対象）
+        const graphRepo = options.graphRepository ?? new GraphRepository(options.db);
+        const extractor = new IncrementalExtractor(options.repository, graphRepo);
+        await extractor.process([result.noteId]);
+
         return formatToolResult({
           id: result.id,
           title,

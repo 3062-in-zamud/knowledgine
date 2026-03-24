@@ -10,6 +10,7 @@ export interface RcConfig {
   plugins?: { enabled?: string[]; [pluginId: string]: unknown };
   search?: { defaultMode?: "keyword" | "semantic" | "hybrid"; defaultLimit?: number };
   serve?: { defaultPort?: number; host?: string };
+  llm?: import("../llm/types.js").LLMConfig;
   [key: string]: unknown;
 }
 

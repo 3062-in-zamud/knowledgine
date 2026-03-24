@@ -93,11 +93,14 @@ describe("GitHubPlugin", () => {
       const prFixture = loadFixture("prs.json");
       const issueFixture = loadFixture("issues.json");
       const emptyDetail = '{"comments":[],"reviews":[]}';
+      const emptyReviewComments = "[]";
 
       mockedExecGh
         .mockResolvedValueOnce(prFixture)
         .mockResolvedValueOnce(emptyDetail) // PR #1 detail
+        .mockResolvedValueOnce(emptyReviewComments) // PR #1 inline review comments
         .mockResolvedValueOnce(emptyDetail) // PR #2 detail
+        .mockResolvedValueOnce(emptyReviewComments) // PR #2 inline review comments
         .mockResolvedValueOnce(issueFixture);
 
       const events = [];
@@ -212,9 +215,11 @@ describe("GitHubPlugin", () => {
       mockedExecGh
         .mockRejectedValueOnce(new Error("API rate limit exceeded"))
         .mockResolvedValueOnce(prFixture)
-        // PR detail requests for 2 PRs
+        // PR detail requests for 2 PRs + inline review comments for each
         .mockResolvedValueOnce('{"comments":[],"reviews":[]}')
+        .mockResolvedValueOnce("[]") // PR #1 inline review comments
         .mockResolvedValueOnce('{"comments":[],"reviews":[]}')
+        .mockResolvedValueOnce("[]") // PR #2 inline review comments
         .mockResolvedValueOnce(emptyFixture);
 
       const events = [];
@@ -223,7 +228,7 @@ describe("GitHubPlugin", () => {
       }
 
       expect(events).toHaveLength(2); // 2 PRs from fixture
-      expect(mockedExecGh).toHaveBeenCalledTimes(5); // 1 rate limit fail + 1 success PRs + 2 PR details + 1 issues
+      expect(mockedExecGh).toHaveBeenCalledTimes(7); // 1 rate limit fail + 1 success PRs + 2 PR details + 2 inline review comments + 1 issues
     }, 15_000);
 
     it("should not retry on non-rate-limit errors", async () => {
@@ -267,7 +272,9 @@ describe("GitHubPlugin", () => {
       mockedExecGh
         .mockResolvedValueOnce(prFixture)
         .mockResolvedValueOnce(detailFixture) // PR #1 detail
+        .mockResolvedValueOnce("[]") // PR #1 inline review comments
         .mockResolvedValueOnce('{"comments":[],"reviews":[]}') // PR #2 detail
+        .mockResolvedValueOnce("[]") // PR #2 inline review comments
         .mockResolvedValueOnce(emptyFixture);
 
       const events = [];
@@ -301,7 +308,9 @@ describe("GitHubPlugin", () => {
       mockedExecGh
         .mockResolvedValueOnce(prFixture)
         .mockResolvedValueOnce(detailFixture) // PR #1 detail
+        .mockResolvedValueOnce("[]") // PR #1 inline review comments
         .mockResolvedValueOnce('{"comments":[],"reviews":[]}') // PR #2 detail
+        .mockResolvedValueOnce("[]") // PR #2 inline review comments
         .mockResolvedValueOnce(emptyFixture);
 
       const events = [];
@@ -324,7 +333,9 @@ describe("GitHubPlugin", () => {
       mockedExecGh
         .mockResolvedValueOnce(prFixture)
         .mockRejectedValueOnce(new Error("not found")) // PR #1 detail fails
+        .mockResolvedValueOnce("[]") // PR #1 inline review comments (still fetched)
         .mockRejectedValueOnce(new Error("not found")) // PR #2 detail fails
+        .mockResolvedValueOnce("[]") // PR #2 inline review comments (still fetched)
         .mockResolvedValueOnce(emptyFixture);
 
       const events = [];
@@ -334,6 +345,36 @@ describe("GitHubPlugin", () => {
 
       // 2 PRs only (detail fetch failures are swallowed)
       expect(events).toHaveLength(2);
+    });
+
+    it("should yield inline review comment events with code location metadata", async () => {
+      const prFixture = loadFixture("prs.json");
+      const emptyFixture = loadFixture("empty.json");
+      const reviewCommentsFixture = loadFixture("review-comments.json");
+
+      mockedExecGh
+        .mockResolvedValueOnce(prFixture)
+        .mockResolvedValueOnce('{"comments":[],"reviews":[]}') // PR #1 detail
+        .mockResolvedValueOnce(reviewCommentsFixture) // PR #1 inline review comments
+        .mockResolvedValueOnce('{"comments":[],"reviews":[]}') // PR #2 detail
+        .mockResolvedValueOnce("[]") // PR #2 inline review comments
+        .mockResolvedValueOnce(emptyFixture);
+
+      const events = [];
+      for await (const event of plugin.ingestAll("github://owner/repo")) {
+        events.push(event);
+      }
+
+      // 2 PRs + 2 inline review comments from PR #1 fixture = 4 events
+      expect(events).toHaveLength(4);
+      const reviewCommentEvent = events.find(
+        (e) =>
+          e.metadata.extra?.type === "review_comment" &&
+          e.metadata.extra?.filePath === "src/example.ts",
+      );
+      expect(reviewCommentEvent).toBeDefined();
+      expect(reviewCommentEvent!.metadata.extra?.line).toBe(42);
+      expect(reviewCommentEvent!.metadata.extra?.side).toBe("RIGHT");
     });
   });
 });

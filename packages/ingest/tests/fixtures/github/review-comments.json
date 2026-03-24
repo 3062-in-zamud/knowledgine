@@ -1,0 +1,19 @@
+[
+  {
+    "id": 101,
+    "body": "This should use const instead of let",
+    "path": "src/example.ts",
+    "line": 42,
+    "side": "RIGHT",
+    "diff_hunk": "@@ -40,3 +40,5 @@\n context line",
+    "user": { "login": "reviewer" },
+    "created_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 102,
+    "body": "Good naming convention",
+    "path": "src/utils.ts",
+    "user": { "login": "reviewer2" },
+    "created_at": "2024-01-02T00:00:00Z"
+  }
+]

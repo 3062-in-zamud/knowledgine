@@ -6,6 +6,8 @@ import {
   createDatabase,
   Migrator,
   KnowledgeRepository,
+  GraphRepository,
+  IncrementalExtractor,
   ALL_MIGRATIONS,
 } from "@knowledgine/core";
 import { EventWriter, sanitizeContent } from "@knowledgine/ingest";
@@ -36,7 +38,8 @@ function initDb(rootPath: string) {
   const db = createDatabase(config.dbPath);
   new Migrator(db, ALL_MIGRATIONS).migrate();
   const repository = new KnowledgeRepository(db);
-  return { db, repository };
+  const graphRepository = new GraphRepository(db);
+  return { db, repository, graphRepository };
 }
 
 /**
@@ -137,12 +140,16 @@ export async function captureAddCommand(
   };
 
   // 5. DB書き込み
-  const { db, repository } = initDb(rootPath);
+  const { db, repository, graphRepository } = initDb(rootPath);
   try {
     const writer = new EventWriter(db, repository);
     const result = writer.writeEvent(event);
 
-    // 6. 出力
+    // 6. 増分抽出（capture したノートのみ対象）
+    const extractor = new IncrementalExtractor(repository, graphRepository);
+    await extractor.process([result.noteId]);
+
+    // 7. 出力
     const format = options.format ?? "plain";
     if (format === "json") {
       console.log(

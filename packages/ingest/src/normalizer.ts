@@ -52,6 +52,14 @@ const SOURCE_TYPE_MAP: Record<string, SourceType> = {
 };
 
 export function normalizeToKnowledgeData(event: NormalizedEvent): KnowledgeData {
+  const codeLocationJson = event.metadata.extra?.filePath
+    ? JSON.stringify({
+        path: event.metadata.extra.filePath,
+        line: event.metadata.extra.line,
+        side: event.metadata.extra.side,
+      })
+    : undefined;
+
   return {
     filePath: event.sourceUri,
     title: event.title,
@@ -62,6 +70,7 @@ export function normalizeToKnowledgeData(event: NormalizedEvent): KnowledgeData 
       ...(event.metadata.tags ? { tags: event.metadata.tags } : {}),
     },
     createdAt: event.timestamp.toISOString(),
+    ...(codeLocationJson !== undefined ? { codeLocationJson } : {}),
   };
 }
 

@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { createDatabase, Migrator, ALL_MIGRATIONS } from "@knowledgine/core";
 import { registerSuggestCommand } from "../../src/commands/suggest.js";
 import { Command } from "commander";
@@ -34,7 +33,7 @@ describe("suggest command", () => {
   let mockFindRelated: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-suggest-test-${randomUUID()}`);
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-suggest-test-"));
     mkdirSync(join(testDir, ".knowledgine"), { recursive: true });
 
     // Create minimal sqlite db
@@ -131,19 +130,22 @@ describe("suggest command", () => {
       );
     });
 
-    it("should use file content (first 200 chars) as query when --file is given", async () => {
-      const contextFile = join(testDir, "context.txt");
-      const longContent = "A".repeat(300);
-      writeFileSync(contextFile, longContent);
+    it("should use smart content extraction (not 200-char limit) when --file is given", async () => {
+      const contextFile = join(testDir, "context.ts");
+      // import 文が後半にある TypeScript ファイル（先頭200文字には含まれない）
+      const prefix = "// ".repeat(70); // ~210文字のコメント
+      const tsContent = `${prefix}\nimport { User } from "./types";\nexport function greet(name: string) {}\n`;
+      writeFileSync(contextFile, tsContent);
 
       const program = makeProgram();
       await program.parseAsync(["suggest", "--file", contextFile, "--path", testDir], {
         from: "user",
       });
 
-      expect(mockSearch).toHaveBeenCalledWith(
-        expect.objectContaining({ query: "A".repeat(200), mode: "hybrid" }),
-      );
+      // スマート抽出では import/export 行が優先されるため、先頭200文字制限では含まれなかった行も含む
+      const calledQuery = (mockSearch.mock.calls[0][0] as { query: string }).query;
+      expect(calledQuery).toContain('import { User } from "./types"');
+      expect(calledQuery).toContain("export function greet");
     });
   });
 
