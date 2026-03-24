@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-03-24
+
+### Added
+
+#### CLI (`@knowledgine/cli`)
+
+- **Agent Skills Setup**: `knowledgine setup --rules --skills` for interactive 3-step agent configuration (MCP → Rules → Skills) across 13 AI agent platforms
+- Rule templates for 12 agents: Claude Code, Cursor, Cline, Codex, Continue, Gemini, GitHub Copilot, OpenCode, Windsurf, Zed, Antigravity
+- 7 MECE skill packages: capture, recall, suggest, explain, debrief, ingest, feedback — covering the full knowledge lifecycle
+- `suggest` command: contextual knowledge suggestions based on current work context
+- `explain` command: entity explanation with knowledge graph navigation
+- `recall` command: search the knowledge base with YAML format support
+- `serve` command: REST API server for HTTP-based integrations
+- Hierarchical `.knowledginerc` discovery with enhanced DX
+- E2E test suite for full workflow and REST API smoke tests
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **Cursor IDE Sessions** plugin: ingest Cursor session history
+- **GitHub Actions CI/CD** plugin: ingest workflow runs, failures, and deployment events
+- PR comment/review ingestion and rate limit detection for GitHub plugin
+
+#### Core (`@knowledgine/core`)
+
+- Bi-temporal schema alignment and provenance spec conformance (migration 007)
+- Entity extractor enhancements for knowledge graph
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- REST API server (`rest-server.ts`) for non-MCP HTTP access
+
+#### Documentation
+
+- Multi-agent setup guides for Cline, Codex, GitHub Copilot, Windsurf
+- Quick-start guide for new users
+
+#### Infrastructure
+
+- Release PR template for standardized release process
+
+### Fixed
+
+- **Security**: Apply `sanitizeContent` to claude-sessions plugin
+- Drop `vec0` triggers when sqlite-vec is not loaded
+- Add `obsidian://` URI scheme to Obsidian plugin `sourceUri`
+
+### Changed
+
+- Align git-history plugin `eventType`, `sourceUri`, and log format to spec
+- Batch improvements across CLI, core, and ingest packages
+
+## [0.2.2] - 2026-03-23
+
+### Added
+
+- **Branching strategy**: develop/main branching model with automated releases on main merge
+- Husky + lint-staged pre-commit quality checks
+- CI concurrency control to cancel duplicate runs
+
+### Changed
+
+- Replace tag-based `publish.yml` with main-merge-triggered `release.yml` (auto git tag, npm publish, GitHub Release)
+- Dependabot now targets `develop` branch
+- Drop Node 18 from CI matrix (EOL, `string-width` v8 incompatible)
+- Scope security audit to production dependencies only
+- Fix duplicate `engines` field in root `package.json`
+- Code formatting unification across CLI commands and README
+- Update `CONTRIBUTING.md` with new branch strategy and release process
+
+### Fixed
+
+- Remove unused imports to pass lint
+
 ## [0.2.1] - 2026-03-23
 
 ### Added
@@ -98,6 +171,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Integration issues from parallel agent work resolved
 
+[0.2.3]: https://github.com/3062-in-zamud/knowledgine/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/3062-in-zamud/knowledgine/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/3062-in-zamud/knowledgine/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/3062-in-zamud/knowledgine/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/3062-in-zamud/knowledgine/compare/v0.0.1...v0.1.0
