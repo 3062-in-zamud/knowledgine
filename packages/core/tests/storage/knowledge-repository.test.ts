@@ -464,4 +464,124 @@ describe("KnowledgeRepository", () => {
       expect(stats.patternsByType["solution"]).toBe(1);
     });
   });
+
+  describe("saveSuggestFeedback and getSuggestFeedbackForNote", () => {
+    let noteId: number;
+
+    beforeEach(() => {
+      noteId = ctx.repository.saveNote({
+        filePath: "feedback-test.md",
+        title: "Feedback Test",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+    });
+
+    it("should save useful feedback and return inserted id", () => {
+      const id = ctx.repository.saveSuggestFeedback(noteId, "TypeScript error", true);
+      expect(typeof id).toBe("number");
+      expect(id).toBeGreaterThan(0);
+    });
+
+    it("should save not-useful feedback with is_useful=false", () => {
+      ctx.repository.saveSuggestFeedback(noteId, "wrong query", false);
+      const records = ctx.repository.getSuggestFeedbackForNote(noteId);
+      expect(records).toHaveLength(1);
+      expect(records[0].isUseful).toBe(false);
+    });
+
+    it("should retrieve saved feedback with correct fields", () => {
+      ctx.repository.saveSuggestFeedback(noteId, "test query", true, "extra context");
+      const records = ctx.repository.getSuggestFeedbackForNote(noteId);
+      expect(records).toHaveLength(1);
+      expect(records[0].query).toBe("test query");
+      expect(records[0].isUseful).toBe(true);
+      expect(records[0].context).toBe("extra context");
+      expect(typeof records[0].createdAt).toBe("string");
+    });
+
+    it("should allow multiple feedback records for the same noteId", () => {
+      ctx.repository.saveSuggestFeedback(noteId, "query 1", true);
+      ctx.repository.saveSuggestFeedback(noteId, "query 2", false);
+      ctx.repository.saveSuggestFeedback(noteId, "query 3", true);
+      const records = ctx.repository.getSuggestFeedbackForNote(noteId);
+      expect(records).toHaveLength(3);
+    });
+
+    it("should return records ordered by created_at DESC", () => {
+      ctx.repository.saveSuggestFeedback(noteId, "first", true);
+      ctx.repository.saveSuggestFeedback(noteId, "second", false);
+      const records = ctx.repository.getSuggestFeedbackForNote(noteId);
+      expect(records[0].query).toBe("second");
+    });
+
+    it("should store null context when not provided", () => {
+      ctx.repository.saveSuggestFeedback(noteId, "no context query", true);
+      const records = ctx.repository.getSuggestFeedbackForNote(noteId);
+      expect(records[0].context).toBeNull();
+    });
+  });
+
+  describe("searchByCodeLocation", () => {
+    beforeEach(() => {
+      const now = new Date().toISOString();
+      // Insert notes with code_location_json via raw SQL (bypassing saveNote until it's extended)
+      ctx.db
+        .prepare(
+          `INSERT INTO knowledge_notes
+           (file_path, title, content, created_at, code_location_json)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "github://owner/repo/pull/1/comments",
+          "Review comment on src/auth.ts",
+          "This should use const",
+          now,
+          JSON.stringify({ path: "src/auth.ts", line: 42, side: "RIGHT" }),
+        );
+      ctx.db
+        .prepare(
+          `INSERT INTO knowledge_notes
+           (file_path, title, content, created_at, code_location_json)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(
+          "github://owner/repo/pull/2/comments",
+          "Review comment on src/utils.ts",
+          "Good naming convention",
+          now,
+          JSON.stringify({ path: "src/utils.ts", line: 10, side: "LEFT" }),
+        );
+      ctx.db
+        .prepare(
+          `INSERT INTO knowledge_notes
+           (file_path, title, content, created_at)
+           VALUES (?, ?, ?, ?)`,
+        )
+        .run("plain-note.md", "Plain note without code location", "some content", now);
+    });
+
+    it("should find notes by file path", () => {
+      const results = ctx.repository.searchByCodeLocation("src/auth.ts");
+      expect(results).toHaveLength(1);
+      const loc = JSON.parse(results[0].code_location_json!) as { path: string };
+      expect(loc.path).toBe("src/auth.ts");
+    });
+
+    it("should return empty array for nonexistent path", () => {
+      const results = ctx.repository.searchByCodeLocation("nonexistent.ts");
+      expect(results).toHaveLength(0);
+    });
+
+    it("should not return notes without code_location_json", () => {
+      const results = ctx.repository.searchByCodeLocation("plain-note");
+      expect(results).toHaveLength(0);
+    });
+
+    it("should support partial path matching", () => {
+      const results = ctx.repository.searchByCodeLocation("src/");
+      expect(results).toHaveLength(2);
+    });
+  });
 });

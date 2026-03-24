@@ -18,6 +18,7 @@ import {
   issueToNormalizedEvent,
   commentToNormalizedEvent,
   reviewToNormalizedEvent,
+  parseReviewComments,
 } from "./gh-parser.js";
 
 export class GitHubPlugin implements IngestPlugin {
@@ -98,6 +99,29 @@ export class GitHubPlugin implements IngestPlugin {
         }
       } catch {
         // 詳細取得失敗は警告のみ（PR本体は既にyield済み）
+      }
+
+      // インラインレビューコメント（ファイル位置情報付き）
+      try {
+        const reviewCommentsJson = await execGh([
+          "api",
+          `repos/${owner}/${repo}/pulls/${pr.number}/comments`,
+          "--paginate",
+        ]);
+        const reviewComments = parseReviewComments(reviewCommentsJson);
+        for (const rc of reviewComments) {
+          yield commentToNormalizedEvent(
+            { body: rc.body, author: { login: rc.user.login }, createdAt: rc.created_at },
+            pr.number,
+            owner,
+            repo,
+            "pr",
+            { path: rc.path, line: rc.line, side: rc.side, diffHunk: rc.diff_hunk },
+          );
+        }
+      } catch {
+        // graceful degradation: warn only
+        process.stderr.write(`  Could not fetch inline review comments for PR #${pr.number}\n`);
       }
     }
 

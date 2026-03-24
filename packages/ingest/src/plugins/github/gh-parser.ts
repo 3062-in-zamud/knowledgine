@@ -162,17 +162,67 @@ export function issueToNormalizedEvent(
   };
 }
 
+export interface ReviewCommentPosition {
+  path?: string;
+  line?: number;
+  side?: string;
+  diffHunk?: string;
+}
+
+export interface ParsedReviewComment {
+  id: number;
+  body: string;
+  user: { login: string };
+  created_at: string;
+  path?: string;
+  line?: number;
+  side?: string;
+  diff_hunk?: string;
+}
+
+export function parseReviewComments(json: string): ParsedReviewComment[] {
+  const data: unknown = JSON.parse(json);
+  if (!Array.isArray(data)) return [];
+  return data.map((item: Record<string, unknown>) => ({
+    id: item.id as number,
+    body: (item.body as string) ?? "",
+    user: (item.user as { login: string }) ?? { login: "unknown" },
+    created_at: (item.created_at as string) ?? "",
+    path: item.path as string | undefined,
+    line: item.line as number | undefined,
+    side: item.side as string | undefined,
+    diff_hunk: item.diff_hunk as string | undefined,
+  }));
+}
+
 export function commentToNormalizedEvent(
   comment: { body: string; author: { login: string }; createdAt: string },
   prOrIssueNumber: number,
   owner: string,
   repo: string,
   type: "pr" | "issue",
+  position?: ReviewCommentPosition,
 ): NormalizedEvent {
   const content = sanitizeContent(truncateContent(comment.body));
-  const path = type === "pr" ? "pull" : "issues";
+  const urlPath = type === "pr" ? "pull" : "issues";
+
+  const extra: Record<string, unknown> = {
+    parentNumber: prOrIssueNumber,
+    parentType: type,
+  };
+
+  if (position) {
+    extra.type = "review_comment";
+    if (position.path !== undefined) extra.filePath = position.path;
+    if (position.line !== undefined) extra.line = position.line;
+    if (position.side !== undefined) extra.side = position.side;
+    if (position.diffHunk !== undefined) extra.diffHunk = truncateContent(position.diffHunk);
+  } else {
+    extra.type = "comment";
+  }
+
   return {
-    sourceUri: `github://${owner}/${repo}/${path}/${prOrIssueNumber}/comments`,
+    sourceUri: `github://${owner}/${repo}/${urlPath}/${prOrIssueNumber}/comments`,
     eventType: "discussion",
     title: `Comment on ${type === "pr" ? "PR" : "Issue"} #${prOrIssueNumber} by ${comment.author.login}`,
     content,
@@ -182,11 +232,7 @@ export function commentToNormalizedEvent(
       sourceId: `${type}-${prOrIssueNumber}-comment-${comment.createdAt}`,
       author: comment.author.login,
       tags: [],
-      extra: {
-        type: "comment",
-        parentNumber: prOrIssueNumber,
-        parentType: type,
-      },
+      extra,
     },
   };
 }

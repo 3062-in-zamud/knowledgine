@@ -42,6 +42,8 @@ export interface KnowledgeData {
   frontmatter: Record<string, unknown>;
   createdAt: string;
   updatedAt?: string;
+  /** JSON blob for code location info (file path, line, side) */
+  codeLocationJson?: string;
 }
 
 /** Search result */

@@ -9,6 +9,7 @@ import {
   parseGitHubSourceUri,
   commentToNormalizedEvent,
   reviewToNormalizedEvent,
+  parseReviewComments,
 } from "../../../src/plugins/github/gh-parser.js";
 import type { ParsedPR, ParsedIssue } from "../../../src/plugins/github/gh-parser.js";
 
@@ -303,6 +304,108 @@ describe("reviewToNormalizedEvent", () => {
     const event = reviewToNormalizedEvent(emptyReview, 5, "owner", "repo");
     expect(event.content).toBeDefined();
     expect(typeof event.content).toBe("string");
+  });
+});
+
+describe("parseReviewComments", () => {
+  it("should parse review comments from fixture", () => {
+    const json = loadFixture("review-comments.json");
+    const comments = parseReviewComments(json);
+    expect(comments).toHaveLength(2);
+    expect(comments[0].id).toBe(101);
+    expect(comments[0].body).toBe("This should use const instead of let");
+    expect(comments[0].path).toBe("src/example.ts");
+    expect(comments[0].line).toBe(42);
+    expect(comments[0].side).toBe("RIGHT");
+    expect(comments[0].diff_hunk).toBe("@@ -40,3 +40,5 @@\n context line");
+    expect(comments[0].user.login).toBe("reviewer");
+    expect(comments[0].created_at).toBe("2024-01-01T00:00:00Z");
+  });
+
+  it("should parse comment without optional fields", () => {
+    const json = loadFixture("review-comments.json");
+    const comments = parseReviewComments(json);
+    expect(comments[1].id).toBe(102);
+    expect(comments[1].path).toBe("src/utils.ts");
+    expect(comments[1].line).toBeUndefined();
+    expect(comments[1].side).toBeUndefined();
+    expect(comments[1].diff_hunk).toBeUndefined();
+  });
+
+  it("should return empty array for non-array JSON", () => {
+    const comments = parseReviewComments('{"not": "array"}');
+    expect(comments).toHaveLength(0);
+  });
+
+  it("should throw on invalid JSON", () => {
+    expect(() => parseReviewComments("not json")).toThrow();
+  });
+});
+
+describe("commentToNormalizedEvent with position", () => {
+  const sampleComment = {
+    body: "This should use const instead of let",
+    author: { login: "reviewer" },
+    createdAt: "2024-01-01T00:00:00Z",
+  };
+
+  it("should set type to review_comment when position is provided", () => {
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr", {
+      path: "src/example.ts",
+      line: 42,
+      side: "RIGHT",
+      diffHunk: "@@ -40,3 +40,5 @@\n context line",
+    });
+    expect(event.metadata.extra?.type).toBe("review_comment");
+  });
+
+  it("should set filePath, line, side in metadata.extra when position provided", () => {
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr", {
+      path: "src/example.ts",
+      line: 42,
+      side: "RIGHT",
+      diffHunk: "@@ -40,3 +40,5 @@\n context line",
+    });
+    expect(event.metadata.extra?.filePath).toBe("src/example.ts");
+    expect(event.metadata.extra?.line).toBe(42);
+    expect(event.metadata.extra?.side).toBe("RIGHT");
+    expect(event.metadata.extra?.diffHunk).toBe("@@ -40,3 +40,5 @@\n context line");
+  });
+
+  it("should maintain backward compat: type stays comment when no position", () => {
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr");
+    expect(event.metadata.extra?.type).toBe("comment");
+    expect(event.metadata.extra?.filePath).toBeUndefined();
+    expect(event.metadata.extra?.line).toBeUndefined();
+    expect(event.metadata.extra?.diffHunk).toBeUndefined();
+  });
+
+  it("should set filePath when only path provided, line remains undefined", () => {
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr", {
+      path: "src/example.ts",
+    });
+    expect(event.metadata.extra?.filePath).toBe("src/example.ts");
+    expect(event.metadata.extra?.line).toBeUndefined();
+  });
+
+  it("should truncate diffHunk exceeding 100KB", () => {
+    const hugeDiffHunk = "x".repeat(200 * 1024);
+    const event = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr", {
+      path: "src/example.ts",
+      diffHunk: hugeDiffHunk,
+    });
+    const diffHunk = event.metadata.extra?.diffHunk as string;
+    expect(diffHunk.length).toBeLessThan(200 * 1024);
+    expect(diffHunk).toContain("... [truncated]");
+  });
+
+  it("should not change content when position provided (FTS pollution prevention)", () => {
+    const eventWithPosition = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr", {
+      path: "src/example.ts",
+      line: 42,
+    });
+    const eventWithoutPosition = commentToNormalizedEvent(sampleComment, 1, "owner", "repo", "pr");
+    expect(eventWithPosition.content).toBe(eventWithoutPosition.content);
   });
 });
 
