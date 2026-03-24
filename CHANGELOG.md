@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-24
+
+### Added
+
+#### Core (`@knowledgine/core`)
+
+- **Incremental Extraction**: `IncrementalExtractor` for running pattern/entity/relation extraction on specific notes instead of all notes — enables extraction on all ingest sources
+- **Causal Link Detection**: `CausalLinkDetector` automatically links related events (session→commit, commit→PR, review→fix-commit) using timestamp proximity and branch matching
+- **Knowledge Versioning Schema**: Migration 008 adds version tracking, supersedes chains, and deprecation support for knowledge notes
+- **Extraction Metadata Schema**: Migration 009 adds `code_location_json`, `extracted_at` columns and `suggest_feedback` table
+- **LLM Provider Abstraction**: Pluggable LLM providers (OpenAI, Ollama) with exponential backoff retry and 7 error code taxonomy
+- **Reasoning Reranker**: 3-axis scoring (temporal, context relevance, PSP quality) for agentic search with graceful LLM degradation
+
+#### CLI (`@knowledgine/cli`)
+
+- **`suggest --diff`**: Check git diffs against past review patterns before creating PRs — proactive issue prevention
+- **`suggest --file` improvement**: Smart content extraction (2000 chars) replacing the previous 200-char limit
+- **`feedback-suggest` command**: Collect usefulness feedback on suggest results for future accuracy improvement
+- **Diff parser**: Unified diff parser with binary skip, rename support, and 50-file limit
+- **Pre-push hook template**: `scripts/knowledgine-pre-push.template` for git integration (advisory only, 10s timeout)
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **Assistant response saving**: Claude session notes now include assistant responses with role markers (`### User:` / `### Assistant:`)
+- **Decision detection**: Important assistant messages (design decisions, tradeoffs, rationale) preserved at 500 chars; general responses at 200 chars (JP/EN pattern matching)
+- **PR review code positions**: Inline review comments from `gh api pulls/{n}/comments` now store file path, line number, and diff hunk in `code_location_json`
+- **Auto-extraction on all sources**: Pattern/entity extraction now runs after every ingest and capture, not just `init`
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- Auto-extraction on `capture_knowledge` tool — patterns and entities extracted immediately after capture
+- Agentic retrieval integration with `--agentic` flag for deprecated note inclusion and LLM reranking
+
+#### Documentation
+
+- Project logo and icon assets
+
+### Changed
+
+- `postIngestProcessing()` now delegates to `IncrementalExtractor` (backward compatible)
+- `EventWriter.writeBatch()` returns `noteIds` array for downstream extraction
+- `IngestSummary` type extended with optional `noteIds` field
+- `explain --timeline` displays causal links with arrow notation
+- Claude session section header changed from `## User Messages` to `## Session Messages`
+- `recall` command supports `--agentic` flag for deprecated note inclusion
+
 ## [0.2.3] - 2026-03-24
 
 ### Added
@@ -171,6 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Integration issues from parallel agent work resolved
 
+[0.3.0]: https://github.com/3062-in-zamud/knowledgine/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/3062-in-zamud/knowledgine/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/3062-in-zamud/knowledgine/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/3062-in-zamud/knowledgine/compare/v0.2.0...v0.2.1
