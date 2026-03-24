@@ -7,6 +7,8 @@ import {
   createDatabase,
   Migrator,
   KnowledgeRepository,
+  GraphRepository,
+  IncrementalExtractor,
   ALL_MIGRATIONS,
 } from "@knowledgine/core";
 import { IngestEngine } from "@knowledgine/ingest";
@@ -47,6 +49,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
   const db = createDatabase(config.dbPath);
   new Migrator(db, ALL_MIGRATIONS).migrate();
   const repository = new KnowledgeRepository(db);
+  const graphRepository = new GraphRepository(db);
 
   // Setup plugin registry
   const registry = createDefaultRegistry();
@@ -160,6 +163,15 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       }
 
       progress.finish();
+
+      // 全プラグイン完了後に全ノートを対象に増分抽出を実行
+      const allNotes = repository.getAllNotes();
+      const allNoteIds = allNotes.map((n) => n.id);
+      if (allNoteIds.length > 0) {
+        const extractor = new IncrementalExtractor(repository, graphRepository);
+        await extractor.process(allNoteIds);
+      }
+
       const elapsed = formatDuration(Date.now() - startTime);
       const report = createSummaryReport("knowledgine ingest", [
         { label: "Plugins:", value: `${plugins.length} run` },
@@ -172,6 +184,13 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       const summary = await engine.ingest(options.source!, sourcePath, {
         full: options.full,
       });
+
+      // ingest 完了後に対象ノートの増分抽出を実行
+      if (summary.noteIds && summary.noteIds.length > 0) {
+        const extractor = new IncrementalExtractor(repository, graphRepository);
+        await extractor.process(summary.noteIds);
+      }
+
       const elapsed = formatDuration(Date.now() - startTime);
       const entries = [
         { label: "Source:", value: options.source! },

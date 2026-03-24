@@ -1,8 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { KnowledgeService, VERSION } from "@knowledgine/core";
+import {
+  KnowledgeService,
+  VERSION,
+  IncrementalExtractor,
+  GraphRepository,
+} from "@knowledgine/core";
 import type { KnowledgeRepository, EmbeddingProvider, FeedbackErrorType } from "@knowledgine/core";
-import type { GraphRepository, FeedbackRepository } from "@knowledgine/core";
+import type { FeedbackRepository } from "@knowledgine/core";
 import type Database from "better-sqlite3";
 import { formatToolResult, formatToolError } from "./helpers.js";
 
@@ -252,6 +257,12 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           },
         };
         const result = writer.writeEvent(event);
+
+        // 増分抽出（capture したノートのみ対象）
+        const graphRepo = options.graphRepository ?? new GraphRepository(options.db);
+        const extractor = new IncrementalExtractor(options.repository, graphRepo);
+        await extractor.process([result.noteId]);
+
         return formatToolResult({
           id: result.id,
           title,

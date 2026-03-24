@@ -15,6 +15,9 @@ export interface KnowledgeNote {
   // migration 008: knowledge versioning
   valid_from: string | null;
   deprecated: 0 | 1 | null;
+  // migration 009: extraction metadata
+  extracted_at: string | null;
+  code_location_json: string | null;
 }
 
 export interface ExtractedPatternRow {
@@ -71,6 +74,8 @@ export class KnowledgeRepository {
           ? JSON.stringify(data.frontmatter)
           : null;
 
+      const codeLocationJson = data.codeLocationJson ?? null;
+
       if (existing) {
         // Skip update if content hasn't changed
         if (existing.content_hash === contentHash) {
@@ -80,17 +85,25 @@ export class KnowledgeRepository {
         const stmt = this.db.prepare(`
           UPDATE knowledge_notes
           SET title = ?, content = ?, frontmatter_json = ?,
-              updated_at = ?, content_hash = ?
+              updated_at = ?, content_hash = ?, code_location_json = ?
           WHERE id = ?
         `);
-        stmt.run(data.title, data.content, frontmatterJson, now, contentHash, existing.id);
+        stmt.run(
+          data.title,
+          data.content,
+          frontmatterJson,
+          now,
+          contentHash,
+          codeLocationJson,
+          existing.id,
+        );
         return existing.id;
       } else {
         const stmt = this.db.prepare(`
           INSERT INTO knowledge_notes (
             file_path, title, content, frontmatter_json,
-            created_at, updated_at, content_hash
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            created_at, updated_at, content_hash, code_location_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const info = stmt.run(
           data.filePath,
@@ -100,6 +113,7 @@ export class KnowledgeRepository {
           data.createdAt || now,
           now,
           contentHash,
+          codeLocationJson,
         );
         return Number(info.lastInsertRowid);
       }
@@ -380,6 +394,20 @@ export class KnowledgeRepository {
   }
 
   /**
+   * コードファイルパスで code_location_json を持つノートを検索する
+   * path パラメータを含む code_location_json が NULL でないノートを返す
+   */
+  searchByCodeLocation(path: string): KnowledgeNote[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM knowledge_notes
+      WHERE code_location_json IS NOT NULL
+        AND code_location_json LIKE ?
+      ORDER BY created_at DESC
+    `);
+    return stmt.all(`%${path}%`) as KnowledgeNote[];
+  }
+
+  /**
    * ノートの埋め込みベクトルを保存する（upsert）
    */
   saveEmbedding(noteId: number, embedding: Float32Array, modelName: string): void {
@@ -537,6 +565,118 @@ export class KnowledgeRepository {
     const stmt = this.db.prepare(`DELETE FROM knowledge_notes WHERE id IN (${placeholders})`);
     const info = stmt.run(...ids);
     return info.changes;
+  }
+
+  /**
+   * ノートの extracted_at タイムスタンプを更新する
+   */
+  updateExtractedAt(noteId: number): void {
+    const now = new Date().toISOString();
+    this.db.prepare("UPDATE knowledge_notes SET extracted_at = ? WHERE id = ?").run(now, noteId);
+  }
+
+  /**
+   * sourceUri プレフィックスでノートを取得する
+   * file_path が sourceUri として使われている（normalizer.ts の仕様）
+   */
+  getNotesBySourceUriPrefix(prefix: string): KnowledgeNote[] {
+    const stmt = this.db.prepare(
+      "SELECT * FROM knowledge_notes WHERE file_path LIKE ? ORDER BY created_at ASC",
+    );
+    return stmt.all(`${prefix}%`) as KnowledgeNote[];
+  }
+
+  /**
+   * 既存リンクチェック後に note_links へ INSERT する（冪等）
+   * 同じ source/target ペアが既に存在する場合は false を返す
+   */
+  saveNoteLinkIfNotExists(
+    sourceNoteId: number,
+    targetNoteId: number,
+    linkType: string,
+    similarity?: number,
+  ): boolean {
+    const existing = this.db
+      .prepare("SELECT id FROM note_links WHERE source_note_id = ? AND target_note_id = ?")
+      .get(sourceNoteId, targetNoteId);
+
+    if (existing) return false;
+
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        "INSERT INTO note_links (source_note_id, target_note_id, link_type, similarity, created_at) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(sourceNoteId, targetNoteId, linkType, similarity ?? null, now);
+
+    return true;
+  }
+
+  /**
+   * 指定ノートに関するリンクをすべて取得する（source または target）
+   */
+  getLinksForNote(noteId: number): Array<{
+    id: number;
+    sourceNoteId: number;
+    targetNoteId: number;
+    linkType: string;
+    similarity: number | null;
+    createdAt: string;
+  }> {
+    const stmt = this.db.prepare(`
+      SELECT id, source_note_id as sourceNoteId, target_note_id as targetNoteId,
+             link_type as linkType, similarity, created_at as createdAt
+      FROM note_links
+      WHERE source_note_id = ? OR target_note_id = ?
+      ORDER BY created_at DESC
+    `);
+    return stmt.all(noteId, noteId) as Array<{
+      id: number;
+      sourceNoteId: number;
+      targetNoteId: number;
+      linkType: string;
+      similarity: number | null;
+      createdAt: string;
+    }>;
+  }
+
+  /**
+   * サジェスト結果へのフィードバックを保存する
+   */
+  saveSuggestFeedback(noteId: number, query: string, isUseful: boolean, context?: string): number {
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(`
+      INSERT INTO suggest_feedback (note_id, query, is_useful, context, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    const info = stmt.run(noteId, query, isUseful ? 1 : 0, context ?? null, now);
+    return Number(info.lastInsertRowid);
+  }
+
+  /**
+   * 特定ノートのサジェストフィードバック一覧を取得する（新しい順）
+   */
+  getSuggestFeedbackForNote(noteId: number): Array<{
+    id: number;
+    query: string;
+    isUseful: boolean;
+    context: string | null;
+    createdAt: string;
+  }> {
+    const stmt = this.db.prepare(`
+      SELECT id, query, is_useful as isUseful, context, created_at as createdAt
+      FROM suggest_feedback
+      WHERE note_id = ?
+      ORDER BY id DESC
+    `);
+    const rows = stmt.all(noteId) as Array<{
+      id: number;
+      query: string;
+      isUseful: number;
+      context: string | null;
+      createdAt: string;
+    }>;
+    return rows.map((row) => ({ ...row, isUseful: row.isUseful === 1 }));
   }
 
   close(): void {
