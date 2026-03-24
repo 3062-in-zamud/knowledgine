@@ -10,6 +10,7 @@ import {
   GraphRepository,
   KnowledgeService,
   ProvenanceRepository,
+  CausalLinkDetector,
 } from "@knowledgine/core";
 import type { EntityWithGraph } from "@knowledgine/core";
 import type { ProvenanceRecord } from "@knowledgine/core";
@@ -73,10 +74,26 @@ function formatPlain(
   return lines.join("\n");
 }
 
+function formatCausalLinks(noteId: number, repository: KnowledgeRepository): string {
+  const links = repository.getLinksForNote(noteId);
+  if (links.length === 0) return "";
+
+  const lines: string[] = ["Causal Links:"];
+  for (const link of links) {
+    const sourceNote = repository.getNoteById(link.sourceNoteId);
+    const targetNote = repository.getNoteById(link.targetNoteId);
+    const sourcePath = sourceNote?.file_path ?? `note#${link.sourceNoteId}`;
+    const targetPath = targetNote?.file_path ?? `note#${link.targetNoteId}`;
+    lines.push(`  ${sourcePath} -> ${targetPath} (${link.linkType})`);
+  }
+  return lines.join("\n");
+}
+
 function formatTimeline(
   entityName: string,
   entityGraph: EntityWithGraph,
   provenance: ProvenanceRecord[],
+  causalLinksText?: string,
 ): string {
   const lines: string[] = [];
 
@@ -110,6 +127,11 @@ function formatTimeline(
   lines.push(
     `  Current: ${noteCount} notes | ${relationCount} entity relations | ${obsCount} observations`,
   );
+
+  if (causalLinksText) {
+    lines.push("");
+    lines.push(causalLinksText);
+  }
 
   return lines.join("\n");
 }
@@ -274,7 +296,26 @@ async function explainAction(
     if (format === "json") {
       console.log(formatJson(entityGraph, provenance));
     } else if (options.timeline) {
-      console.error(formatTimeline(entityName, entityGraph, provenance));
+      // 因果リンク検出・表示
+      const causalDetector = new CausalLinkDetector(repository);
+      causalDetector.detectAll();
+
+      // エンティティに紐づくノートの因果リンクを表示
+      const linkedNoteIds = entityGraph.linkedNotes
+        .map((n) => (typeof n === "object" && "id" in n ? (n as { id: number }).id : null))
+        .filter((id): id is number => id !== null);
+
+      const causalLinksText =
+        linkedNoteIds.length > 0
+          ? linkedNoteIds
+              .map((id) => formatCausalLinks(id, repository))
+              .filter((s) => s.length > 0)
+              .join("\n")
+          : "";
+
+      console.error(
+        formatTimeline(entityName, entityGraph, provenance, causalLinksText || undefined),
+      );
     } else {
       console.error(formatPlain(entityName, entityGraph, provenance));
     }
