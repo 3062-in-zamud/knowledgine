@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { createDatabase, Migrator, ALL_MIGRATIONS, KnowledgeRepository } from "@knowledgine/core";
 import { registerFeedbackSuggestCommand } from "../../src/commands/feedback-suggest.js";
 import { Command } from "commander";
@@ -21,7 +20,7 @@ describe("feedback-suggest command", () => {
   let dbPath: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-feedback-suggest-test-${randomUUID()}`);
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-feedback-suggest-test-"));
     mkdirSync(join(testDir, ".knowledgine"), { recursive: true });
 
     dbPath = join(testDir, ".knowledgine", "index.sqlite");

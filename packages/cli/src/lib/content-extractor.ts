@@ -44,7 +44,6 @@ export function extractSmartContent(content: string, options?: { maxLength?: num
     const entry = line + "\n";
     if (entry.length > remaining) {
       parts.push(line.slice(0, remaining));
-      remaining = 0;
       break;
     }
     parts.push(entry);

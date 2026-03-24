@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { createDatabase, Migrator, ALL_MIGRATIONS } from "@knowledgine/core";
 import { registerSuggestCommand } from "../../src/commands/suggest.js";
 import { Command } from "commander";
@@ -34,7 +33,7 @@ describe("suggest command", () => {
   let mockFindRelated: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-suggest-test-${randomUUID()}`);
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-suggest-test-"));
     mkdirSync(join(testDir, ".knowledgine"), { recursive: true });
 
     // Create minimal sqlite db

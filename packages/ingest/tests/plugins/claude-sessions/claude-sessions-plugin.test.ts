@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { writeFile, mkdir, rm, utimes } from "fs/promises";
+import { writeFile, mkdir, rm, utimes, mkdtemp } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
+import { randomUUID } from "crypto"; // still needed for makeEntry uuid
 import { ClaudeSessionsPlugin } from "../../../src/plugins/claude-sessions/index.js";
 import type { NormalizedEvent } from "../../../src/types.js";
 
@@ -45,8 +45,7 @@ describe("ClaudeSessionsPlugin", () => {
 
   beforeEach(async () => {
     plugin = new ClaudeSessionsPlugin();
-    testDir = join(tmpdir(), `knowledgine-sessions-test-${Date.now()}`);
-    await mkdir(testDir, { recursive: true });
+    testDir = await mkdtemp(join(tmpdir(), "knowledgine-sessions-test-"));
   });
 
   afterEach(async () => {
