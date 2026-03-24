@@ -117,4 +117,6 @@ export interface IngestSummary {
   deleted: number;
   skipped: number;
   elapsedMs: number;
+  /** IDs of knowledge_notes records created/updated during this ingest run */
+  noteIds?: number[];
 }

@@ -75,6 +75,7 @@ export { migration005b } from "./storage/migrations/005b_bitemporal.js";
 export { migration005c } from "./storage/migrations/005c_provenance.js";
 export { migration007 } from "./storage/migrations/007_spec_alignment.js";
 export { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
+export { migration009 } from "./storage/migrations/009_extraction_metadata.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -96,6 +97,7 @@ import { migration005c } from "./storage/migrations/005c_provenance.js";
 import { migration006 } from "./storage/migrations/006_extraction_feedback.js";
 import { migration007 } from "./storage/migrations/007_spec_alignment.js";
 import { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
+import { migration009 } from "./storage/migrations/009_extraction_metadata.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -108,6 +110,7 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration005c,
   migration007,
   migration008,
+  migration009,
 ];
 
 // Provenance
@@ -155,6 +158,10 @@ export { SemanticSearcher } from "./search/semantic-searcher.js";
 export { HybridSearcher } from "./search/hybrid-searcher.js";
 
 // Extraction
+export { CausalLinkDetector } from "./extraction/causal-link-detector.js";
+export type { CausalLinkSummary } from "./extraction/causal-link-detector.js";
+export { IncrementalExtractor } from "./extraction/incremental-extractor.js";
+export type { ExtractionSummary } from "./extraction/incremental-extractor.js";
 export { PatternExtractor } from "./extraction/pattern-extractor.js";
 export { ProblemSolutionDetector } from "./extraction/psp-detector.js";
 export type { DetectedPair } from "./extraction/psp-detector.js";
