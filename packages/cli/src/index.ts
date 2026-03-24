@@ -20,6 +20,9 @@ import { searchCommand } from "./commands/search.js";
 import { captureAddCommand, captureListCommand, captureDeleteCommand } from "./commands/capture.js";
 import { registerToolCommands } from "./commands/tool.js";
 import { registerRecallCommand } from "./commands/recall.js";
+import { registerExplainCommand } from "./commands/explain.js";
+import { registerSuggestCommand } from "./commands/suggest.js";
+import { registerServeCommand } from "./commands/serve.js";
 import { createOutputErrorHandler } from "./lib/unknown-command-handler.js";
 
 const program = new Command();
@@ -256,6 +259,9 @@ captureCmd
 
 registerToolCommands(program);
 registerRecallCommand(program);
+registerExplainCommand(program);
+registerSuggestCommand(program);
+registerServeCommand(program);
 
 program.showSuggestionAfterError(true);
 program.configureOutput({
