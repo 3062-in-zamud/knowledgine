@@ -85,17 +85,20 @@ Example:
 
 program
   .command("setup")
-  .description("Generate MCP configuration for AI tools")
+  .description("Configure MCP, rules, and skills for AI tools")
   .option("--target <tool>", "Target AI tool (claude-desktop, cursor, claude-code)")
   .option("--path <dir>", "Root directory of indexed notes")
   .option("--write", "Write configuration to file (default: dry-run)")
+  .option("--rules", "Configure agent rules (instruction files)")
+  .option("--skills", "Install agent skill packages (SKILL.md)")
   .addHelpText(
     "after",
     `
 Examples:
-  knowledgine setup --target claude-desktop --path ~/notes
-  knowledgine setup --target cursor --path ~/notes --write
-  knowledgine setup --target claude-code --path ~/notes`,
+  knowledgine setup                                        Interactive 3-step setup
+  knowledgine setup --target cursor --path ~/notes --write MCP config
+  knowledgine setup --rules --target cursor --write        Agent rules
+  knowledgine setup --skills --target cursor --write       Agent skills`,
   )
   .action(setupCommand);
 

@@ -1,0 +1,12 @@
+export { getCoreRules } from "./core-rules.js";
+export { getTemplate as getClaudeCodeRuleTemplate } from "./claude-code.js";
+export { getTemplate as getCursorRuleTemplate } from "./cursor.js";
+export { getTemplate as getWindsurfRuleTemplate } from "./windsurf.js";
+export { getTemplate as getClineRuleTemplate } from "./cline.js";
+export { getTemplate as getCodexRuleTemplate } from "./codex.js";
+export { getTemplate as getGithubCopilotRuleTemplate } from "./github-copilot.js";
+export { getTemplate as getGeminiRuleTemplate } from "./gemini.js";
+export { getTemplate as getContinueRuleTemplate } from "./continue.js";
+export { getTemplate as getZedRuleTemplate } from "./zed.js";
+export { getTemplate as getOpencodeRuleTemplate } from "./opencode.js";
+export { getTemplate as getAntigravityRuleTemplate } from "./antigravity.js";

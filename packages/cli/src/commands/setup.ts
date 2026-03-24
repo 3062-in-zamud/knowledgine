@@ -5,12 +5,16 @@ import { resolveDefaultPath } from "@knowledgine/core";
 import { createBox, colors, symbols } from "../lib/ui/index.js";
 import * as p from "@clack/prompts";
 import * as TOML from "smol-toml";
+import { interactiveRulesSetup, nonInteractiveRulesSetup } from "./setup-rules.js";
+import { interactiveSkillsSetup, nonInteractiveSkillsSetup } from "./setup-skills.js";
 
 export interface SetupOptions {
   target?: string;
   path?: string;
   dryRun?: boolean;
   write?: boolean;
+  rules?: boolean;
+  skills?: boolean;
 }
 
 interface McpServerConfig {
@@ -361,7 +365,7 @@ async function interactiveSetup(rootPath: string): Promise<void> {
     }
   }
 
-  // Summary
+  // MCP Summary
   const ok = results.filter((r) => r.status === "ok");
   const fail = results.filter((r) => r.status === "fail");
 
@@ -370,14 +374,44 @@ async function interactiveSetup(rootPath: string): Promise<void> {
       const extra = r.note ? `  ${colors.dim(`(${r.note})`)}` : "";
       return `${symbols.success} ${getTargetLabel(r.target)}  ${colors.dim(r.configPath)}${extra}`;
     });
-    p.note(lines.join("\n"), "Configured");
+    p.note(lines.join("\n"), "MCP Configured");
   }
 
   if (fail.length > 0) {
     const lines = fail.map(
       (r) => `${symbols.error} ${getTargetLabel(r.target)}  ${colors.dim(r.error ?? "")}`,
     );
-    p.note(lines.join("\n"), "Failed");
+    p.note(lines.join("\n"), "MCP Failed");
+  }
+
+  // Step 4: Agent Rules
+  const ruleResults = await interactiveRulesSetup(rootPath, targets);
+
+  // Step 5: Agent Skills
+  const skillResults = await interactiveSkillsSetup(rootPath, targets);
+
+  // Final Summary
+  const summaryLines: string[] = [];
+  if (ok.length > 0) {
+    summaryLines.push(`MCP:    ${ok.map((r) => getTargetLabel(r.target)).join(", ")}`);
+  }
+  if (ruleResults.length > 0) {
+    const ruleOk = ruleResults.filter((r) => r.status === "ok");
+    if (ruleOk.length > 0) {
+      summaryLines.push(`Rules:  ${ruleOk.map((r) => r.target).join(", ")}`);
+    }
+  }
+  if (skillResults.length > 0) {
+    const skillOk = skillResults.filter((r) => r.status === "ok");
+    if (skillOk.length > 0) {
+      summaryLines.push(
+        `Skills: ${skillOk.map((r) => `${r.target} (${r.skillCount} skills)`).join(", ")}`,
+      );
+    }
+  }
+
+  if (summaryLines.length > 0) {
+    p.note(summaryLines.join("\n"), "Summary");
   }
 
   p.outro(`${colors.success("Setup complete!")} Restart your AI tools to activate knowledgine.`);
@@ -399,19 +433,52 @@ export async function setupCommand(
       ? (ioOrCommand as SetupIO)
       : undefined;
 
-  const rootPath = resolveDefaultPath(options.path);
+  // For --rules and --skills, default to cwd (project root), not knowledge base path
+  const rulesOrSkillsOnly = options.rules || options.skills;
+  const rootPath = rulesOrSkillsOnly
+    ? options.path
+      ? resolve(options.path)
+      : process.cwd()
+    : resolveDefaultPath(options.path);
 
-  const knowledgineDir = resolve(rootPath, ".knowledgine");
-  if (!existsSync(knowledgineDir)) {
-    console.error(
-      `${symbols.error} Not initialized. Run 'knowledgine init --path ${rootPath}' first.`,
-    );
-    process.exitCode = 1;
-    return;
+  // --rules and --skills don't require knowledgine init
+  const needsInit = !rulesOrSkillsOnly;
+
+  if (needsInit) {
+    const knowledgineDir = resolve(rootPath, ".knowledgine");
+    if (!existsSync(knowledgineDir)) {
+      console.error(
+        `${symbols.error} Not initialized. Run 'knowledgine init --path ${rootPath}' first.`,
+      );
+      process.exitCode = 1;
+      return;
+    }
   }
 
   // Interactive mode when no --target specified
   if (!options.target) {
+    // --rules or --skills only (no --target) → use cwd as project root
+    if (options.rules) {
+      const tty = io ? io.isTTY : isTTY();
+      if (!tty) {
+        console.error("Error: --target is required in non-interactive mode.");
+        process.exitCode = 1;
+        return;
+      }
+      await interactiveRulesSetup(rootPath);
+      return;
+    }
+    if (options.skills) {
+      const tty = io ? io.isTTY : isTTY();
+      if (!tty) {
+        console.error("Error: --target is required in non-interactive mode.");
+        process.exitCode = 1;
+        return;
+      }
+      await interactiveSkillsSetup(rootPath);
+      return;
+    }
+
     const tty = io ? io.isTTY : isTTY();
     if (!tty) {
       console.error("Error: --target is required in non-interactive mode.");
@@ -424,9 +491,23 @@ export async function setupCommand(
   }
 
   const target = options.target;
+  const shouldWrite = options.write === true;
+
+  // Non-interactive: --rules flag
+  if (options.rules) {
+    nonInteractiveRulesSetup(target, rootPath, { write: shouldWrite });
+    return;
+  }
+
+  // Non-interactive: --skills flag
+  if (options.skills) {
+    nonInteractiveSkillsSetup(target, rootPath, { write: shouldWrite });
+    return;
+  }
+
+  // Non-interactive: MCP setup (default)
   const configPath = getConfigPath(target);
   const targetLabel = getTargetLabel(target);
-  const shouldWrite = options.write === true;
 
   let existingConfig: McpConfig;
   try {
