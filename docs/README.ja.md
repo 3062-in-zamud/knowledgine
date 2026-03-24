@@ -11,7 +11,7 @@
 ![CI](https://github.com/3062-in-zamud/knowledgine/actions/workflows/ci.yml/badge.svg)
 [![npm](https://img.shields.io/npm/v/@knowledgine/cli)](https://www.npmjs.com/package/@knowledgine/cli)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
+![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
 
 <!-- TODO: CLI出力の最終化後にデモGIFを追加。録画コマンド: vhs docs/assets/demo.tape -->
 
