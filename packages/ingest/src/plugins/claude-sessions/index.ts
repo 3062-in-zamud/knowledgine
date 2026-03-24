@@ -11,6 +11,7 @@ import type {
 } from "../../types.js";
 import { parseSessionFile } from "./session-parser.js";
 import { sanitizeContent } from "../../normalizer.js";
+import { isDecisionPoint } from "./decision-detector.js";
 
 /**
  * Maximum number of messages to include in a session summary.
@@ -107,10 +108,27 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
     const firstMessage = allMessages[0];
     const lastMessage = allMessages[allMessages.length - 1];
 
-    // Build a summary content from user messages (most relevant for search)
-    const userMessages = allMessages
-      .filter((m) => m.type === "user")
-      .map((m) => m.content.slice(0, 500)) // Truncate long messages
+    const MAX_DECISION_MESSAGES = 20;
+    let decisionCount = 0;
+
+    const sessionMessages = allMessages
+      .filter((m) => m.type === "user" || m.type === "assistant")
+      .filter((m) => m.content.trim().length > 0)
+      .map((m) => {
+        const marker = m.type === "user" ? "### User:" : "### Assistant:";
+        let truncatedContent: string;
+
+        if (m.type === "user") {
+          truncatedContent = m.content.slice(0, 500);
+        } else if (isDecisionPoint(m.content) && decisionCount < MAX_DECISION_MESSAGES) {
+          decisionCount++;
+          truncatedContent = m.content.slice(0, 500);
+        } else {
+          truncatedContent = m.content.slice(0, 200);
+        }
+
+        return `${marker}\n${truncatedContent}`;
+      })
       .join("\n\n---\n\n");
 
     const summaryContent = [
@@ -120,9 +138,9 @@ export class ClaudeSessionsPlugin implements IngestPlugin {
       `Started: ${firstMessage.timestamp.toISOString()}`,
       `Ended: ${lastMessage.timestamp.toISOString()}`,
       "",
-      "## User Messages",
+      "## Session Messages",
       "",
-      userMessages || "(no user messages)",
+      sessionMessages || "(no messages)",
     ].join("\n");
 
     return {
