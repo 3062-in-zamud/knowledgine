@@ -34,3 +34,5 @@ export { GitHistoryPlugin } from "./plugins/git-history/index.js";
 export { ClaudeSessionsPlugin } from "./plugins/claude-sessions/index.js";
 export { GitHubPlugin } from "./plugins/github/index.js";
 export { ObsidianPlugin } from "./plugins/obsidian/index.js";
+export { CursorSessionsPlugin } from "./plugins/cursor-sessions/index.js";
+export { CicdPlugin } from "./plugins/cicd/index.js";

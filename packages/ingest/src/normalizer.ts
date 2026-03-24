@@ -44,9 +44,11 @@ const SOURCE_TYPE_MAP: Record<string, SourceType> = {
   "claude-sessions": "claude_code",
   github: "github",
   obsidian: "markdown",
+  cicd: "github",
   slack: "slack",
   notion: "notion",
   capture: "manual",
+  "cursor-sessions": "cursor",
 };
 
 export function normalizeToKnowledgeData(event: NormalizedEvent): KnowledgeData {

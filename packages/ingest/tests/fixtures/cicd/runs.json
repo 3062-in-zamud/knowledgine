@@ -1,0 +1,24 @@
+[
+  {
+    "databaseId": 12345,
+    "displayTitle": "CI - main",
+    "status": "completed",
+    "conclusion": "success",
+    "createdAt": "2026-03-20T10:00:00Z",
+    "updatedAt": "2026-03-20T10:05:00Z",
+    "workflowName": "CI",
+    "headBranch": "main",
+    "event": "push"
+  },
+  {
+    "databaseId": 12346,
+    "displayTitle": "CI - feature/test",
+    "status": "completed",
+    "conclusion": "failure",
+    "createdAt": "2026-03-20T11:00:00Z",
+    "updatedAt": "2026-03-20T11:10:00Z",
+    "workflowName": "CI",
+    "headBranch": "feature/test",
+    "event": "push"
+  }
+]
