@@ -98,7 +98,7 @@ describe("migration007: spec_alignment provenance", () => {
       expect(new Migrator(db, wave2Migrations).getCurrentVersion()).toBe(6);
 
       new Migrator(db, ALL_MIGRATIONS).migrate();
-      expect(new Migrator(db, ALL_MIGRATIONS).getCurrentVersion()).toBe(9);
+      expect(new Migrator(db, ALL_MIGRATIONS).getCurrentVersion()).toBe(10);
 
       // VIEWとテーブルの存在確認
       const tables = db
