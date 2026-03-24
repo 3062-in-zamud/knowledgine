@@ -12,6 +12,9 @@ export interface KnowledgeNote {
   created_at: string;
   updated_at: string | null;
   content_hash: string | null;
+  // migration 008: knowledge versioning
+  valid_from: string | null;
+  deprecated: 0 | 1 | null;
 }
 
 export interface ExtractedPatternRow {
@@ -446,13 +449,16 @@ export class KnowledgeRepository {
   searchNotesWithRank(
     query: string,
     limit: number = 50,
+    includeDeprecated: boolean = false,
   ): Array<{ note: KnowledgeNote; rank: number }> {
+    const deprecatedFilter = includeDeprecated ? "" : "AND n.deprecated = 0";
     try {
       const stmt = this.db.prepare(`
         SELECT n.*, fts.rank
         FROM knowledge_notes n
         JOIN knowledge_notes_fts fts ON n.id = fts.rowid
         WHERE knowledge_notes_fts MATCH ?
+        ${deprecatedFilter}
         ORDER BY rank
         LIMIT ?
       `);
@@ -460,8 +466,9 @@ export class KnowledgeRepository {
       return rows.map(({ rank, ...note }) => ({ note: note as KnowledgeNote, rank }));
     } catch {
       // FTS5失敗時はLIKEフォールバック（不正なクエリ構文への耐性）
+      const deprecatedClause = includeDeprecated ? "" : "AND n.deprecated = 0";
       const fallbackStmt = this.db.prepare(
-        `SELECT n.* FROM knowledge_notes n WHERE n.title LIKE ? OR n.content LIKE ? LIMIT ?`,
+        `SELECT n.* FROM knowledge_notes n WHERE (n.title LIKE ? OR n.content LIKE ?) ${deprecatedClause} LIMIT ?`,
       );
       const fallbackRows = fallbackStmt.all(`%${query}%`, `%${query}%`, limit) as Array<
         KnowledgeNote & { rank: number }
