@@ -76,6 +76,7 @@ export { migration005c } from "./storage/migrations/005c_provenance.js";
 export { migration007 } from "./storage/migrations/007_spec_alignment.js";
 export { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
 export { migration009 } from "./storage/migrations/009_extraction_metadata.js";
+export { migration010 } from "./storage/migrations/010_memory_protocol.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -98,6 +99,7 @@ import { migration006 } from "./storage/migrations/006_extraction_feedback.js";
 import { migration007 } from "./storage/migrations/007_spec_alignment.js";
 import { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
 import { migration009 } from "./storage/migrations/009_extraction_metadata.js";
+import { migration010 } from "./storage/migrations/010_memory_protocol.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -111,6 +113,7 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration007,
   migration008,
   migration009,
+  migration010,
 ];
 
 // Provenance

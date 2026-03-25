@@ -114,6 +114,22 @@ importers:
         specifier: ^11.0.0
         version: 11.10.0
 
+  packages/mcp-memory-protocol:
+    dependencies:
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
+    devDependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.27.1
+        version: 1.27.1(zod@4.3.6)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.5.0)(yaml@2.8.2)
+
   packages/mcp-server:
     dependencies:
       '@hono/node-server':
@@ -125,6 +141,9 @@ importers:
       '@knowledgine/ingest':
         specifier: workspace:*
         version: link:../ingest
+      '@knowledgine/mcp-memory-protocol':
+        specifier: workspace:*
+        version: link:../mcp-memory-protocol
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.1
         version: 1.27.1(zod@4.3.6)
