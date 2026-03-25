@@ -128,6 +128,12 @@ export { EntityExtractor } from "./graph/entity-extractor.js";
 export type { ExtractedEntity } from "./graph/entity-extractor.js";
 export { RelationInferrer } from "./graph/relation-inferrer.js";
 export type { InferredRelation } from "./graph/relation-inferrer.js";
+export { TemporalQueryEngine } from "./graph/temporal-query.js";
+export type {
+  PointInTimeQuery,
+  TemporalQueryResult,
+  TemporalTimelineEntry,
+} from "./graph/temporal-query.js";
 
 // LLM
 export type {
@@ -190,6 +196,10 @@ export type {
 } from "./search/reasoning-reranker.js";
 export { LocalLinkGenerator } from "./search/link-generator.js";
 export type { RelatedNote } from "./search/link-generator.js";
+export { classifyQuery, getWeightsForQueryType } from "./search/query-classifier.js";
+export type { QueryType, QueryWeights } from "./search/query-classifier.js";
+export { QueryOrchestrator } from "./search/query-orchestrator.js";
+export type { OrchestratedResult, QueryOrchestratorConfig } from "./search/query-orchestrator.js";
 
 // Processing
 export { FileProcessor } from "./processing/file-processor.js";

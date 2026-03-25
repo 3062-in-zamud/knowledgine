@@ -1,10 +1,12 @@
 import type { KnowledgeRepository, KnowledgeNote } from "../storage/knowledge-repository.js";
+import type { GraphRepository } from "../graph/graph-repository.js";
 import type { EmbeddingProvider } from "../embedding/embedding-provider.js";
 import type { LLMProvider } from "../llm/types.js";
 import { SemanticSearcher } from "./semantic-searcher.js";
 import { HybridSearcher } from "./hybrid-searcher.js";
 import { ReasoningReranker } from "./reasoning-reranker.js";
 import type { RerankerWeights } from "./reasoning-reranker.js";
+import { QueryOrchestrator } from "./query-orchestrator.js";
 
 export interface SearchOptions {
   query?: string;
@@ -31,12 +33,14 @@ export class KnowledgeSearcher {
   private hybridSearcher?: HybridSearcher;
   private reranker: ReasoningReranker;
   private agenticReranker: ReasoningReranker;
+  private orchestrator?: QueryOrchestrator;
 
   constructor(
     private repository: KnowledgeRepository,
     embeddingProvider?: EmbeddingProvider,
     hybridAlpha: number = 0.3,
     llmProvider?: LLMProvider,
+    graphRepository?: GraphRepository,
   ) {
     if (embeddingProvider) {
       this.semanticSearcher = new SemanticSearcher(repository, embeddingProvider);
@@ -44,9 +48,29 @@ export class KnowledgeSearcher {
     }
     this.reranker = new ReasoningReranker(undefined, repository);
     this.agenticReranker = new ReasoningReranker(llmProvider, repository);
+
+    // graphRepositoryが提供された場合はQueryOrchestratorを使用
+    if (graphRepository) {
+      this.orchestrator = new QueryOrchestrator(
+        repository,
+        graphRepository,
+        embeddingProvider,
+        llmProvider,
+      );
+    }
   }
 
   async search(options: SearchOptions): Promise<SearchResult[]> {
+    // orchestratorが利用可能な場合はQueryOrchestratorに委譲
+    if (this.orchestrator && options.query) {
+      const results = await this.orchestrator.query(options);
+      return results.map((r) => ({
+        note: r.note,
+        score: r.score,
+        matchReason: r.matchReason,
+      }));
+    }
+
     const {
       query,
       limit = 50,
