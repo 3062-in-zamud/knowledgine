@@ -13,8 +13,11 @@ export interface KnowledgeNote {
   updated_at: string | null;
   content_hash: string | null;
   // migration 008: knowledge versioning
+  version: number | null;
+  supersedes: number | null;
   valid_from: string | null;
   deprecated: 0 | 1 | null;
+  deprecation_reason: string | null;
   // migration 009: extraction metadata
   extracted_at: string | null;
   code_location_json: string | null;
@@ -677,6 +680,84 @@ export class KnowledgeRepository {
       createdAt: string;
     }>;
     return rows.map((row) => ({ ...row, isUseful: row.isUseful === 1 }));
+  }
+
+  /**
+   * ノートを deprecated にマークする
+   */
+  deprecateNote(noteId: number, reason: string): void {
+    const note = this.getNoteById(noteId);
+    if (!note) throw new KnowledgeNotFoundError(noteId, "id");
+
+    this.db
+      .prepare("UPDATE knowledge_notes SET deprecated = 1, deprecation_reason = ? WHERE id = ?")
+      .run(reason, noteId);
+  }
+
+  /**
+   * ノートの deprecated フラグを解除する
+   */
+  undeprecateNote(noteId: number): void {
+    const note = this.getNoteById(noteId);
+    if (!note) throw new KnowledgeNotFoundError(noteId, "id");
+
+    this.db
+      .prepare("UPDATE knowledge_notes SET deprecated = 0, deprecation_reason = NULL WHERE id = ?")
+      .run(noteId);
+  }
+
+  /**
+   * 既存ノートの新バージョンを作成する
+   * 旧ノートは deprecated にマークされ、新ノートが supersedes で旧ノートを参照する
+   */
+  createNewVersion(noteId: number, data: Partial<KnowledgeData>): number {
+    const existing = this.getNoteById(noteId);
+    if (!existing) throw new KnowledgeNotFoundError(noteId, "id");
+
+    const now = new Date().toISOString();
+    const currentVersion = existing.version ?? 1;
+    const newVersion = currentVersion + 1;
+
+    const title = data.title ?? existing.title;
+    const content = data.content ?? existing.content;
+    const frontmatterJson = data.frontmatter
+      ? JSON.stringify(data.frontmatter)
+      : existing.frontmatter_json;
+    const contentHash = this.computeHash(content);
+
+    // file_path に UNIQUE 制約があるため、バージョン付きパスを生成
+    const versionedPath = `${existing.file_path}#v${newVersion}`;
+
+    const createNewVersion = this.db.transaction(() => {
+      // deprecated にマーク
+      this.db
+        .prepare("UPDATE knowledge_notes SET deprecated = 1, deprecation_reason = ? WHERE id = ?")
+        .run(`Superseded by version ${newVersion}`, noteId);
+
+      // 新バージョンを INSERT
+      const stmt = this.db.prepare(`
+        INSERT INTO knowledge_notes (
+          file_path, title, content, frontmatter_json,
+          created_at, updated_at, content_hash,
+          version, supersedes, valid_from, deprecated
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      `);
+      const info = stmt.run(
+        versionedPath,
+        title,
+        content,
+        frontmatterJson,
+        existing.created_at,
+        now,
+        contentHash,
+        newVersion,
+        noteId,
+        now,
+      );
+      return Number(info.lastInsertRowid);
+    });
+
+    return createNewVersion();
   }
 
   close(): void {
