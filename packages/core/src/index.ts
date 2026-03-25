@@ -199,6 +199,19 @@ export type { ProcessedFile } from "./processing/file-processor.js";
 export { CodeBlockDetector } from "./utils/code-block-detector.js";
 export type { CodeBlockRange } from "./utils/code-block-detector.js";
 
+// Agents
+export type {
+  KnowledgeVectorCategory,
+  KnowledgeVector,
+  ObserverOutput,
+  ContradictionDetection,
+  DeprecationCandidate,
+  ReflectorOutput,
+} from "./agents/types.js";
+export { ObserverAgent } from "./agents/observer-agent.js";
+export type { ObserverAgentConfig, ObserverAgentDeps } from "./agents/observer-agent.js";
+export { classifyByRules, parseLLMVectorResponse } from "./agents/vector-classification-rules.js";
+
 // Services
 export { KnowledgeService } from "./services/knowledge-service.js";
 export type {
