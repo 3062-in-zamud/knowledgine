@@ -210,6 +210,8 @@ export type {
 } from "./agents/types.js";
 export { ObserverAgent } from "./agents/observer-agent.js";
 export type { ObserverAgentConfig, ObserverAgentDeps } from "./agents/observer-agent.js";
+export { ReflectorAgent } from "./agents/reflector-agent.js";
+export type { ReflectorAgentConfig, ReflectorAgentDeps } from "./agents/reflector-agent.js";
 export { classifyByRules, parseLLMVectorResponse } from "./agents/vector-classification-rules.js";
 
 // Services
