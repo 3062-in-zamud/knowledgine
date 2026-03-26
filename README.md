@@ -12,6 +12,7 @@ Developer Knowledge Infrastructure — extract structured knowledge from your ma
 [![npm](https://img.shields.io/npm/v/@knowledgine/cli)](https://www.npmjs.com/package/@knowledgine/cli)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
+![LongMemEval](https://img.shields.io/badge/LongMemEval-73%25-yellowgreen)
 
 <!-- TODO: Add demo GIF once CLI output is finalized. Record with: vhs docs/assets/demo.tape -->
 
