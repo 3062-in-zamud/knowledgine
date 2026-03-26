@@ -154,7 +154,7 @@ export class LongMemEvalEvaluator {
   ): Promise<EvalResult> {
     const isAbstention = questionId.endsWith("_abs");
     let correct: boolean;
-    let evalMethod: "llm" | "rule" = "rule";
+    let evalMethod: "llm" | "rule";
 
     if (this.judgeMethod === "llm" && this.llmProvider && (await this.llmProvider.isAvailable())) {
       correct = await llmJudge(this.llmProvider, question, hypothesis, expectedAnswer);

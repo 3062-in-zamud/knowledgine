@@ -6,11 +6,11 @@ export interface QueryWeights {
   agentic: number;
 }
 
-// 時間表現のパターン
+// 時間表現のパターン（量指定子を上限付きにして ReDoS を防止）
 const TEMPORAL_PATTERNS = [
   /先週|昨日|今日|今週|先月|今月|最近|直近/,
   /\d{4}[-/]\d{1,2}[-/]\d{1,2}/, // YYYY-MM-DD or YYYY/MM/DD
-  /\d+月|\d+年/,
+  /\d{1,6}月|\d{1,4}年/,
   /before|after|ago|yesterday|last\s+week|last\s+month|recently/i,
 ];
 
@@ -20,11 +20,11 @@ const PROCEDURAL_PATTERNS = [
   /how\s+to|steps?|procedure|tutorial|guide|setup|configure|install/i,
 ];
 
-// 事実・固有名詞のパターン
+// 事実・固有名詞のパターン（量指定子を上限付きにして ReDoS を防止）
 const FACTUAL_PATTERNS = [
   /とは|って何|というのは|定義/,
-  /v\d+\.\d+(\.\d+)?/, // バージョン番号 v1.2.3
-  /\d+\.\d+(\.\d+)?/, // バージョン番号 1.2.3
+  /v\d{1,4}\.\d{1,4}(?:\.\d{1,4})?/, // バージョン番号 v1.2.3
+  /\d{1,8}\.\d{1,8}(?:\.\d{1,8})?/, // バージョン番号 1.2.3
   /what\s+is|what's|definition|version|release/i,
   /[A-Z][a-z]+[A-Z][a-zA-Z]+/, // キャメルケース固有名詞 (TypeScript, ReactHooks等)
 ];
