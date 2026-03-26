@@ -79,6 +79,8 @@ export class KnowledgeSearcher {
       rerankWeights,
       includeDeprecated = false,
       agentic = false,
+      dateFrom,
+      dateTo,
     } = options;
 
     if (!query) {
@@ -99,7 +101,13 @@ export class KnowledgeSearcher {
           (mode === "hybrid" && !this.hybridSearcher));
 
       // keyword mode (デフォルト) — FTS5
-      const rows = this.repository.searchNotesWithRank(query, limit, includeDeprecated);
+      const rows = this.repository.searchNotesWithRank(
+        query,
+        limit,
+        includeDeprecated,
+        dateFrom,
+        dateTo,
+      );
 
       if (rows.length === 0) {
         return [];

@@ -481,8 +481,16 @@ export class KnowledgeRepository {
     query: string,
     limit: number = 50,
     includeDeprecated: boolean = false,
+    dateFrom?: string,
+    dateTo?: string,
   ): Array<{ note: KnowledgeNote; rank: number }> {
     const deprecatedFilter = includeDeprecated ? "" : "AND n.deprecated = 0";
+    const dateFromFilter = dateFrom ? "AND n.created_at >= ?" : "";
+    const dateToFilter = dateTo ? "AND n.created_at <= ?" : "";
+    const dateParams: string[] = [];
+    if (dateFrom) dateParams.push(dateFrom);
+    if (dateTo) dateParams.push(dateTo);
+
     try {
       const stmt = this.db.prepare(`
         SELECT n.*, fts.rank
@@ -490,20 +498,25 @@ export class KnowledgeRepository {
         JOIN knowledge_notes_fts fts ON n.id = fts.rowid
         WHERE knowledge_notes_fts MATCH ?
         ${deprecatedFilter}
+        ${dateFromFilter}
+        ${dateToFilter}
         ORDER BY rank
         LIMIT ?
       `);
-      const rows = stmt.all(query, limit) as Array<KnowledgeNote & { rank: number }>;
+      const rows = stmt.all(query, ...dateParams, limit) as Array<KnowledgeNote & { rank: number }>;
       return rows.map(({ rank, ...note }) => ({ note: note as KnowledgeNote, rank }));
     } catch {
       // FTS5失敗時はLIKEフォールバック（不正なクエリ構文への耐性）
       const deprecatedClause = includeDeprecated ? "" : "AND n.deprecated = 0";
       const fallbackStmt = this.db.prepare(
-        `SELECT n.* FROM knowledge_notes n WHERE (n.title LIKE ? OR n.content LIKE ?) ${deprecatedClause} LIMIT ?`,
+        `SELECT n.* FROM knowledge_notes n WHERE (n.title LIKE ? OR n.content LIKE ?) ${deprecatedClause} ${dateFromFilter} ${dateToFilter} LIMIT ?`,
       );
-      const fallbackRows = fallbackStmt.all(`%${query}%`, `%${query}%`, limit) as Array<
-        KnowledgeNote & { rank: number }
-      >;
+      const fallbackRows = fallbackStmt.all(
+        `%${query}%`,
+        `%${query}%`,
+        ...dateParams,
+        limit,
+      ) as Array<KnowledgeNote & { rank: number }>;
       return fallbackRows.map((row) => ({ note: row as KnowledgeNote, rank: 0 }));
     }
   }
