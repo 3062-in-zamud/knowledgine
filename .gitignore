@@ -13,3 +13,5 @@ coverage/
 .knowledgine/
 .knowledginerc.json
 packages/core/models/
+packages/core/tests/benchmark/longmemeval/fixtures/*.json
+packages/core/tests/benchmark/longmemeval/fixtures/results/

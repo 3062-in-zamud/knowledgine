@@ -5,6 +5,7 @@ import type { GraphRepository } from "../graph/graph-repository.js";
 import type { FeedbackRepository, FeedbackRecord } from "../feedback/feedback-repository.js";
 import type { FeedbackErrorType } from "../types.js";
 import type { EmbeddingProvider } from "../embedding/embedding-provider.js";
+import type { LLMProvider } from "../llm/types.js";
 import { KnowledgeSearcher } from "../search/knowledge-searcher.js";
 import { LocalLinkGenerator } from "../search/link-generator.js";
 
@@ -14,6 +15,7 @@ export interface KnowledgeServiceOptions {
   embeddingProvider?: EmbeddingProvider;
   graphRepository?: GraphRepository;
   feedbackRepository?: FeedbackRepository;
+  llmProvider?: LLMProvider;
 }
 
 export interface SearchKnowledgeResult {
@@ -137,7 +139,13 @@ export class KnowledgeService {
   private linkGenerator: LocalLinkGenerator;
 
   constructor(private options: KnowledgeServiceOptions) {
-    this.searcher = new KnowledgeSearcher(options.repository, options.embeddingProvider);
+    this.searcher = new KnowledgeSearcher(
+      options.repository,
+      options.embeddingProvider,
+      0.3,
+      options.llmProvider,
+      options.graphRepository,
+    );
     this.linkGenerator = new LocalLinkGenerator(options.repository, options.graphRepository);
   }
 

@@ -233,9 +233,18 @@ export class EntityExtractor {
   private extractImports(content: string): ExtractedEntity[] {
     const results: ExtractedEntity[] = [];
     // import X from 'package' / import { X } from 'package' / require('package')
-    const importRe = /(?:import\s+(?:.*?\s+from\s+)?|require\s*\(\s*)['"]([^'"./][^'"]*)['"]/g;
+    // Use separate patterns to avoid polynomial backtracking on user-controlled input
+    const fromRe = /\bfrom\s+['"]([^'"./][^'"]*)['"]/g;
+    const requireRe = /\brequire\s*\(\s*['"]([^'"./][^'"]*)['"]\s*\)/g;
+    const seen = new Set<string>();
     let m: RegExpExecArray | null;
-    while ((m = importRe.exec(content)) !== null) {
+    while ((m = fromRe.exec(content)) !== null) {
+      const pkg = m[1].split("/")[0];
+      if (!pkg || this.isStopWord(pkg) || seen.has(pkg)) continue;
+      seen.add(pkg);
+      results.push({ name: pkg.toLowerCase(), entityType: "technology", sourceType: "import" });
+    }
+    while ((m = requireRe.exec(content)) !== null) {
       const pkg = m[1].split("/")[0]; // @scope/pkg → @scope/pkg, lodash/fp → lodash
       if (!pkg || this.isStopWord(pkg)) continue;
       // Exclude destructured (e.g., import { useState } from 'react' → react is fine, but not useState)

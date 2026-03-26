@@ -1,6 +1,6 @@
 {
   "name": "@knowledgine/mcp-server",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,6 +23,7 @@
     "@hono/node-server": "^1.19.11",
     "@knowledgine/core": "workspace:*",
     "@knowledgine/ingest": "workspace:*",
+    "@knowledgine/mcp-memory-protocol": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "hono": "^4.12.9",
     "zod": "^4.3.6"

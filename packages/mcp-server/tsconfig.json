@@ -5,5 +5,9 @@
     "rootDir": "src"
   },
   "include": ["src/**/*"],
-  "references": [{ "path": "../core" }, { "path": "../ingest" }]
+  "references": [
+    { "path": "../core" },
+    { "path": "../ingest" },
+    { "path": "../mcp-memory-protocol" }
+  ]
 }

@@ -21,6 +21,7 @@
     { "path": "packages/core" },
     { "path": "packages/mcp-server" },
     { "path": "packages/cli" },
-    { "path": "packages/ingest" }
+    { "path": "packages/ingest" },
+    { "path": "packages/mcp-memory-protocol" }
   ]
 }

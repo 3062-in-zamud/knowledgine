@@ -5,11 +5,14 @@ import {
   VERSION,
   IncrementalExtractor,
   GraphRepository,
+  MemoryManager,
 } from "@knowledgine/core";
 import type { KnowledgeRepository, EmbeddingProvider, FeedbackErrorType } from "@knowledgine/core";
 import type { FeedbackRepository } from "@knowledgine/core";
 import type Database from "better-sqlite3";
 import { formatToolResult, formatToolError } from "./helpers.js";
+import { KnowledgineMemoryProvider } from "./memory-adapter.js";
+import { registerMemoryTools } from "./memory-tools.js";
 
 export interface McpServerOptions {
   repository: KnowledgeRepository;
@@ -18,6 +21,7 @@ export interface McpServerOptions {
   graphRepository?: GraphRepository;
   feedbackRepository?: FeedbackRepository;
   db?: Database.Database;
+  memoryManager?: MemoryManager;
 }
 
 export function createKnowledgineMcpServer(options: McpServerOptions): McpServer {
@@ -274,6 +278,12 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
       }
     },
   );
+
+  // Memory tools (optional: requires memoryManager + db)
+  if (options.memoryManager && options.db) {
+    const memoryProvider = new KnowledgineMemoryProvider(options.memoryManager, options.db);
+    registerMemoryTools(server, memoryProvider);
+  }
 
   return server;
 }

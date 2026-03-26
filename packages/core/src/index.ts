@@ -76,6 +76,7 @@ export { migration005c } from "./storage/migrations/005c_provenance.js";
 export { migration007 } from "./storage/migrations/007_spec_alignment.js";
 export { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
 export { migration009 } from "./storage/migrations/009_extraction_metadata.js";
+export { migration010 } from "./storage/migrations/010_memory_protocol.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -98,6 +99,7 @@ import { migration006 } from "./storage/migrations/006_extraction_feedback.js";
 import { migration007 } from "./storage/migrations/007_spec_alignment.js";
 import { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
 import { migration009 } from "./storage/migrations/009_extraction_metadata.js";
+import { migration010 } from "./storage/migrations/010_memory_protocol.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -111,6 +113,7 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration007,
   migration008,
   migration009,
+  migration010,
 ];
 
 // Provenance
@@ -128,6 +131,12 @@ export { EntityExtractor } from "./graph/entity-extractor.js";
 export type { ExtractedEntity } from "./graph/entity-extractor.js";
 export { RelationInferrer } from "./graph/relation-inferrer.js";
 export type { InferredRelation } from "./graph/relation-inferrer.js";
+export { TemporalQueryEngine } from "./graph/temporal-query.js";
+export type {
+  PointInTimeQuery,
+  TemporalQueryResult,
+  TemporalTimelineEntry,
+} from "./graph/temporal-query.js";
 
 // LLM
 export type {
@@ -190,6 +199,10 @@ export type {
 } from "./search/reasoning-reranker.js";
 export { LocalLinkGenerator } from "./search/link-generator.js";
 export type { RelatedNote } from "./search/link-generator.js";
+export { classifyQuery, getWeightsForQueryType } from "./search/query-classifier.js";
+export type { QueryType, QueryWeights } from "./search/query-classifier.js";
+export { QueryOrchestrator } from "./search/query-orchestrator.js";
+export type { OrchestratedResult, QueryOrchestratorConfig } from "./search/query-orchestrator.js";
 
 // Processing
 export { FileProcessor } from "./processing/file-processor.js";
@@ -198,6 +211,21 @@ export type { ProcessedFile } from "./processing/file-processor.js";
 // Utils
 export { CodeBlockDetector } from "./utils/code-block-detector.js";
 export type { CodeBlockRange } from "./utils/code-block-detector.js";
+
+// Agents
+export type {
+  KnowledgeVectorCategory,
+  KnowledgeVector,
+  ObserverOutput,
+  ContradictionDetection,
+  DeprecationCandidate,
+  ReflectorOutput,
+} from "./agents/types.js";
+export { ObserverAgent } from "./agents/observer-agent.js";
+export type { ObserverAgentConfig, ObserverAgentDeps } from "./agents/observer-agent.js";
+export { ReflectorAgent } from "./agents/reflector-agent.js";
+export type { ReflectorAgentConfig, ReflectorAgentDeps } from "./agents/reflector-agent.js";
+export { classifyByRules, parseLLMVectorResponse } from "./agents/vector-classification-rules.js";
 
 // Services
 export { KnowledgeService } from "./services/knowledge-service.js";

@@ -637,4 +637,74 @@ export class GraphRepository {
       supersededBy: row.superseded_by,
     }));
   }
+
+  /**
+   * 指定時点で有効なrelationを取得する。
+   * valid_at <= asOf かつ invalid_at > asOf (または invalid_at IS NULL) の条件で絞り込む。
+   */
+  getRelationsAsOf(entityId: number, asOf: string): Array<Relation & { id: number }> {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM relations
+         WHERE (from_entity_id = ? OR to_entity_id = ?)
+           AND (valid_at IS NULL OR valid_at <= ?)
+           AND (invalid_at IS NULL OR invalid_at > ?)
+         ORDER BY strength DESC`,
+      )
+      .all(entityId, entityId, asOf, asOf) as RelationRow[];
+    return rows.map(rowToRelation);
+  }
+
+  /**
+   * 指定時点で有効なobservationを取得する。
+   * valid_at <= asOf かつ invalid_at > asOf (または invalid_at IS NULL) の条件で絞り込む。
+   */
+  getObservationsAsOf(entityId: number, asOf: string): Array<Observation & { id: number }> {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM observations
+         WHERE entity_id = ?
+           AND (valid_at IS NULL OR valid_at <= ?)
+           AND (invalid_at IS NULL OR invalid_at > ?)
+         ORDER BY created_at DESC`,
+      )
+      .all(entityId, asOf, asOf) as ObservationRow[];
+    return rows.map(rowToObservation);
+  }
+
+  /**
+   * エンティティに関連する全observation（invalidated含む）を取得する。
+   * タイムライン取得に使用する。
+   */
+  getAllObservationsForEntity(
+    entityId: number,
+  ): Array<Observation & { id: number; validAt: string | null; invalidAt: string | null }> {
+    const rows = this.db
+      .prepare(`SELECT * FROM observations WHERE entity_id = ? ORDER BY created_at ASC`)
+      .all(entityId) as ObservationRow[];
+    return rows.map((row) => ({
+      ...rowToObservation(row),
+      validAt: row.valid_at,
+      invalidAt: row.invalid_at,
+    }));
+  }
+
+  /**
+   * エンティティに関連する全relation（invalidated含む）を取得する。
+   * タイムライン取得に使用する。
+   */
+  getAllRelationsForEntity(
+    entityId: number,
+  ): Array<Relation & { id: number; validAt: string | null; invalidAt: string | null }> {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM relations WHERE from_entity_id = ? OR to_entity_id = ? ORDER BY created_at ASC`,
+      )
+      .all(entityId, entityId) as RelationRow[];
+    return rows.map((row) => ({
+      ...rowToRelation(row),
+      validAt: row.valid_at,
+      invalidAt: row.invalid_at,
+    }));
+  }
 }

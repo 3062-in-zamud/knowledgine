@@ -523,6 +523,164 @@ describe("KnowledgeRepository", () => {
     });
   });
 
+  describe("deprecateNote", () => {
+    let noteId: number;
+
+    beforeEach(() => {
+      noteId = ctx.repository.saveNote({
+        filePath: "deprecate-test.md",
+        title: "Deprecate Test",
+        content: "Content to deprecate",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+    });
+
+    it("should mark note as deprecated with reason", () => {
+      ctx.repository.deprecateNote(noteId, "Superseded by newer version");
+      const note = ctx.repository.getNoteById(noteId)!;
+      expect(note.deprecated).toBe(1);
+      expect(note.deprecation_reason).toBe("Superseded by newer version");
+    });
+
+    it("should throw KnowledgeNotFoundError for nonexistent note", () => {
+      expect(() => ctx.repository.deprecateNote(99999, "reason")).toThrow(KnowledgeNotFoundError);
+    });
+
+    it("should be excluded from searchNotesWithRank by default", () => {
+      ctx.repository.deprecateNote(noteId, "outdated");
+      const results = ctx.repository.searchNotesWithRank("deprecate", 50, false);
+      expect(results.find((r) => r.note.id === noteId)).toBeUndefined();
+    });
+
+    it("should be included in searchNotesWithRank when includeDeprecated is true", () => {
+      ctx.repository.deprecateNote(noteId, "outdated");
+      const results = ctx.repository.searchNotesWithRank("deprecate", 50, true);
+      expect(results.find((r) => r.note.id === noteId)).toBeDefined();
+    });
+  });
+
+  describe("undeprecateNote", () => {
+    let noteId: number;
+
+    beforeEach(() => {
+      noteId = ctx.repository.saveNote({
+        filePath: "undeprecate-test.md",
+        title: "Undeprecate Test",
+        content: "Content to undeprecate",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.deprecateNote(noteId, "temporarily deprecated");
+    });
+
+    it("should clear deprecated flag and reason", () => {
+      ctx.repository.undeprecateNote(noteId);
+      const note = ctx.repository.getNoteById(noteId)!;
+      expect(note.deprecated).toBe(0);
+      expect(note.deprecation_reason).toBeNull();
+    });
+
+    it("should throw KnowledgeNotFoundError for nonexistent note", () => {
+      expect(() => ctx.repository.undeprecateNote(99999)).toThrow(KnowledgeNotFoundError);
+    });
+  });
+
+  describe("createNewVersion", () => {
+    let noteId: number;
+
+    beforeEach(() => {
+      noteId = ctx.repository.saveNote({
+        filePath: "version-test.md",
+        title: "Version 1",
+        content: "Original content",
+        frontmatter: { tags: ["test"] },
+        createdAt: new Date().toISOString(),
+      });
+    });
+
+    it("should create a new version and deprecate the old one", () => {
+      const newId = ctx.repository.createNewVersion(noteId, {
+        title: "Version 2",
+        content: "Updated content",
+      } as Partial<import("../../src/types.js").KnowledgeData>);
+
+      expect(newId).not.toBe(noteId);
+
+      const oldNote = ctx.repository.getNoteById(noteId)!;
+      expect(oldNote.deprecated).toBe(1);
+      expect(oldNote.deprecation_reason).toContain("Superseded by version");
+
+      const newNote = ctx.repository.getNoteById(newId)!;
+      expect(newNote.title).toBe("Version 2");
+      expect(newNote.content).toBe("Updated content");
+      expect(newNote.supersedes).toBe(noteId);
+      expect(newNote.version).toBe(2);
+      expect(newNote.deprecated).toBe(0);
+      expect(newNote.file_path).toBe("version-test.md#v2");
+    });
+
+    it("should preserve original fields when partial data provided", () => {
+      const newId = ctx.repository.createNewVersion(noteId, {
+        content: "Only content changed",
+      } as Partial<import("../../src/types.js").KnowledgeData>);
+
+      const newNote = ctx.repository.getNoteById(newId)!;
+      expect(newNote.title).toBe("Version 1");
+      expect(newNote.content).toBe("Only content changed");
+    });
+
+    it("should increment version from existing version", () => {
+      const v2Id = ctx.repository.createNewVersion(noteId, {
+        content: "v2",
+      } as Partial<import("../../src/types.js").KnowledgeData>);
+      const v3Id = ctx.repository.createNewVersion(v2Id, {
+        content: "v3",
+      } as Partial<import("../../src/types.js").KnowledgeData>);
+
+      const v3 = ctx.repository.getNoteById(v3Id)!;
+      expect(v3.version).toBe(3);
+      expect(v3.supersedes).toBe(v2Id);
+    });
+
+    it("should throw KnowledgeNotFoundError for nonexistent note", () => {
+      expect(() =>
+        ctx.repository.createNewVersion(
+          99999,
+          {} as Partial<import("../../src/types.js").KnowledgeData>,
+        ),
+      ).toThrow(KnowledgeNotFoundError);
+    });
+
+    it("should be atomic - both deprecation and creation succeed or fail together", () => {
+      const newId = ctx.repository.createNewVersion(noteId, {
+        content: "new version",
+      } as Partial<import("../../src/types.js").KnowledgeData>);
+
+      // Both operations should have succeeded
+      const old = ctx.repository.getNoteById(noteId)!;
+      const newNote = ctx.repository.getNoteById(newId)!;
+      expect(old.deprecated).toBe(1);
+      expect(newNote.deprecated).toBe(0);
+    });
+  });
+
+  describe("KnowledgeNote type includes version fields", () => {
+    it("should include version, supersedes, and deprecation_reason fields", () => {
+      const noteId = ctx.repository.saveNote({
+        filePath: "type-test.md",
+        title: "Type Test",
+        content: "Content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const note = ctx.repository.getNoteById(noteId)!;
+      expect("version" in note).toBe(true);
+      expect("supersedes" in note).toBe(true);
+      expect("deprecation_reason" in note).toBe(true);
+    });
+  });
+
   describe("searchByCodeLocation", () => {
     beforeEach(() => {
       const now = new Date().toISOString();

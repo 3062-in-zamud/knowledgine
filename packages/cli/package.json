@@ -1,6 +1,6 @@
 {
   "name": "@knowledgine/cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -33,7 +33,7 @@
     "hono": "^4.12.9",
     "log-symbols": "^7.0.1",
     "ora": "^9.3.0",
-    "smol-toml": "^1.6.0"
+    "smol-toml": "^1.6.1"
   },
   "files": [
     "dist",
