@@ -15,7 +15,10 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "verify": "pnpm run build && pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test:run",
-    "prepare": "husky"
+    "prepare": "husky",
+    "benchmark:longmemeval": "pnpm --filter @knowledgine/core exec vitest run --config vitest.benchmark.config.ts tests/benchmark/longmemeval/longmemeval-full.test.ts",
+    "benchmark:longmemeval:download": "pnpm --filter @knowledgine/core exec tsx tests/benchmark/longmemeval/download-dataset.ts",
+    "benchmark:longmemeval:quick": "pnpm --filter @knowledgine/core run test:run tests/benchmark/longmemeval/longmemeval.test.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [
