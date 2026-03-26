@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-26
+
+### Added
+
+#### Core (`@knowledgine/core`)
+
+- **Version Fields on KnowledgeNote**: `version`, `supersededBy`, and `deprecatedAt` fields added to `KnowledgeNote` type with deprecation API support
+- **Observer Agent**: 6-vector classification system for automatic knowledge observation and categorization
+- **Reflector Agent**: Contradiction detection and knowledge validation across stored notes
+- **Unified Query Orchestrator**: 3-layer search integration combining vector, graph, and agentic retrieval
+- **Query Classifier**: Intent-based query routing to the appropriate search layer
+- **Temporal Query Engine**: Point-in-time queries and version chain navigation with time-travel support
+- **LongMemEval Benchmark Infrastructure**: Complete benchmark suite (adapter, evaluator, runner, reporter) with 73.2% task-averaged accuracy
+- **LongMemEval Search Improvements**: ISO 8601 date normalization, preference keyword expansion, multi-session top-3 synthesis, SQL-level temporal filtering
+- **MCP Memory Protocol**: Migration 010 adds memory protocol schema; `@knowledgine/mcp-memory-protocol` package with Zod schemas, conformance test suite, and provider interface
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **MCP Memory Protocol tools**: `memory_store`, `memory_recall`, `memory_update`, `memory_forget` tools implementing the MCP Memory Protocol specification
+- **Memory adapter**: Bridge layer translating MCP Memory Protocol operations to Knowledgine's internal storage
+
+#### Documentation
+
+- LongMemEval benchmark results (73.2% accuracy, competitive with Zep 71% and Mem0 49%)
+- MCP Memory Protocol proposal: SEP draft, conformance suite spec, reference implementation guide, and feedback plan
+- Japanese blog post announcing LongMemEval benchmark achievement
+
 ## [0.3.0] - 2026-03-24
 
 ### Added
