@@ -1,5 +1,5 @@
 import { resolve, join } from "path";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from "fs";
+import { existsSync } from "fs";
 import { homedir } from "os";
 import { resolveDefaultPath } from "@knowledgine/core";
 import { createBox, colors, symbols } from "../lib/ui/index.js";
@@ -7,6 +7,7 @@ import * as p from "@clack/prompts";
 import * as TOML from "smol-toml";
 import { interactiveRulesSetup, nonInteractiveRulesSetup } from "./setup-rules.js";
 import { interactiveSkillsSetup, nonInteractiveSkillsSetup } from "./setup-skills.js";
+import { readTextFileIfExists, writeTextFileAtomically } from "../lib/file-utils.js";
 
 export interface SetupOptions {
   target?: string;
@@ -165,21 +166,22 @@ function getMcpKey(target: string): string {
 }
 
 function readExistingConfig(configPath: string, target?: string): McpConfig {
-  if (!existsSync(configPath)) {
+  const raw = readTextFileIfExists(configPath);
+  if (raw === null) {
     return {};
   }
-  const raw = readFileSync(configPath, "utf-8").trim();
-  if (!raw) {
+  const trimmed = raw.trim();
+  if (!trimmed) {
     return {};
   }
   try {
     if (isTomlConfig(configPath)) {
-      const parsed = TOML.parse(raw) as Record<string, unknown>;
+      const parsed = TOML.parse(trimmed) as Record<string, unknown>;
       return {
         mcpServers: (parsed["mcp_servers"] ?? {}) as Record<string, McpServerConfig>,
       };
     }
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
     const mcpKey = getMcpKey(target ?? "");
     // For tools that embed MCP in a larger settings file (Zed, VS Code)
     if (parsed[mcpKey]) {
@@ -207,20 +209,13 @@ function mergeConfig(existing: McpConfig, rootPath: string): McpConfig {
 }
 
 function writeConfig(configPath: string, config: McpConfig, target?: string): void {
-  const configDir = resolve(configPath, "..");
-  if (!existsSync(configDir)) {
-    mkdirSync(configDir, { recursive: true });
-  }
-  if (existsSync(configPath)) {
-    copyFileSync(configPath, configPath + ".bak");
-  }
-
   if (isTomlConfig(configPath)) {
     // TOML: read existing, merge mcp_servers, write back
     let existing: Record<string, unknown> = {};
-    if (existsSync(configPath)) {
+    const raw = readTextFileIfExists(configPath);
+    if (raw !== null) {
       try {
-        existing = TOML.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
+        existing = TOML.parse(raw) as Record<string, unknown>;
       } catch {
         /* start fresh */
       }
@@ -229,7 +224,7 @@ function writeConfig(configPath: string, config: McpConfig, target?: string): vo
       ...((existing["mcp_servers"] as Record<string, unknown>) ?? {}),
       knowledgine: config.mcpServers?.["knowledgine"] ?? buildMcpConfig(""),
     };
-    writeFileSync(configPath, TOML.stringify(existing) + "\n", "utf-8");
+    writeTextFileAtomically(configPath, TOML.stringify(existing) + "\n");
   } else {
     const mcpKey = getMcpKey(target ?? "");
     const isEmbeddedSettings =
@@ -238,9 +233,10 @@ function writeConfig(configPath: string, config: McpConfig, target?: string): vo
     if (isEmbeddedSettings) {
       // Zed/VS Code: merge into existing settings.json
       let existing: Record<string, unknown> = {};
-      if (existsSync(configPath)) {
+      const raw = readTextFileIfExists(configPath);
+      if (raw !== null) {
         try {
-          existing = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
+          existing = JSON.parse(raw) as Record<string, unknown>;
         } catch {
           /* start fresh */
         }
@@ -249,9 +245,9 @@ function writeConfig(configPath: string, config: McpConfig, target?: string): vo
         ...((existing[mcpKey] as Record<string, unknown>) ?? {}),
         knowledgine: config.mcpServers?.["knowledgine"] ?? buildMcpConfig(""),
       };
-      writeFileSync(configPath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
+      writeTextFileAtomically(configPath, JSON.stringify(existing, null, 2) + "\n");
     } else {
-      writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf-8");
+      writeTextFileAtomically(configPath, JSON.stringify(config, null, 2) + "\n");
     }
   }
 }

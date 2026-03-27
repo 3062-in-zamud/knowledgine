@@ -22,6 +22,10 @@ export interface UpgradeOptions {
   path?: string;
 }
 
+function sanitizeForLog(value: string): string {
+  return value.replace(/[\r\n]+/g, " ");
+}
+
 export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
   const rootPath = resolveDefaultPath(options.path);
 
@@ -122,11 +126,8 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
       });
       console.error(`${symbols.success} ${colors.success("Model download complete.")}`);
     } catch (error) {
-      console.error(
-        colors.error(
-          `\nModel download failed: ${error instanceof Error ? error.message : String(error)}`,
-        ),
-      );
+      const message = sanitizeForLog(error instanceof Error ? error.message : String(error));
+      console.error(colors.error(`\nModel download failed: ${message}`));
       console.error(colors.error("Semantic search upgrade aborted."));
       db.close();
       process.exitCode = 1;
