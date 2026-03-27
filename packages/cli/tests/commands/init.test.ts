@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, existsSync, rmSync, chmodSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync, chmodSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { createDatabase, Migrator, KnowledgeRepository, ALL_MIGRATIONS } from "@knowledgine/core";
 import { initCommand } from "../../src/commands/init.js";
 
@@ -10,8 +9,7 @@ describe("init command", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-test-"));
   });
 
   afterEach(() => {
@@ -119,8 +117,7 @@ describe("init command – error handling", () => {
   let stderrOutput: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-test-"));
     stderrOutput = "";
     stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
       stderrOutput += typeof chunk === "string" ? chunk : chunk.toString();

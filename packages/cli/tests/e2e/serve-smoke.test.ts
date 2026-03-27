@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execSync, spawn, ChildProcess } from "child_process";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { execFileSync, spawn, ChildProcess } from "child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 
 describe("E2E: serve command", { timeout: 30_000 }, () => {
-  const testDir = join(tmpdir(), `knowledgine-serve-${randomUUID()}`);
+  const testDir = mkdtempSync(join(tmpdir(), "knowledgine-serve-"));
   const cliPath = join(process.cwd(), "packages/cli/dist/index.js");
   let serverProcess: ChildProcess;
   const port = 13456 + Math.floor(Math.random() * 1000); // ランダムポートで競合回避
@@ -14,22 +13,65 @@ describe("E2E: serve command", { timeout: 30_000 }, () => {
   beforeAll(async () => {
     mkdirSync(join(testDir, "notes"), { recursive: true });
     writeFileSync(join(testDir, "notes", "test.md"), "# Test\nContent");
-    execSync(`node ${cliPath} init --path ${testDir}`, { stdio: "pipe" });
+    execFileSync("node", [cliPath, "init", "--path", testDir], { stdio: "pipe" });
 
     // サーバーをバックグラウンドで起動
     serverProcess = spawn("node", [cliPath, "serve", "--path", testDir, "--port", String(port)], {
       stdio: "pipe",
     });
 
+    const stderrChunks: string[] = [];
+    serverProcess.stderr?.on("data", (data) => {
+      stderrChunks.push(data.toString());
+    });
+
     // サーバー起動待ち
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Server start timeout")), 10_000);
-      serverProcess.stderr?.on("data", (data) => {
-        if (data.toString().includes("REST API server running")) {
-          clearTimeout(timeout);
-          resolve();
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Server start timeout\n${stderrChunks.join("")}`.trim()));
+      }, 10_000);
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        serverProcess.off("error", onError);
+        serverProcess.off("exit", onExit);
+      };
+
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+
+      const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+        cleanup();
+        reject(
+          new Error(
+            `Server exited before readiness (code=${String(code)}, signal=${String(signal)})\n${stderrChunks.join("")}`.trim(),
+          ),
+        );
+      };
+
+      const checkHealth = async () => {
+        try {
+          const res = await fetch(`http://127.0.0.1:${port}/health`);
+          if (res.ok) {
+            cleanup();
+            resolve();
+            return;
+          }
+        } catch {
+          // Retry until the timeout fires or the process exits.
         }
-      });
+
+        setTimeout(() => {
+          void checkHealth();
+        }, 200);
+      };
+
+      serverProcess.on("error", onError);
+      serverProcess.on("exit", onExit);
+      void checkHealth();
     });
   });
 

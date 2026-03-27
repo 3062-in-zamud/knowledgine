@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { execFileSync } from "child_process";
 import { ingestCommand } from "../../src/commands/ingest.js";
 
@@ -10,8 +9,7 @@ describe("ingest command", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-test-"));
     // Initialize git repo for git-history plugin
     execFileSync("git", ["init"], { cwd: testDir });
     // Create .knowledgine and DB

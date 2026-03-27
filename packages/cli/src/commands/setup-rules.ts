@@ -1,7 +1,11 @@
 import { join } from "path";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from "fs";
 import * as p from "@clack/prompts";
 import { colors, symbols } from "../lib/ui/index.js";
+import {
+  readTextFileIfExists,
+  writeTextFileAtomically,
+  writeTextFileExclusively,
+} from "../lib/file-utils.js";
 import {
   getClaudeCodeRuleTemplate,
   getCursorRuleTemplate,
@@ -174,9 +178,9 @@ export function writeRuleFile(
 
   if (target.strategy === "append-section") {
     let finalContent: string;
+    const existing = readTextFileIfExists(filePath);
 
-    if (existsSync(filePath)) {
-      const existing = readFileSync(filePath, "utf-8");
+    if (existing !== null) {
       const startIdx = existing.indexOf(MARKER_START);
       const endIdx = existing.indexOf(MARKER_END);
 
@@ -193,17 +197,12 @@ export function writeRuleFile(
       }
 
       if (!options.dryRun) {
-        copyFileSync(filePath, filePath + ".bak");
-        writeFileSync(filePath, finalContent, "utf-8");
+        writeTextFileAtomically(filePath, finalContent);
       }
     } else {
       finalContent = templateContent + "\n";
       if (!options.dryRun) {
-        const dir = join(filePath, "..");
-        if (!existsSync(dir)) {
-          mkdirSync(dir, { recursive: true });
-        }
-        writeFileSync(filePath, finalContent, "utf-8");
+        writeTextFileAtomically(filePath, finalContent);
       }
     }
 
@@ -211,24 +210,17 @@ export function writeRuleFile(
   }
 
   // create-file strategy
-  if (existsSync(filePath) && !options.force) {
-    return {
-      target: target.label,
-      status: "skipped",
-      filePath,
-      note: "File already exists. Use --force to overwrite.",
-    };
-  }
-
   if (!options.dryRun) {
-    const dir = join(filePath, "..");
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
+    if (options.force) {
+      writeTextFileAtomically(filePath, templateContent);
+    } else if (!writeTextFileExclusively(filePath, templateContent)) {
+      return {
+        target: target.label,
+        status: "skipped",
+        filePath,
+        note: "File already exists. Use --force to overwrite.",
+      };
     }
-    if (existsSync(filePath)) {
-      copyFileSync(filePath, filePath + ".bak");
-    }
-    writeFileSync(filePath, templateContent, "utf-8");
   }
 
   return { target: target.label, status: "ok", filePath };

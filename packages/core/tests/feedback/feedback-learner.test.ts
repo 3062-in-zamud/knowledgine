@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { createTestDb } from "../helpers/test-db.js";
 import type { TestContext } from "../helpers/test-db.js";
 import { FeedbackRepository } from "../../src/feedback/feedback-repository.js";
@@ -19,8 +18,7 @@ describe("FeedbackLearner", () => {
   beforeEach(() => {
     ctx = createTestDb();
     repo = new FeedbackRepository(ctx.db);
-    testDir = join(tmpdir(), `knowledgine-feedback-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-feedback-test-"));
     rulesPath = join(testDir, "extraction-rules.json");
     learner = new FeedbackLearner(repo, rulesPath);
   });

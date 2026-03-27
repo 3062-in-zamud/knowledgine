@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { copyFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { setupCommand } from "../../src/commands/setup.js";
 import { PassThrough } from "stream";
 
@@ -12,9 +11,8 @@ describe("setup command", () => {
   let originalExitCode: number | undefined;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-setup-test-${randomUUID()}`);
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-setup-test-"));
     configDir = join(testDir, "config");
-    mkdirSync(testDir, { recursive: true });
     mkdirSync(configDir, { recursive: true });
     // Create .knowledgine dir to simulate initialized state
     mkdirSync(join(testDir, ".knowledgine"), { recursive: true });
@@ -29,8 +27,7 @@ describe("setup command", () => {
   });
 
   it("should show error for uninitialized directory", async () => {
-    const uninitDir = join(tmpdir(), `knowledgine-uninit-${randomUUID()}`);
-    mkdirSync(uninitDir, { recursive: true });
+    const uninitDir = mkdtempSync(join(tmpdir(), "knowledgine-uninit-"));
 
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -124,16 +121,12 @@ describe("setup command", () => {
 
   it("KNOW-295: dry-run output should only show knowledgine entry, not full merged config", async () => {
     const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { mkdirSync: mkd, writeFileSync: wfs, rmSync: rms } = await import("fs");
+    const originalHome = process.env["HOME"];
+    process.env["HOME"] = testDir;
 
-    // Write a cursor config with another MCP server containing a secret to a temp path.
-    // We use the cursor target because the config path (~/.cursor/mcp.json) is writable
-    // and predictable. We write a temp file and arrange cleanup.
-    const { homedir } = await import("os");
-    const { join: pathJoin } = await import("path");
-    const { mkdirSync: mkd, writeFileSync: wfs, existsSync: exs, rmSync: rms } = await import("fs");
-
-    const cursorConfigPath = pathJoin(homedir(), ".cursor", "mcp.json");
-    const cursorConfigDir = pathJoin(homedir(), ".cursor");
+    const cursorConfigPath = join(testDir, ".cursor", "mcp.json");
+    const cursorConfigDir = join(testDir, ".cursor");
     const backupPath = cursorConfigPath + ".know295test.bak";
 
     const existingConfigWithSecret = {
@@ -146,11 +139,14 @@ describe("setup command", () => {
       },
     };
 
-    // Backup existing cursor config if present
-    const hadExisting = exs(cursorConfigPath);
-    if (hadExisting) {
-      const { copyFileSync } = await import("fs");
+    let hadExisting = false;
+    try {
       copyFileSync(cursorConfigPath, backupPath);
+      hadExisting = true;
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") {
+        throw error;
+      }
     }
 
     // Ensure .cursor dir and write test config
@@ -168,9 +164,14 @@ describe("setup command", () => {
       // Output should indicate that other servers are preserved
       expect(output).toContain("other MCP server(s) will be preserved");
     } finally {
+      if (originalHome === undefined) {
+        delete process.env["HOME"];
+      } else {
+        process.env["HOME"] = originalHome;
+      }
+
       // Restore original state
       if (hadExisting) {
-        const { copyFileSync } = await import("fs");
         copyFileSync(backupPath, cursorConfigPath);
         rms(backupPath, { force: true });
       } else {

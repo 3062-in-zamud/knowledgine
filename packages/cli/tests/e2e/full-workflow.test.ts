@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execSync, spawnSync } from "child_process";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
+import { execFileSync, spawnSync } from "child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 
 describe("E2E: full workflow", { timeout: 60_000 }, () => {
-  const testDir = join(tmpdir(), `knowledgine-e2e-${randomUUID()}`);
+  const testDir = mkdtempSync(join(tmpdir(), "knowledgine-e2e-"));
   const cliPath = join(process.cwd(), "packages/cli/dist/index.js");
 
   beforeAll(() => {
@@ -22,7 +21,7 @@ describe("E2E: full workflow", { timeout: 60_000 }, () => {
     );
 
     // init 実行
-    execSync(`node ${cliPath} init --path ${testDir}`, { stdio: "pipe" });
+    execFileSync("node", [cliPath, "init", "--path", testDir], { stdio: "pipe" });
   });
 
   afterAll(() => {
@@ -34,7 +33,7 @@ describe("E2E: full workflow", { timeout: 60_000 }, () => {
   });
 
   it("search returns results", () => {
-    execSync(`node ${cliPath} search "TypeScript" --path ${testDir} --format json`, {
+    execFileSync("node", [cliPath, "search", "TypeScript", "--path", testDir, "--format", "json"], {
       encoding: "utf-8",
     });
     // stderrに出力されるため、エラーにならなければOK
@@ -51,7 +50,9 @@ describe("E2E: full workflow", { timeout: 60_000 }, () => {
 
   it("suggest returns without error", () => {
     // 0件でもエラーにならないこと
-    execSync(`node ${cliPath} suggest --context "TypeScript" --path ${testDir}`, { stdio: "pipe" });
+    execFileSync("node", [cliPath, "suggest", "--context", "TypeScript", "--path", testDir], {
+      stdio: "pipe",
+    });
   });
 
   it("explain exits with non-zero when entity not found", () => {
@@ -69,24 +70,24 @@ describe("CLI smoke test", { timeout: 30_000 }, () => {
   const cliPath = join(process.cwd(), "packages/cli/dist/index.js");
 
   const commands = [
-    "init --help",
-    "start --help",
-    "setup --help",
-    "status --help",
-    "upgrade --help",
-    "ingest --help",
-    "plugins --help",
-    "feedback --help",
-    "demo --help",
-    "suggest --help",
-    "explain --help",
-    "serve --help",
-    "recall --help",
+    ["init", "--help"],
+    ["start", "--help"],
+    ["setup", "--help"],
+    ["status", "--help"],
+    ["upgrade", "--help"],
+    ["ingest", "--help"],
+    ["plugins", "--help"],
+    ["feedback", "--help"],
+    ["demo", "--help"],
+    ["suggest", "--help"],
+    ["explain", "--help"],
+    ["serve", "--help"],
+    ["recall", "--help"],
   ];
 
-  for (const cmd of commands) {
-    it(`${cmd} exits 0`, () => {
-      execSync(`node ${cliPath} ${cmd}`, { stdio: "pipe" });
+  for (const args of commands) {
+    it(`${args.join(" ")} exits 0`, () => {
+      execFileSync("node", [cliPath, ...args], { stdio: "pipe" });
     });
   }
 });
