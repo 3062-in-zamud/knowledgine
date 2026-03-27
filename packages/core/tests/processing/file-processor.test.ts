@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { FileProcessor } from "../../src/processing/file-processor.js";
-import { writeFile, mkdir, rm } from "fs/promises";
+import { writeFile, mkdtemp, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -10,8 +10,7 @@ describe("FileProcessor", () => {
 
   beforeEach(async () => {
     processor = new FileProcessor();
-    testDir = join(tmpdir(), `knowledgine-test-${Date.now()}`);
-    await mkdir(testDir, { recursive: true });
+    testDir = await mkdtemp(join(tmpdir(), "knowledgine-test-"));
   });
 
   afterEach(async () => {
@@ -91,6 +90,12 @@ describe("FileProcessor", () => {
       const content = "#   Padded Title   \n\nBody";
       const title = processor.extractTitle(content, "test.md");
       expect(title).toBe("Padded Title");
+    });
+
+    it("should support tab-separated H1 headings", () => {
+      const content = "#\tTabbed Title\n\nBody";
+      const title = processor.extractTitle(content, "test.md");
+      expect(title).toBe("Tabbed Title");
     });
   });
 });

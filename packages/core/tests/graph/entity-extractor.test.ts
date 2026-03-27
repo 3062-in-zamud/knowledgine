@@ -68,6 +68,19 @@ const yaml = require('yaml');
       expect(result.some((e) => e.name === "console")).toBe(false);
       expect(result.some((e) => e.name === "process")).toBe(false);
     });
+
+    it("should ignore identifiers that only contain require", () => {
+      const content = `
+const requirement = requires('chalk');
+const value = requirement('yaml');
+foo.require('lodash');
+      `;
+      const result = extractor.extract(content);
+      const names = result.map((e) => e.name);
+      expect(names).not.toContain("chalk");
+      expect(names).not.toContain("yaml");
+      expect(names).not.toContain("lodash");
+    });
   });
 
   describe("extract @mentions", () => {

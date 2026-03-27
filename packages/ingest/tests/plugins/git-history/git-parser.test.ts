@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdir, rm, writeFile } from "fs/promises";
+import { mkdtemp, rm, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { execFile } from "node:child_process";
@@ -196,8 +196,7 @@ describe("getDiffsParallel", () => {
   let repoDir: string;
 
   beforeEach(async () => {
-    repoDir = join(tmpdir(), `knowledgine-diff-test-${Date.now()}`);
-    await mkdir(repoDir, { recursive: true });
+    repoDir = await mkdtemp(join(tmpdir(), "knowledgine-diff-test-"));
     await initRepo(repoDir);
   });
 

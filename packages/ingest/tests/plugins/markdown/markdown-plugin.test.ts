@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { writeFile, mkdir, rm } from "fs/promises";
+import { writeFile, mkdir, mkdtemp, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { MarkdownPlugin } from "../../../src/plugins/markdown/index.js";
@@ -10,8 +10,7 @@ describe("MarkdownPlugin", () => {
 
   beforeEach(async () => {
     plugin = new MarkdownPlugin();
-    testDir = join(tmpdir(), `knowledgine-test-${Date.now()}`);
-    await mkdir(testDir, { recursive: true });
+    testDir = await mkdtemp(join(tmpdir(), "knowledgine-test-"));
   });
 
   afterEach(async () => {

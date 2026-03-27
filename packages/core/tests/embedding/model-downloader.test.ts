@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdirSync, writeFileSync, existsSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { PassThrough } from "stream";
 import { ModelManager } from "../../src/embedding/model-manager.js";
 import { downloadModel, MODEL_FILES } from "../../src/embedding/model-downloader.js";
@@ -64,8 +63,7 @@ describe("model-downloader", () => {
   let modelManager: ModelManager;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-dl-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-dl-test-"));
     modelManager = new ModelManager(testDir);
   });
 

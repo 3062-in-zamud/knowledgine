@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { createDatabase, Migrator, ALL_MIGRATIONS } from "@knowledgine/core";
 import { captureCommand } from "../../src/commands/capture.js";
 
@@ -15,8 +14,7 @@ describe("capture command", () => {
   let originalExitCode: number | undefined;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-capture-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-capture-test-"));
     stderrOutput = [];
     stdoutOutput = [];
     stderrSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {

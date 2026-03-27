@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { writeFile, mkdir, rm } from "fs/promises";
+import { writeFile, mkdtemp, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
@@ -16,8 +16,7 @@ describe("parseCursorSessionFile", () => {
   let testDir: string;
 
   beforeEach(async () => {
-    testDir = join(tmpdir(), `knowledgine-cursor-parser-test-${Date.now()}`);
-    await mkdir(testDir, { recursive: true });
+    testDir = await mkdtemp(join(tmpdir(), "knowledgine-cursor-parser-test-"));
   });
 
   afterEach(async () => {
