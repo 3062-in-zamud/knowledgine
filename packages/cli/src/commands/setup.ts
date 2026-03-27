@@ -7,10 +7,7 @@ import * as p from "@clack/prompts";
 import * as TOML from "smol-toml";
 import { interactiveRulesSetup, nonInteractiveRulesSetup } from "./setup-rules.js";
 import { interactiveSkillsSetup, nonInteractiveSkillsSetup } from "./setup-skills.js";
-import {
-  readTextFileIfExists,
-  writeTextFileAtomically,
-} from "../lib/file-utils.js";
+import { readTextFileIfExists, writeTextFileAtomically } from "../lib/file-utils.js";
 
 export interface SetupOptions {
   target?: string;

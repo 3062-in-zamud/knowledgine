@@ -10,7 +10,9 @@ import {
 import { basename, dirname, join } from "path";
 
 function hasErrnoCode(error: unknown, code: string): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code;
+  return (
+    error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code
+  );
 }
 
 export function readTextFileIfExists(filePath: string): string | null {
