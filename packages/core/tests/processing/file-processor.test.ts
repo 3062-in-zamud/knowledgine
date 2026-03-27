@@ -91,5 +91,11 @@ describe("FileProcessor", () => {
       const title = processor.extractTitle(content, "test.md");
       expect(title).toBe("Padded Title");
     });
+
+    it("should support tab-separated H1 headings", () => {
+      const content = "#\tTabbed Title\n\nBody";
+      const title = processor.extractTitle(content, "test.md");
+      expect(title).toBe("Tabbed Title");
+    });
   });
 });

@@ -45,7 +45,10 @@ export class FileProcessor {
     for (const line of content.split(/\r?\n/)) {
       if (!line.startsWith("#")) continue;
       if (line.startsWith("##")) continue;
-      if (line.length < 3 || line[1] !== " ") continue;
+      if (line.length < 3) continue;
+
+      const separator = line[1];
+      if (separator !== " " && separator !== "\t") continue;
 
       const title = line.slice(2).trim();
       if (title) {
