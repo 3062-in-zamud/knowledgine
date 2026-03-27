@@ -1,0 +1,22 @@
+name: Auto-assign Copilot reviewer
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+jobs:
+  assign-copilot:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              reviewers: ['copilot']
+            });
