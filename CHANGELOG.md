@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **lint-staged**: 15.x → 16.4.0
 - **onnxruntime-node**: 1.20.1 → 1.24.3
 
+### Fixed
+
+#### Security
+
+- **ReDoS prevention**: Replaced combined import regex with separate `\bfrom\b`/`\brequire\b` patterns in entity-extractor; bounded numeric quantifiers (`\d+` → `\d{1,N}`) in query-classifier temporal/factual patterns
+- **TOCTOU elimination**: Replaced `existsSync` + `writeFileSync` with atomic `wx` flag in dataset downloader
+- **Dependency security**: Updated `yaml` to 2.8.3 and `smol-toml` to 1.6.1 for security fixes
+
+#### Core (`@knowledgine/core`)
+
+- **Markdown heading title parsing**: Preserve heading titles correctly during file processing
+- **Code scanning alerts**: Resolved static analysis findings in CLI commands and core utilities (atomic write helper, file-utils refactor)
+
 ## [0.4.0] - 2026-03-26
 
 ### Added
