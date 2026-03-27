@@ -158,6 +158,19 @@ describe("writeRuleFile", () => {
       expect(result.status).toBe("ok");
       expect(existsSync(filePath)).toBe(false);
     });
+
+    it("dryRun create-file reports skipped when the file already exists", () => {
+      const cursorTarget = RULE_TARGETS.find((t) => t.value === "cursor")!;
+      const filePath = cursorTarget.getRulePath(testDir);
+      mkdirSync(join(filePath, ".."), { recursive: true });
+      writeFileSync(filePath, "existing content", "utf-8");
+
+      const result = writeRuleFile(cursorTarget, testDir, { dryRun: true });
+
+      expect(result.status).toBe("skipped");
+      expect(result.note).toContain("--force");
+      expect(readFileSync(filePath, "utf-8")).toBe("existing content");
+    });
   });
 
   describe("RULE_TARGETS metadata", () => {

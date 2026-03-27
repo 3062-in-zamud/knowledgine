@@ -210,6 +210,19 @@ export function writeRuleFile(
   }
 
   // create-file strategy
+  if (options.dryRun) {
+    if (!options.force && readTextFileIfExists(filePath) !== null) {
+      return {
+        target: target.label,
+        status: "skipped",
+        filePath,
+        note: "File already exists. Use --force to overwrite.",
+      };
+    }
+
+    return { target: target.label, status: "ok", filePath };
+  }
+
   if (!options.dryRun) {
     if (options.force) {
       writeTextFileAtomically(filePath, templateContent);

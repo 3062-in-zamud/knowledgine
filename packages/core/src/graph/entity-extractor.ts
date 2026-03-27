@@ -261,15 +261,57 @@ export class EntityExtractor {
       return quoteIndex >= 0 ? this.readQuotedValue(line, quoteIndex) : null;
     }
 
-    const requireIndex = line.indexOf("require");
+    const requireIndex = this.findStandaloneRequireIndex(line);
     if (requireIndex >= 0) {
-      const openParenIndex = line.indexOf("(", requireIndex);
+      const openParenIndex = this.findRequireCallOpenParenIndex(
+        line,
+        requireIndex + "require".length,
+      );
       if (openParenIndex < 0) return null;
       const quoteIndex = this.findQuoteIndex(line, openParenIndex + 1);
       return quoteIndex >= 0 ? this.readQuotedValue(line, quoteIndex) : null;
     }
 
     return null;
+  }
+
+  private findStandaloneRequireIndex(line: string): number {
+    let searchIndex = 0;
+
+    while (searchIndex < line.length) {
+      const requireIndex = line.indexOf("require", searchIndex);
+      if (requireIndex < 0) return -1;
+
+      const prevChar = requireIndex > 0 ? line[requireIndex - 1] : "";
+      const nextIndex = requireIndex + "require".length;
+      const nextChar = nextIndex < line.length ? line[nextIndex] : "";
+
+      if (
+        prevChar !== "." &&
+        !this.isIdentifierChar(prevChar) &&
+        !this.isIdentifierChar(nextChar)
+      ) {
+        return requireIndex;
+      }
+
+      searchIndex = nextIndex;
+    }
+
+    return -1;
+  }
+
+  private findRequireCallOpenParenIndex(line: string, startIndex: number): number {
+    for (let i = startIndex; i < line.length; i++) {
+      const char = line[i];
+      if (char === "(") {
+        return i;
+      }
+      if (char !== " " && char !== "\t") {
+        return -1;
+      }
+    }
+
+    return -1;
   }
 
   private findQuoteIndex(line: string, startIndex: number): number {
@@ -356,6 +398,16 @@ export class EntityExtractor {
 
   private isStopWord(word: string): boolean {
     return STOP_LIST.has(word.toLowerCase());
+  }
+
+  private isIdentifierChar(char: string): boolean {
+    return (
+      (char >= "a" && char <= "z") ||
+      (char >= "A" && char <= "Z") ||
+      (char >= "0" && char <= "9") ||
+      char === "_" ||
+      char === "$"
+    );
   }
 
   private resolveEntityTypes(entities: ExtractedEntity[]): ExtractedEntity[] {
