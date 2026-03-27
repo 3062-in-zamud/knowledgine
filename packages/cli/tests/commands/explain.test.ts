@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { createDatabase, Migrator, ALL_MIGRATIONS } from "@knowledgine/core";
 import { registerExplainCommand } from "../../src/commands/explain.js";
 import { Command } from "commander";
@@ -143,7 +142,7 @@ describe("explain command", () => {
   };
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-explain-test-${randomUUID()}`);
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-explain-test-"));
     mkdirSync(join(testDir, ".knowledgine"), { recursive: true });
 
     // Create minimal sqlite db

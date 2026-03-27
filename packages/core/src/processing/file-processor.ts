@@ -42,10 +42,20 @@ export class FileProcessor {
   }
 
   extractTitle(content: string, filePath: string): string {
-    const headingMatch = content.match(/^#\s+(.+)$/m);
-    if (headingMatch?.[1]) {
-      return headingMatch[1].trim();
+    for (const line of content.split(/\r?\n/)) {
+      if (!line.startsWith("#")) continue;
+      if (line.startsWith("##")) continue;
+      if (line.length < 3) continue;
+
+      const separator = line[1];
+      if (separator !== " " && separator !== "\t") continue;
+
+      const title = line.slice(2).trim();
+      if (title) {
+        return title;
+      }
     }
+
     const filename = filePath.split("/").pop() || "untitled";
     return filename.replace(/\.md$/, "");
   }

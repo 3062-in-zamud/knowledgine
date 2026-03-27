@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdir, rm, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { execFile } from "node:child_process";
@@ -48,8 +48,7 @@ describe("GitHistoryPlugin", () => {
 
   beforeEach(async () => {
     plugin = new GitHistoryPlugin();
-    repoDir = join(tmpdir(), `knowledgine-git-test-${Date.now()}`);
-    await mkdir(repoDir, { recursive: true });
+    repoDir = await mkdtemp(join(tmpdir(), "knowledgine-git-test-"));
   });
 
   afterEach(async () => {
@@ -139,8 +138,7 @@ describe("GitHistoryPlugin", () => {
     });
 
     it("should yield 0 events for non-git directory", async () => {
-      const nonGitDir = join(tmpdir(), `non-git-${Date.now()}`);
-      await mkdir(nonGitDir, { recursive: true });
+      const nonGitDir = await mkdtemp(join(tmpdir(), "non-git-"));
 
       try {
         const events = [];

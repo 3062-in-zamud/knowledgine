@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { spawn, execSync } from "child_process";
+import { spawn, execFileSync } from "child_process";
 import type { ChildProcess } from "child_process";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
+import { mkdtempSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 
 interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -81,12 +80,11 @@ describe("MCP Server E2E: stdio", () => {
   beforeAll(async () => {
     // Build if needed
     if (!existsSync(mcpServerDist) || !existsSync(cliDist)) {
-      execSync("pnpm run build", { cwd: monorepoRoot, stdio: "inherit" });
+      execFileSync("pnpm", ["run", "build"], { cwd: monorepoRoot, stdio: "inherit" });
     }
 
     // Create test data
-    testDir = join(tmpdir(), `knowledgine-mcp-e2e-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-mcp-e2e-"));
 
     writeFileSync(
       join(testDir, "typescript-notes.md"),
@@ -117,7 +115,9 @@ useEffectの依存配列に注意が必要。
     );
 
     // Run CLI init to create DB
-    execSync(`node ${cliDist} init --path ${testDir} --skip-embeddings`, { timeout: 30_000 });
+    execFileSync("node", [cliDist, "init", "--path", testDir, "--skip-embeddings"], {
+      timeout: 30_000,
+    });
 
     const dbPath = join(testDir, ".knowledgine", "index.sqlite");
 

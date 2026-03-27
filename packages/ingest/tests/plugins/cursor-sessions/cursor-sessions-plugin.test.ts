@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { writeFile, mkdir, rm, utimes } from "fs/promises";
+import { writeFile, mkdir, mkdtemp, rm, utimes } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { CursorSessionsPlugin } from "../../../src/plugins/cursor-sessions/index.js";
@@ -11,8 +11,7 @@ describe("CursorSessionsPlugin", () => {
 
   beforeEach(async () => {
     plugin = new CursorSessionsPlugin();
-    testDir = join(tmpdir(), `knowledgine-cursor-plugin-test-${Date.now()}`);
-    await mkdir(testDir, { recursive: true });
+    testDir = await mkdtemp(join(tmpdir(), "knowledgine-cursor-plugin-test-"));
   });
 
   afterEach(async () => {
