@@ -1,16 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, existsSync, rmSync, writeFileSync, readdirSync } from "fs";
+import { mkdtempSync, mkdirSync, existsSync, rmSync, writeFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { getDemoDir, copyDemoFixtures, cleanDemo } from "../../src/lib/demo-manager.js";
 
 describe("demo-manager", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-demo-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-demo-test-"));
   });
 
   afterEach(() => {

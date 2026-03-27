@@ -232,25 +232,60 @@ export class EntityExtractor {
 
   private extractImports(content: string): ExtractedEntity[] {
     const results: ExtractedEntity[] = [];
-    // import X from 'package' / import { X } from 'package' / require('package')
-    // Use separate patterns to avoid polynomial backtracking on user-controlled input
-    const fromRe = /\bfrom\s+['"]([^'"./][^'"]*)['"]/g;
-    const requireRe = /\brequire\s*\(\s*['"]([^'"./][^'"]*)['"]\s*\)/g;
     const seen = new Set<string>();
-    let m: RegExpExecArray | null;
-    while ((m = fromRe.exec(content)) !== null) {
-      const pkg = m[1].split("/")[0];
-      if (!pkg || this.isStopWord(pkg) || seen.has(pkg)) continue;
-      seen.add(pkg);
-      results.push({ name: pkg.toLowerCase(), entityType: "technology", sourceType: "import" });
-    }
-    while ((m = requireRe.exec(content)) !== null) {
-      const pkg = m[1].split("/")[0]; // @scope/pkg → @scope/pkg, lodash/fp → lodash
-      if (!pkg || this.isStopWord(pkg)) continue;
-      // Exclude destructured (e.g., import { useState } from 'react' → react is fine, but not useState)
-      results.push({ name: pkg.toLowerCase(), entityType: "technology", sourceType: "import" });
+    for (const rawLine of content.split(/\r?\n/)) {
+      const specifier = this.extractImportSpecifier(rawLine.trim());
+      if (!specifier || specifier.startsWith(".") || specifier.startsWith("/")) continue;
+
+      const pkg = specifier.startsWith("@")
+        ? specifier.split("/").slice(0, 2).join("/")
+        : specifier.split("/")[0];
+      const normalized = pkg.toLowerCase();
+      if (!pkg || this.isStopWord(normalized) || seen.has(normalized)) continue;
+
+      seen.add(normalized);
+      results.push({ name: normalized, entityType: "technology", sourceType: "import" });
     }
     return results;
+  }
+
+  private extractImportSpecifier(line: string): string | null {
+    if (!line) return null;
+
+    if (line.startsWith("import ")) {
+      const fromIndex = line.lastIndexOf(" from ");
+      const quoteIndex =
+        fromIndex >= 0
+          ? this.findQuoteIndex(line, fromIndex + " from ".length)
+          : this.findQuoteIndex(line, "import ".length);
+      return quoteIndex >= 0 ? this.readQuotedValue(line, quoteIndex) : null;
+    }
+
+    const requireIndex = line.indexOf("require");
+    if (requireIndex >= 0) {
+      const openParenIndex = line.indexOf("(", requireIndex);
+      if (openParenIndex < 0) return null;
+      const quoteIndex = this.findQuoteIndex(line, openParenIndex + 1);
+      return quoteIndex >= 0 ? this.readQuotedValue(line, quoteIndex) : null;
+    }
+
+    return null;
+  }
+
+  private findQuoteIndex(line: string, startIndex: number): number {
+    for (let i = startIndex; i < line.length; i++) {
+      if (line[i] === "'" || line[i] === '"') {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private readQuotedValue(line: string, quoteIndex: number): string | null {
+    const quote = line[quoteIndex];
+    const endQuoteIndex = line.indexOf(quote, quoteIndex + 1);
+    if (endQuoteIndex < 0) return null;
+    return line.slice(quoteIndex + 1, endQuoteIndex);
   }
 
   private extractMarkdownLinks(content: string): ExtractedEntity[] {

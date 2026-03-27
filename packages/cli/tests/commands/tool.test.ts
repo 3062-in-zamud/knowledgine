@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { createDatabase, Migrator, KnowledgeRepository, ALL_MIGRATIONS } from "@knowledgine/core";
 import {
   toolSearchCommand,
@@ -30,8 +29,7 @@ describe("tool command", () => {
   let originalExitCode: number | undefined;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-tool-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-tool-test-"));
     output = [];
     stderrSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
       output.push(args.map(String).join(" "));

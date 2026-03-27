@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { execSync } from "child_process";
-import { mkdirSync, writeFileSync, existsSync, rmSync } from "fs";
+import { execFileSync } from "child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import {
   createDatabase,
   Migrator,
@@ -21,11 +20,10 @@ describe("CLI E2E: init → extract → search", () => {
   beforeAll(() => {
     // Ensure CLI is built
     if (!existsSync(cliDist)) {
-      execSync("pnpm run build", { cwd: monorepoRoot, stdio: "inherit" });
+      execFileSync("pnpm", ["run", "build"], { cwd: monorepoRoot, stdio: "inherit" });
     }
 
-    testDir = join(tmpdir(), `knowledgine-e2e-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-e2e-"));
 
     // Create subdirectories
     for (const dir of ["daily", "tickets", "notes", "retrospective"]) {
@@ -191,7 +189,7 @@ solved: テスト環境をDockerで統一して修正完了。
   });
 
   it("should run init command successfully", () => {
-    execSync(`node ${cliDist} init --path ${testDir} --skip-embeddings`, {
+    execFileSync("node", [cliDist, "init", "--path", testDir, "--skip-embeddings"], {
       encoding: "utf-8",
       timeout: 30_000,
     });

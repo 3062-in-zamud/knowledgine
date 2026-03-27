@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync, renameSync } from "fs";
-import { join, dirname } from "path";
+import { readFileSync } from "fs";
 import { FeedbackRepository } from "./feedback-repository.js";
+import { writeTextFileAtomically } from "../utils/atomic-write.js";
 
 export interface TypeOverride {
   name: string;
@@ -106,9 +106,6 @@ export class FeedbackLearner {
   }
 
   private saveRules(rules: ExtractionRules): void {
-    const dir = dirname(this.rulesPath);
-    const tmpPath = join(dir, `.extraction-rules.tmp.${process.pid}.json`);
-    writeFileSync(tmpPath, JSON.stringify(rules, null, 2), "utf-8");
-    renameSync(tmpPath, this.rulesPath);
+    writeTextFileAtomically(this.rulesPath, JSON.stringify(rules, null, 2));
   }
 }

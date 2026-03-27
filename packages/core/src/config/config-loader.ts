@@ -1,8 +1,9 @@
-import { readFileSync, existsSync, writeFileSync } from "fs";
+import { readFileSync } from "fs";
 import { resolve } from "path";
 import { parse as parseYaml } from "yaml";
 import { defineConfig } from "../config.js";
 import type { KnowledgineConfig } from "../config.js";
+import { writeTextFileAtomically } from "../utils/atomic-write.js";
 
 export interface RcConfig {
   semantic?: boolean;
@@ -12,6 +13,10 @@ export interface RcConfig {
   serve?: { defaultPort?: number; host?: string };
   llm?: import("../llm/types.js").LLMConfig;
   [key: string]: unknown;
+}
+
+function hasErrnoCode(error: unknown, code: string): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code;
 }
 
 /**
@@ -42,11 +47,20 @@ function loadRcFile(startDir: string): RcConfig | null {
     const jsonPath = resolve(dir, ".knowledginerc.json");
     const ymlPath = resolve(dir, ".knowledginerc.yml");
     try {
-      if (existsSync(jsonPath)) {
+      try {
         return JSON.parse(readFileSync(jsonPath, "utf-8")) as RcConfig;
+      } catch (error) {
+        if (!hasErrnoCode(error, "ENOENT")) {
+          throw error;
+        }
       }
-      if (existsSync(ymlPath)) {
+
+      try {
         return parseYaml(readFileSync(ymlPath, "utf-8")) as RcConfig;
+      } catch (error) {
+        if (!hasErrnoCode(error, "ENOENT")) {
+          throw error;
+        }
       }
     } catch (error) {
       console.error(
@@ -86,12 +100,13 @@ export function writeRcConfig(dirPath: string, config: RcConfig): void {
   const rcPath = resolve(dirPath, ".knowledginerc.json");
   let existing: RcConfig = {};
   try {
-    if (existsSync(rcPath)) {
-      existing = JSON.parse(readFileSync(rcPath, "utf-8")) as RcConfig;
+    existing = JSON.parse(readFileSync(rcPath, "utf-8")) as RcConfig;
+  } catch (error) {
+    if (hasErrnoCode(error, "ENOENT")) {
+      existing = {};
     }
-  } catch {
     // If existing file is invalid, overwrite it
   }
   const merged = { ...existing, ...config };
-  writeFileSync(rcPath, JSON.stringify(merged, null, 2) + "\n");
+  writeTextFileAtomically(rcPath, JSON.stringify(merged, null, 2) + "\n");
 }
