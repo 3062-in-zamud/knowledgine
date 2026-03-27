@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-03-27
+
+### Changed
+
+#### CI/CD
+
+- **GitHub Actions**: Updated actions/checkout v4 → v6, actions/setup-node v4 → v6, pnpm/action-setup v4 → v5, github/codeql-action v3 → v4, actions/labeler v5 → v6
+
+#### Dependencies
+
+- **eslint**: 9.x → 10.1.0 (flat config fully compatible)
+- **lint-staged**: 15.x → 16.4.0
+- **onnxruntime-node**: 1.20.1 → 1.24.3
+
 ## [0.4.0] - 2026-03-26
 
 ### Added
