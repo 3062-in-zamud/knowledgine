@@ -59,6 +59,10 @@ export function createDatabase(
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
+  if (dbPath !== ":memory:") {
+    db.pragma("mmap_size = 67108864"); // 64MB mmap
+  }
+  db.pragma("temp_store = MEMORY");
 
   // Load sqlite-vec if requested
   let vec0Loaded = false;
