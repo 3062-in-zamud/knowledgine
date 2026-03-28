@@ -83,9 +83,8 @@ describe("Search Benchmark", () => {
     );
     console.log(`[Benchmark] Speedup: ${(rePrepareElapsed / cachedElapsed).toFixed(2)}x`);
 
-    // キャッシュ版は re-prepare より遅くないこと（同等以上のパフォーマンス）
-    expect(cachedElapsed).toBeLessThan(rePrepareElapsed * 3); // 3倍以上遅くなることはない
-    expect(cachedElapsed / ITERATIONS).toBeLessThan(0.5); // 1クエリあたり 0.5ms 以内
+    // キャッシュ版は re-prepare より大幅に遅くないこと（相対比較のみ、CI環境差を吸収）
+    expect(cachedElapsed).toBeLessThan(rePrepareElapsed * 3);
 
     db.close();
   });
