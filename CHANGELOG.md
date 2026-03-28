@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 #### Core (`@knowledgine/core`)
 
 - **RcConfig拡張 + Zodバリデーション**: `serve.authToken`、`noise`、`observer`、`projects` フィールドをRcConfigに追加。Zodスキーマによるランタイムバリデーションを実装し、不正な設定値はデフォルトにフォールバック + 警告ログを出力
+- **Migration 013 — `unknown` entityタイプ追加**: `entities` テーブルのCHECK制約に `'unknown'` を追加（SQLiteのALTER COLUMN非サポートによりテーブル再作成）（KNOW-362）
+- **entityタイプ推定の保守化**: `@mention` のフォールバック分類を `person` → `unknown` に変更。TECH_DICTIONARY に `vscode`・`neovim` を追加、NOT_PERSON_LISTに `linter`・`formatter`・`bundler`・`transpiler` を追加（KNOW-362）
+- **`searchEntities` に `includeUnknown` オプション追加**: デフォルト `false` で `entity_type='unknown'` を検索結果から除外（KNOW-362）
 
 #### Ingest (`@knowledgine/ingest`)
 
