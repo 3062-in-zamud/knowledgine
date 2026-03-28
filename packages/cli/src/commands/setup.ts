@@ -16,6 +16,7 @@ export interface SetupOptions {
   write?: boolean;
   rules?: boolean;
   skills?: boolean;
+  scope?: string;
 }
 
 interface McpServerConfig {
@@ -502,7 +503,18 @@ export async function setupCommand(
   }
 
   // Non-interactive: MCP setup (default)
-  const configPath = getConfigPath(target);
+  const scope = (options.scope ?? "global") as "global" | "project";
+  if (scope === "project" && !(target in PROJECT_CONFIG_SUPPORT)) {
+    const supported = Object.keys(PROJECT_CONFIG_SUPPORT).join(", ");
+    console.error(
+      `${symbols.error} ${colors.error(`Target "${target}" does not support project-level configuration.`)}`,
+    );
+    console.error(`${symbols.arrow} ${colors.hint(`Supported targets: ${supported}`)}`);
+    console.error(`${symbols.arrow} ${colors.hint(`Use --scope global (default) instead.`)}`);
+    process.exitCode = 1;
+    return;
+  }
+  const configPath = getConfigPathForScope(target, scope, rootPath);
   const targetLabel = getTargetLabel(target);
 
   let existingConfig: McpConfig;
@@ -533,8 +545,9 @@ export async function setupCommand(
     console.error(
       `${symbols.arrow} ${colors.hint(`To apply: Run with --write flag, then restart ${targetLabel}.`)}`,
     );
+    const scopeFlag = scope === "project" ? " --scope project" : "";
     console.error(
-      `${symbols.arrow} ${colors.hint(`knowledgine setup --target ${target} --path ${rootPath} --write`)}`,
+      `${symbols.arrow} ${colors.hint(`knowledgine setup --target ${target} --path ${rootPath}${scopeFlag} --write`)}`,
     );
     console.error("");
     console.error(
