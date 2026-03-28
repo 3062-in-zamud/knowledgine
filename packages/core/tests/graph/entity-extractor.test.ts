@@ -224,6 +224,66 @@ main/examples is just a directory listing
     });
   });
 
+  describe("entity type inference improvement (KNOW-362)", () => {
+    it("should not classify sandbox as person", () => {
+      const content = "Using @sandbox for testing";
+      const result = extractor.extract(content);
+      const sandbox = result.find((e) => e.name === "sandbox");
+      if (sandbox) {
+        expect(sandbox.entityType).not.toBe("person");
+      }
+    });
+
+    it("should classify Docker as technology", () => {
+      const content = "We use @docker for containerization";
+      const result = extractor.extract(content);
+      const docker = result.find((e) => e.name === "docker");
+      expect(docker).toBeDefined();
+      expect(docker!.entityType).toBe("technology");
+    });
+
+    it("should classify Redis as technology", () => {
+      const content = "Cache layer uses @redis";
+      const result = extractor.extract(content);
+      const redis = result.find((e) => e.name === "redis");
+      expect(redis).toBeDefined();
+      expect(redis!.entityType).toBe("technology");
+    });
+
+    it("should classify Kubernetes as technology", () => {
+      const content = "Deployed on @kubernetes cluster";
+      const result = extractor.extract(content);
+      const k8s = result.find((e) => e.name === "kubernetes");
+      expect(k8s).toBeDefined();
+      expect(k8s!.entityType).toBe("technology");
+    });
+
+    it("should still classify real usernames as person", () => {
+      const content = "cc @alice @bob please review";
+      const result = extractor.extract(content);
+      const alice = result.find((e) => e.name === "alice");
+      expect(alice).toBeDefined();
+      expect(alice!.entityType).toBe("person");
+    });
+
+    it("should keep tag-based technology classification for @react", () => {
+      const result = extractor.extract("cc @react please review", { tags: ["react"] });
+      const reactEntities = result.filter((e) => e.name === "react");
+      expect(reactEntities.length).toBe(1);
+      expect(reactEntities[0].sourceType).toBe("tag");
+      expect(reactEntities[0].entityType).toBe("technology");
+    });
+
+    it("should classify programming concepts as concept, not person", () => {
+      const content = "The @middleware handles authentication";
+      const result = extractor.extract(content);
+      const middleware = result.find((e) => e.name === "middleware");
+      if (middleware) {
+        expect(middleware.entityType).not.toBe("person");
+      }
+    });
+  });
+
   describe("extractOrgRepos sourceType", () => {
     it("should have sourceType 'code' for org/repo entities", () => {
       const content = "Check out facebook/react for more details";

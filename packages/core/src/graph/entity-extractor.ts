@@ -84,6 +84,129 @@ const STOP_LIST = new Set([
 /**
  * Extracts entities from note text, with optional post-processing via ExtractionRules.
  */
+/**
+ * Known technology/tool names that should never be classified as person.
+ * Maps to preferred entity type.
+ */
+const TECH_DICTIONARY = new Map<string, EntityType>([
+  // Databases
+  ["redis", "technology"],
+  ["postgresql", "technology"],
+  ["postgres", "technology"],
+  ["mongodb", "technology"],
+  ["mysql", "technology"],
+  ["sqlite", "technology"],
+  ["elasticsearch", "technology"],
+  ["dynamodb", "technology"],
+  ["cassandra", "technology"],
+  // Containers & orchestration
+  ["docker", "technology"],
+  ["kubernetes", "technology"],
+  ["podman", "technology"],
+  // Web servers & proxies
+  ["nginx", "technology"],
+  ["apache", "technology"],
+  ["caddy", "technology"],
+  ["traefik", "technology"],
+  // Languages & runtimes
+  ["python", "technology"],
+  ["golang", "technology"],
+  ["rust", "technology"],
+  ["swift", "technology"],
+  ["kotlin", "technology"],
+  ["deno", "technology"],
+  ["bun", "technology"],
+  // Frameworks & libraries
+  ["react", "technology"],
+  ["angular", "technology"],
+  ["vue", "technology"],
+  ["svelte", "technology"],
+  ["django", "technology"],
+  ["flask", "technology"],
+  ["express", "technology"],
+  ["fastapi", "technology"],
+  ["nextjs", "technology"],
+  ["nuxt", "technology"],
+  // Tools
+  ["webpack", "tool"],
+  ["vite", "tool"],
+  ["eslint", "tool"],
+  ["prettier", "tool"],
+  ["babel", "tool"],
+  ["terraform", "tool"],
+  ["ansible", "tool"],
+  ["grafana", "tool"],
+  ["prometheus", "tool"],
+  // Cloud & services
+  ["vercel", "technology"],
+  ["netlify", "technology"],
+  ["heroku", "technology"],
+  ["supabase", "technology"],
+  ["firebase", "technology"],
+]);
+
+/**
+ * Programming concepts that should not be classified as person.
+ */
+const NOT_PERSON_LIST = new Set([
+  "sandbox",
+  "middleware",
+  "proxy",
+  "daemon",
+  "worker",
+  "handler",
+  "listener",
+  "observer",
+  "adapter",
+  "bridge",
+  "factory",
+  "builder",
+  "parser",
+  "compiler",
+  "runtime",
+  "kernel",
+  "scheduler",
+  "dispatcher",
+  "controller",
+  "resolver",
+  "navigator",
+  "provider",
+  "consumer",
+  "producer",
+  "generator",
+  "iterator",
+  "executor",
+  "loader",
+  "renderer",
+  "emitter",
+  "pipeline",
+  "gateway",
+  "registry",
+  "container",
+  "server",
+  "client",
+  "agent",
+  "bot",
+  "cli",
+  "api",
+  "sdk",
+  "env",
+  "config",
+  "admin",
+  "debug",
+  "staging",
+  "production",
+  "development",
+  "localhost",
+  "webhook",
+  "cron",
+  "cache",
+  "queue",
+  "stack",
+  "heap",
+  "buffer",
+]);
+
 export class EntityExtractor {
   private rules?: ExtractionRules;
 
@@ -392,11 +515,21 @@ export class EntityExtractor {
     let m: RegExpExecArray | null;
     while ((m = mentionRe.exec(content)) !== null) {
       const username = m[1].trim().toLowerCase();
-      if (!this.isStopWord(username)) {
-        results.push({ name: username, entityType: "person", sourceType: "mention" });
-      }
+      if (this.isStopWord(username)) continue;
+      const { entityType, sourceType } = this.classifyMention(username);
+      results.push({ name: username, entityType, sourceType });
     }
     return results;
+  }
+
+  private classifyMention(name: string): {
+    entityType: EntityType;
+    sourceType: ExtractedEntity["sourceType"];
+  } {
+    const techType = TECH_DICTIONARY.get(name);
+    if (techType) return { entityType: techType, sourceType: "mention" };
+    if (NOT_PERSON_LIST.has(name)) return { entityType: "concept", sourceType: "mention" };
+    return { entityType: "person", sourceType: "mention" };
   }
 
   private extractOrgRepos(content: string): ExtractedEntity[] {

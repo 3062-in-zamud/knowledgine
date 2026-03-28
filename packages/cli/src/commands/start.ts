@@ -186,7 +186,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
   if (options.watch !== false) {
     watcher = watch("**/*.md", {
       cwd: rootPath,
-      ignored: [/node_modules/, /\.knowledgine/],
+      ignored: [/node_modules/, /\.knowledgine/, /\.git/, /dist/],
       persistent: true,
       ignoreInitial: true,
     });
@@ -198,6 +198,12 @@ export async function startCommand(options: StartOptions): Promise<void> {
           `${symbols.error} ${colors.error("File watcher limit reached. Use --no-watch to disable.")}`,
         );
         console.error(`  Or increase the limit: ulimit -n 4096`);
+        // Gracefully close the watcher to prevent further EMFILE cascading
+        watcher?.close().catch(() => {});
+        watcher = undefined;
+        console.error(
+          `${symbols.info} ${colors.info("File watcher stopped. MCP server continues without auto-reindexing.")}`,
+        );
       } else {
         console.error(
           `${symbols.error} ${colors.error(`File watcher error: ${nodeErr.message ?? String(err)}`)}`,
