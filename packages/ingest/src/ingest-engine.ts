@@ -81,8 +81,12 @@ export class IngestEngine {
       batch.push(event);
       processedPaths.add(event.sourceUri);
 
-      const heapRatio = getHeapUsageRatio();
-      const currentBatchSize = getAdaptiveBatchSize(DEFAULT_BATCH_SIZE, heapRatio);
+      // Sample heap usage at batch boundaries to avoid per-event overhead
+      const shouldSample = batch.length % DEFAULT_BATCH_SIZE === 0;
+      const heapRatio = shouldSample ? getHeapUsageRatio() : 0;
+      const currentBatchSize = shouldSample
+        ? getAdaptiveBatchSize(DEFAULT_BATCH_SIZE, heapRatio)
+        : DEFAULT_BATCH_SIZE;
 
       if (!heapWarned && heapRatio > 0.8) {
         heapWarned = true;
