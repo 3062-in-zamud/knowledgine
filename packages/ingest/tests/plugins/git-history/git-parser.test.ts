@@ -223,9 +223,9 @@ describe("getDiffsParallel", () => {
     const result = await getDiffsParallel([hash1, hash2, hash3], { cwd: repoDir });
 
     expect(result.size).toBe(3);
-    expect(result.get(hash1)).toContain("file1.ts");
-    expect(result.get(hash2)).toContain("file2.ts");
-    expect(result.get(hash3)).toContain("file3.ts");
+    expect(result.get(hash1)?.diff).toContain("file1.ts");
+    expect(result.get(hash2)?.diff).toContain("file2.ts");
+    expect(result.get(hash3)?.diff).toContain("file3.ts");
   });
 
   it("should return empty map for empty hashes array", async () => {
@@ -249,9 +249,9 @@ describe("getDiffsParallel", () => {
     const result = await getDiffsParallel([hash1, invalidHash, hash3], { cwd: repoDir });
 
     expect(result.size).toBe(3);
-    expect(result.get(hash1)).toContain("file1.ts");
-    expect(result.get(invalidHash)).toBe("");
-    expect(result.get(hash3)).toContain("file3.ts");
+    expect(result.get(hash1)?.diff).toContain("file1.ts");
+    expect(result.get(invalidHash)?.diff).toBe("");
+    expect(result.get(hash3)?.diff).toContain("file3.ts");
   });
 });
 

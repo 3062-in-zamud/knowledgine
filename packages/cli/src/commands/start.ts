@@ -16,6 +16,7 @@ import {
   OnnxEmbeddingProvider,
   ModelManager,
   DEFAULT_MODEL_NAME,
+  checkSemanticReadiness,
 } from "@knowledgine/core";
 import { createKnowledgineMcpServer, StdioServerTransport } from "@knowledgine/mcp-server";
 import { indexFile } from "../lib/indexer.js";
@@ -24,6 +25,7 @@ import { createBox, colors, symbols } from "../lib/ui/index.js";
 export interface StartOptions {
   path?: string;
   ingest?: boolean;
+  watch?: boolean;
 }
 
 export async function startCommand(options: StartOptions): Promise<void> {
@@ -67,14 +69,15 @@ export async function startCommand(options: StartOptions): Promise<void> {
     );
   }
 
-  // Initialize embedding provider if model is available and semantic is enabled
+  // Initialize embedding provider based on semantic readiness
   let embeddingProvider: OnnxEmbeddingProvider | undefined;
-  if (config.embedding.enabled) {
-    const modelManager = new ModelManager();
-    if (modelManager.isModelAvailable()) {
-      embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
-    } else {
-      // Warn if notes exist but no embeddings
+  const modelManager = new ModelManager();
+  const semanticReadiness = checkSemanticReadiness(config, modelManager, repository);
+  if (semanticReadiness.ready) {
+    embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
+  } else if (semanticReadiness.configEnabled) {
+    if (!semanticReadiness.modelAvailable) {
+      // Config enabled but model not downloaded
       const notesWithout = repository.getNotesWithoutEmbeddings();
       if (notesWithout.length > 0) {
         console.error(
@@ -84,6 +87,15 @@ export async function startCommand(options: StartOptions): Promise<void> {
           )}`,
         );
       }
+    } else if (semanticReadiness.embeddingsCount === 0 && semanticReadiness.totalNotes > 0) {
+      // Model available but embeddings not yet generated
+      const notesWithout = repository.getNotesWithoutEmbeddings();
+      console.error(
+        `${symbols.warning} ${colors.warning(
+          `${notesWithout.length} notes have no embeddings. ` +
+            "Semantic search unavailable. Run 'knowledgine upgrade --semantic' to download the model and generate embeddings.",
+        )}`,
+      );
     }
   } else {
     console.error(`${symbols.info} ${colors.info("Running with FTS5 full-text search only")}`);
@@ -168,73 +180,92 @@ export async function startCommand(options: StartOptions): Promise<void> {
   const fileProcessor = new FileProcessor();
   const patternExtractor = new PatternExtractor();
 
-  const watcher = watch("**/*.md", {
-    cwd: rootPath,
-    ignored: [/node_modules/, /\.knowledgine/],
-    persistent: true,
-    ignoreInitial: true,
-  });
+  let watcher: ReturnType<typeof watch> | undefined;
+  if (options.watch !== false) {
+    watcher = watch("**/*.md", {
+      cwd: rootPath,
+      ignored: [/node_modules/, /\.knowledgine/],
+      persistent: true,
+      ignoreInitial: true,
+    });
 
-  watcher.on("add", async (filePath: string) => {
-    try {
-      const noteId = await indexFile(
-        filePath,
-        rootPath,
-        fileProcessor,
-        patternExtractor,
-        repository,
-        graphRepository,
-      );
-      if (embeddingProvider) {
-        const note = repository.getNoteById(noteId);
-        if (note) {
-          const embedding = await embeddingProvider.embed(note.content);
-          repository.saveEmbedding(noteId, embedding, config.embedding.modelName);
-        }
+    watcher.on("error", (err: unknown) => {
+      const nodeErr = err as NodeJS.ErrnoException;
+      if (nodeErr.code === "EMFILE" || nodeErr.code === "ENOSPC") {
+        console.error(
+          `${symbols.error} ${colors.error("File watcher limit reached. Use --no-watch to disable.")}`,
+        );
+        console.error(`  Or increase the limit: ulimit -n 4096`);
+      } else {
+        console.error(
+          `${symbols.error} ${colors.error(`File watcher error: ${nodeErr.message ?? String(err)}`)}`,
+        );
       }
-      console.error(`${symbols.arrow} ${colors.info(`Indexed: ${filePath}`)}`);
-    } catch (error) {
-      console.error(
-        `${symbols.error} ${colors.error(`Error indexing ${filePath}: ${error instanceof Error ? error.message : error}`)}`,
-      );
-    }
-  });
+    });
 
-  watcher.on("change", async (filePath: string) => {
-    try {
-      const noteId = await indexFile(
-        filePath,
-        rootPath,
-        fileProcessor,
-        patternExtractor,
-        repository,
-        graphRepository,
-      );
-      if (embeddingProvider) {
-        const note = repository.getNoteById(noteId);
-        if (note) {
-          const embedding = await embeddingProvider.embed(note.content);
-          repository.saveEmbedding(noteId, embedding, config.embedding.modelName);
+    watcher.on("add", async (filePath: string) => {
+      try {
+        const noteId = await indexFile(
+          filePath,
+          rootPath,
+          fileProcessor,
+          patternExtractor,
+          repository,
+          graphRepository,
+        );
+        if (embeddingProvider) {
+          const note = repository.getNoteById(noteId);
+          if (note) {
+            const embedding = await embeddingProvider.embed(note.content);
+            repository.saveEmbedding(noteId, embedding, config.embedding.modelName);
+          }
         }
+        console.error(`${symbols.arrow} ${colors.info(`Indexed: ${filePath}`)}`);
+      } catch (error) {
+        console.error(
+          `${symbols.error} ${colors.error(`Error indexing ${filePath}: ${error instanceof Error ? error.message : error}`)}`,
+        );
       }
-      console.error(`${symbols.arrow} ${colors.info(`Re-indexed: ${filePath}`)}`);
-    } catch (error) {
-      console.error(
-        `${symbols.error} ${colors.error(`Error re-indexing ${filePath}: ${error instanceof Error ? error.message : error}`)}`,
-      );
-    }
-  });
+    });
 
-  watcher.on("unlink", (filePath: string) => {
-    try {
-      repository.deleteNoteByPath(filePath);
-      console.error(`${symbols.arrow} ${colors.info(`Removed: ${filePath}`)}`);
-    } catch (error) {
-      console.error(
-        `${symbols.error} ${colors.error(`Error removing ${filePath}: ${error instanceof Error ? error.message : error}`)}`,
-      );
-    }
-  });
+    watcher.on("change", async (filePath: string) => {
+      try {
+        const noteId = await indexFile(
+          filePath,
+          rootPath,
+          fileProcessor,
+          patternExtractor,
+          repository,
+          graphRepository,
+        );
+        if (embeddingProvider) {
+          const note = repository.getNoteById(noteId);
+          if (note) {
+            const embedding = await embeddingProvider.embed(note.content);
+            repository.saveEmbedding(noteId, embedding, config.embedding.modelName);
+          }
+        }
+        console.error(`${symbols.arrow} ${colors.info(`Re-indexed: ${filePath}`)}`);
+      } catch (error) {
+        console.error(
+          `${symbols.error} ${colors.error(`Error re-indexing ${filePath}: ${error instanceof Error ? error.message : error}`)}`,
+        );
+      }
+    });
+
+    watcher.on("unlink", (filePath: string) => {
+      try {
+        repository.deleteNoteByPath(filePath);
+        console.error(`${symbols.arrow} ${colors.info(`Removed: ${filePath}`)}`);
+      } catch (error) {
+        console.error(
+          `${symbols.error} ${colors.error(`Error removing ${filePath}: ${error instanceof Error ? error.message : error}`)}`,
+        );
+      }
+    });
+  } else {
+    console.error(`${symbols.info} ${colors.info("File watcher disabled (--no-watch)")}`);
+  }
 
   // Graceful shutdown
   const shutdown = async (): Promise<void> => {
@@ -248,7 +279,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
     if (embeddingProvider) {
       await embeddingProvider.close();
     }
-    await watcher.close();
+    if (watcher) {
+      await watcher.close();
+    }
     db.close();
     process.exit(0);
   };

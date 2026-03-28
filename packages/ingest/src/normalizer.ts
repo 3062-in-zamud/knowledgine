@@ -8,6 +8,21 @@ const SECRET_PATTERNS: RegExp[] = [
   /ghp_[a-zA-Z0-9]{36}/g,
   /xoxb-[0-9]+-[a-zA-Z0-9]+/g,
   /glpat-[a-zA-Z0-9\-_]{20,}/g,
+  // AWS Access Key ID
+  /AKIA[0-9A-Z]{16}/g,
+  // JWT Token (3-part base64url)
+  /eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]+/g,
+  // Database connection strings (with credentials)
+  /(?:mongodb|postgres|postgresql|mysql|redis|amqp):\/\/[^\s'")\]]+/gi,
+  // Private key headers
+  /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
+  // Generic secrets in assignment context (KEY="value" or KEY: value)
+  // matches patterns like SECRET_KEY="value", TOKEN="value", PASSWORD: "value"
+  /(?:SECRET|TOKEN|PASSWORD|CREDENTIAL|API_KEY|APIKEY|AUTH)(?:[\w]*\s*)?[=:]\s*['"][^'"]{8,}['"]/gi,
+  // GitHub personal access tokens (ghs_, ghp_ already covered, adding ghs_ and ghx_)
+  /gh[ps]_[A-Za-z0-9_]{36,}/g,
+  // Slack tokens (xoxp-, xoxs-, xoxa-, xoxr-)
+  /xox[poras]-[A-Za-z0-9-]+/g,
 ];
 
 export function sanitizeContent(content: string): string {

@@ -22,6 +22,9 @@ export interface IngestOptions {
   full?: boolean;
   all?: boolean;
   repo?: string;
+  limit?: number;
+  since?: string;
+  unlimited?: boolean;
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
@@ -165,8 +168,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       progress.finish();
 
       // 全プラグイン完了後に全ノートを対象に増分抽出を実行
-      const allNotes = repository.getAllNotes();
-      const allNoteIds = allNotes.map((n) => n.id);
+      const allNoteIds = repository.getAllNoteIds();
       if (allNoteIds.length > 0) {
         const extractor = new IncrementalExtractor(repository, graphRepository);
         await extractor.process(allNoteIds);
@@ -181,8 +183,14 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       ]);
       console.error("\n" + report);
     } else {
+      const pluginConfig: Record<string, unknown> = {};
+      if (options.limit !== undefined) pluginConfig.limit = options.limit;
+      if (options.since !== undefined) pluginConfig.since = options.since;
+      if (options.unlimited) pluginConfig.unlimited = true;
+
       const summary = await engine.ingest(options.source!, sourcePath, {
         full: options.full,
+        pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
       });
 
       // ingest 完了後に対象ノートの増分抽出を実行
@@ -198,6 +206,14 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         { label: "Errors:", value: summary.errors },
         ...(summary.deleted > 0
           ? [{ label: "Removed:", value: `${summary.deleted} stale notes` }]
+          : []),
+        ...(summary.skippedLargeDiff && summary.skippedLargeDiff > 0
+          ? [
+              {
+                label: "Skipped:",
+                value: `${summary.skippedLargeDiff} large diffs (metadata indexed only)`,
+              },
+            ]
           : []),
         { label: "Duration:", value: elapsed },
       ];

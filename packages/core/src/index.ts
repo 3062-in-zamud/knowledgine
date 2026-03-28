@@ -77,6 +77,7 @@ export { migration007 } from "./storage/migrations/007_spec_alignment.js";
 export { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
 export { migration009 } from "./storage/migrations/009_extraction_metadata.js";
 export { migration010 } from "./storage/migrations/010_memory_protocol.js";
+export { migration011 } from "./storage/migrations/011_fts_unicode61.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -100,6 +101,7 @@ import { migration007 } from "./storage/migrations/007_spec_alignment.js";
 import { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
 import { migration009 } from "./storage/migrations/009_extraction_metadata.js";
 import { migration010 } from "./storage/migrations/010_memory_protocol.js";
+import { migration011 } from "./storage/migrations/011_fts_unicode61.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -114,6 +116,7 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration008,
   migration009,
   migration010,
+  migration011,
 ];
 
 // Provenance
@@ -211,6 +214,8 @@ export type { ProcessedFile } from "./processing/file-processor.js";
 // Utils
 export { CodeBlockDetector } from "./utils/code-block-detector.js";
 export type { CodeBlockRange } from "./utils/code-block-detector.js";
+export { checkSemanticReadiness } from "./utils/semantic-readiness.js";
+export type { SemanticReadiness } from "./utils/semantic-readiness.js";
 
 // Agents
 export type {

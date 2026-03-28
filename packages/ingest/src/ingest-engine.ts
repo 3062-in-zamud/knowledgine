@@ -26,7 +26,7 @@ export class IngestEngine {
   async ingest(
     pluginId: string,
     sourcePath: string,
-    options?: { full?: boolean },
+    options?: { full?: boolean; pluginConfig?: Record<string, unknown> },
   ): Promise<IngestSummary> {
     const start = Date.now();
     const plugin = this.registry.getOrThrow(pluginId);
@@ -34,7 +34,12 @@ export class IngestEngine {
     let errors = 0;
     let deleted = 0;
     let skipped = 0;
+    let skippedLargeDiff = 0;
     const allNoteIds: number[] = [];
+
+    if (options?.pluginConfig) {
+      await plugin.initialize(options.pluginConfig);
+    }
 
     const cursor = options?.full ? undefined : this.cursorStore.getCursor(pluginId, sourcePath);
     const generator = cursor
@@ -47,6 +52,9 @@ export class IngestEngine {
       if (!event.content || event.content.trim() === "") {
         skipped++;
         continue;
+      }
+      if (event.metadata.skippedReason === "large_diff") {
+        skippedLargeDiff++;
       }
       batch.push(event);
       processedPaths.add(event.sourceUri);
@@ -85,6 +93,7 @@ export class IngestEngine {
       errors,
       deleted,
       skipped,
+      ...(skippedLargeDiff > 0 ? { skippedLargeDiff } : {}),
       elapsedMs: Date.now() - start,
       noteIds: allNoteIds,
     };
