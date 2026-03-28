@@ -241,6 +241,20 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       ];
       const report = createSummaryReport("knowledgine ingest", entries);
       console.error("\n" + report);
+
+      // Show default limit hint for git-history when no explicit limit was set
+      if (
+        options.source === "git-history" &&
+        options.limit === undefined &&
+        options.since === undefined &&
+        !options.unlimited
+      ) {
+        console.error(
+          `${symbols.info} ${colors.hint(
+            `Default: latest 100 commits. Use --unlimited for all, --limit N for a custom limit, or --since YYYY-MM-DD for date-based filtering.`,
+          )}`,
+        );
+      }
     }
   } catch (error) {
     console.error(
