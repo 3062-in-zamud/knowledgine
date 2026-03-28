@@ -28,6 +28,7 @@ export interface IngestOptions {
   unlimited?: boolean;
   verbose?: boolean;
   quiet?: boolean;
+  excludePattern?: string[];
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
@@ -216,11 +217,18 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       if (options.limit !== undefined) pluginConfig.limit = options.limit;
       if (options.since !== undefined) pluginConfig.since = options.since;
       if (options.unlimited) pluginConfig.unlimited = true;
+      if (options.excludePattern && options.excludePattern.length > 0) {
+        pluginConfig.noise = { excludePatterns: options.excludePattern };
+      }
 
       const summary = await engine.ingest(options.source!, sourcePath, {
         full: options.full,
         pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
         verbose: options.verbose,
+        excludePatterns:
+          options.excludePattern && options.excludePattern.length > 0
+            ? options.excludePattern
+            : undefined,
       });
 
       // ingest 完了後に対象ノートの増分抽出を実行
