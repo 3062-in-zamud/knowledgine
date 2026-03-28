@@ -16,6 +16,7 @@ export interface SetupOptions {
   write?: boolean;
   rules?: boolean;
   skills?: boolean;
+  scope?: string;
 }
 
 interface McpServerConfig {
@@ -502,8 +503,32 @@ export async function setupCommand(
   }
 
   // Non-interactive: MCP setup (default)
-  const configPath = getConfigPath(target);
+  const rawScope = options.scope ?? "global";
+  if (rawScope !== "global" && rawScope !== "project") {
+    console.error(`${symbols.error} ${colors.error(`Invalid scope "${rawScope}".`)}`);
+    console.error(
+      `${symbols.arrow} ${colors.hint('Valid values for --scope are "global" (default) or "project".')}`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const scope: "global" | "project" = rawScope;
+
+  // Validate target before checking scope compatibility so unknown targets
+  // get the correct "Unknown target" error from getConfigPath() instead of
+  // the misleading "does not support project-level configuration" message.
   const targetLabel = getTargetLabel(target);
+  if (scope === "project" && !(target in PROJECT_CONFIG_SUPPORT)) {
+    const supported = Object.keys(PROJECT_CONFIG_SUPPORT).join(", ");
+    console.error(
+      `${symbols.error} ${colors.error(`Target "${target}" does not support project-level configuration.`)}`,
+    );
+    console.error(`${symbols.arrow} ${colors.hint(`Supported targets: ${supported}`)}`);
+    console.error(`${symbols.arrow} ${colors.hint(`Use --scope global (default) instead.`)}`);
+    process.exitCode = 1;
+    return;
+  }
+  const configPath = getConfigPathForScope(target, scope, rootPath);
 
   let existingConfig: McpConfig;
   try {
@@ -533,8 +558,9 @@ export async function setupCommand(
     console.error(
       `${symbols.arrow} ${colors.hint(`To apply: Run with --write flag, then restart ${targetLabel}.`)}`,
     );
+    const scopeFlag = scope === "project" ? " --scope project" : "";
     console.error(
-      `${symbols.arrow} ${colors.hint(`knowledgine setup --target ${target} --path ${rootPath} --write`)}`,
+      `${symbols.arrow} ${colors.hint(`knowledgine setup --target ${target} --path ${rootPath}${scopeFlag} --write`)}`,
     );
     console.error("");
     console.error(

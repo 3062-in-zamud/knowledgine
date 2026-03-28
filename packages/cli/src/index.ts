@@ -98,12 +98,14 @@ program
   .option("--write", "Write configuration to file (default: dry-run)")
   .option("--rules", "Configure agent rules (instruction files)")
   .option("--skills", "Install agent skill packages (SKILL.md)")
+  .option("--scope <scope>", "Configuration scope: global or project (default: global)")
   .addHelpText(
     "after",
     `
 Examples:
   knowledgine setup                                        Interactive 3-step setup
   knowledgine setup --target cursor --path ~/notes --write MCP config
+  knowledgine setup --target claude-code --scope project --write  Project MCP config
   knowledgine setup --rules --target cursor --write        Agent rules
   knowledgine setup --skills --target cursor --write       Agent skills`,
   )

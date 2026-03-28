@@ -495,16 +495,23 @@ export async function initCommand(options: InitOptions): Promise<void> {
   stepProgress.finish();
 
   // ---------------------------------------------------------------------------
-  // Write .knowledginerc.json only when explicitly requested (--save-config)
+  // Persist semantic: true when embeddings were generated (reflects DB state)
+  // Same pattern as upgrade --semantic (unconditional write)
+  // ---------------------------------------------------------------------------
+  if (enableSemantic && config.embedding.enabled) {
+    writeRcConfig(rootPath, { semantic: true });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Write defaultPath only when explicitly requested (--save-config + --path)
   // ---------------------------------------------------------------------------
   if (options.saveConfig) {
     const cwd = process.cwd();
     const resolvedRoot = resolve(rootPath);
-    if (resolvedRoot !== resolve(cwd)) {
+    // Only write defaultPath when --path was explicitly provided by user,
+    // preventing resolveDefaultPath inferred paths from being written back
+    if (options.path && resolvedRoot !== resolve(cwd)) {
       writeRcConfig(cwd, { defaultPath: resolvedRoot });
-    }
-    if (enableSemantic && config.embedding.enabled) {
-      writeRcConfig(rootPath, { semantic: true });
     }
   }
 

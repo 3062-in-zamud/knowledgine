@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync, chmodSync } from "fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  existsSync,
+  readFileSync,
+  rmSync,
+  chmodSync,
+} from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { createDatabase, Migrator, KnowledgeRepository, ALL_MIGRATIONS } from "@knowledgine/core";
@@ -125,9 +133,64 @@ describe("init command – rc.json generation", () => {
   it("should not generate .knowledginerc.json by default", async () => {
     writeFileSync(join(testDir, "note.md"), "# Test\n\nContent");
 
-    await initCommand({ path: testDir });
+    // Explicitly disable semantic to prevent auto-detection from creating rc file
+    await initCommand({ path: testDir, semantic: false });
 
     expect(existsSync(join(testDir, ".knowledginerc.json"))).toBe(false);
+  });
+
+  it("should write semantic: true when embeddings are enabled without --save-config", async () => {
+    writeFileSync(join(testDir, "note.md"), "# Test\n\nContent");
+
+    await initCommand({ path: testDir, semantic: true });
+
+    // If sqlite-vec is available, semantic: true should be written to rc file
+    // regardless of --save-config flag (Bug 1 fix)
+    const rcPath = join(testDir, ".knowledginerc.json");
+    if (existsSync(rcPath)) {
+      const rc = JSON.parse(readFileSync(rcPath, "utf-8"));
+      expect(rc.semantic).toBe(true);
+      // defaultPath should NOT be written without --save-config
+      expect(rc.defaultPath).toBeUndefined();
+    }
+    // If sqlite-vec is unavailable, rc file won't be created — that's expected
+  });
+
+  it("should not write semantic: true when semantic is disabled", async () => {
+    writeFileSync(join(testDir, "note.md"), "# Test\n\nContent");
+
+    await initCommand({ path: testDir, semantic: false });
+
+    expect(existsSync(join(testDir, ".knowledginerc.json"))).toBe(false);
+  });
+
+  it("should write defaultPath only when --path is explicitly provided with --save-config", async () => {
+    const subDir = join(testDir, "notes");
+    mkdirSync(subDir);
+    writeFileSync(join(subDir, "note.md"), "# Test\n\nContent");
+
+    // chdir to testDir so that any rc file is written inside the temp dir
+    const originalCwd = process.cwd();
+    process.chdir(testDir);
+    try {
+      await initCommand({ path: subDir, saveConfig: true, semantic: false });
+
+      // defaultPath should be written to cwd's rc (testDir) since
+      // options.path was explicitly provided and subDir != testDir (cwd)
+      const cwdRcPath = join(testDir, ".knowledginerc.json");
+      expect(existsSync(cwdRcPath)).toBe(true);
+      const rc = JSON.parse(readFileSync(cwdRcPath, "utf-8"));
+      expect(rc.defaultPath).toBe(subDir);
+
+      // subDir rc should NOT have defaultPath
+      const subRcPath = join(subDir, ".knowledginerc.json");
+      if (existsSync(subRcPath)) {
+        const subRc = JSON.parse(readFileSync(subRcPath, "utf-8"));
+        expect(subRc.defaultPath).toBeUndefined();
+      }
+    } finally {
+      process.chdir(originalCwd);
+    }
   });
 });
 

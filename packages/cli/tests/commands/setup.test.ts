@@ -229,4 +229,37 @@ describe("setup command", () => {
     expect(output).toContain("Claude Code");
     expect(output).toContain('"knowledgine"');
   });
+
+  it("should use project .mcp.json when --scope project", async () => {
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await setupCommand({ target: "claude-code", path: testDir, scope: "project" });
+
+    const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain(".mcp.json");
+    expect(output).toContain('"knowledgine"');
+    expect(output).toContain("--scope project");
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("should error when --scope project with unsupported target", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await setupCommand({ target: "claude-desktop", path: testDir, scope: "project" });
+
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("should default to global config when scope not specified (backward compat)", async () => {
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { homedir } = await import("os");
+    const { join } = await import("path");
+
+    await setupCommand({ target: "claude-code", path: testDir });
+
+    const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
+    const expectedPath = join(homedir(), ".claude.json");
+    expect(output).toContain(expectedPath);
+    expect(process.exitCode).toBeUndefined();
+  });
 });
