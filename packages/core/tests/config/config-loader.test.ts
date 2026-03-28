@@ -209,6 +209,81 @@ describe("loadConfig: hierarchical RC file search", () => {
   });
 });
 
+describe("RcConfig validation", () => {
+  let testDir: string;
+  let savedSemantic: string | undefined;
+
+  beforeEach(() => {
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-rcconfig-validation-test-"));
+    savedSemantic = process.env["KNOWLEDGINE_SEMANTIC"];
+    delete process.env["KNOWLEDGINE_SEMANTIC"];
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+    if (savedSemantic === undefined) {
+      delete process.env["KNOWLEDGINE_SEMANTIC"];
+    } else {
+      process.env["KNOWLEDGINE_SEMANTIC"] = savedSemantic;
+    }
+  });
+
+  it("should accept valid config with all new fields", () => {
+    const config = {
+      semantic: true,
+      serve: { defaultPort: 3000, host: "localhost", authToken: "secret" },
+      noise: {
+        shortMessageThreshold: 10,
+        botAuthors: ["bot1"],
+        noiseSubjectPatterns: ["^WIP"],
+        excludePatterns: ["node_modules"],
+      },
+      observer: { enabled: true, limit: 100 },
+      projects: [{ name: "proj1", path: "/tmp/proj1" }],
+    };
+    writeFileSync(join(testDir, ".knowledginerc.json"), JSON.stringify(config));
+    const loaded = loadConfig(testDir);
+    expect(loaded.embedding.enabled).toBe(true);
+  });
+
+  it("should accept config with only existing fields (no new fields)", () => {
+    const config = { semantic: false, serve: { defaultPort: 8080, host: "0.0.0.0" } };
+    writeFileSync(join(testDir, ".knowledginerc.json"), JSON.stringify(config));
+    const loaded = loadConfig(testDir);
+    expect(loaded.embedding.enabled).toBe(false);
+  });
+
+  it("should fallback on invalid noise config (wrong type)", () => {
+    const config = { semantic: true, noise: { shortMessageThreshold: "not-a-number" } };
+    writeFileSync(join(testDir, ".knowledginerc.json"), JSON.stringify(config));
+    // Should not throw — falls back gracefully
+    const loaded = loadConfig(testDir);
+    expect(loaded.rootPath).toBe(testDir);
+  });
+
+  it("should fallback on invalid observer config (wrong type)", () => {
+    const config = { semantic: true, observer: { enabled: "yes", limit: "many" } };
+    writeFileSync(join(testDir, ".knowledginerc.json"), JSON.stringify(config));
+    const loaded = loadConfig(testDir);
+    expect(loaded.rootPath).toBe(testDir);
+  });
+
+  it("should fallback on invalid projects config (missing required field)", () => {
+    const config = { semantic: true, projects: [{ name: "proj1" }] }; // missing path
+    writeFileSync(join(testDir, ".knowledginerc.json"), JSON.stringify(config));
+    const loaded = loadConfig(testDir);
+    expect(loaded.rootPath).toBe(testDir);
+  });
+
+  it("should preserve unknown fields via passthrough", () => {
+    const config = { semantic: true, customField: "value", nested: { key: 42 } };
+    writeFileSync(join(testDir, ".knowledginerc.json"), JSON.stringify(config));
+    const loaded = loadConfig(testDir);
+    // Should not throw and should still return valid config
+    expect(loaded.rootPath).toBe(testDir);
+  });
+});
+
 describe("writeRcConfig", () => {
   let testDir: string;
 
