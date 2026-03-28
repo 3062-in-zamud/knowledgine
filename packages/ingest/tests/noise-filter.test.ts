@@ -4,6 +4,7 @@ import {
   isDependabotCommit,
   isShortCommitMessage,
   classifyNoiseLevel,
+  NoiseFilter,
 } from "../src/noise-filter.js";
 
 describe("noise-filter", () => {
@@ -86,5 +87,64 @@ describe("noise-filter", () => {
       );
       expect(level).toBe("normal");
     });
+  });
+});
+
+describe("NoiseFilter class", () => {
+  it("should use default thresholds when no config provided", () => {
+    const filter = new NoiseFilter();
+    expect(filter.isShortCommitMessage("fix")).toBe(true); // 3 < 10
+    expect(filter.isShortCommitMessage("fix: resolve memory leak issue")).toBe(false);
+  });
+
+  it("should accept custom shortMessageThreshold", () => {
+    const filter = new NoiseFilter({ shortMessageThreshold: 20 });
+    expect(filter.isShortCommitMessage("fix: quick patch")).toBe(true); // 16 < 20
+    expect(filter.isShortCommitMessage("fix: resolve memory leak issue here")).toBe(false);
+  });
+
+  it("should accept custom botAuthors", () => {
+    const filter = new NoiseFilter({ botAuthors: ["my-bot[bot]"] });
+    expect(filter.isDependabotCommit("auto-update deps", "my-bot[bot]")).toBe(true);
+    expect(filter.isDependabotCommit("auto-update deps", "dependabot[bot]")).toBe(false); // not in custom list
+  });
+
+  it("should apply excludePatterns to changedPaths", () => {
+    const filter = new NoiseFilter({ excludePatterns: ["**/vendor/**"] });
+    expect(filter.classify("fix vendor code", "dev", ["vendor/lib/foo.js"])).toBe("noise");
+    expect(filter.classify("fix vendor code", "dev", ["src/index.ts"])).toBe("normal");
+  });
+
+  it("should apply custom noiseSubjectPatterns", () => {
+    const filter = new NoiseFilter({ noiseSubjectPatterns: ["^Merge branch"] });
+    expect(filter.classify("Merge branch 'feature'", "dev", ["src/index.ts"])).toBe("noise");
+    expect(filter.classify("feat: add feature", "dev", ["src/index.ts"])).toBe("normal");
+  });
+
+  it("should treat all paths as noise when all match excludePatterns", () => {
+    const filter = new NoiseFilter({ excludePatterns: ["**/vendor/**", "**/node_modules/**"] });
+    expect(filter.classify("update deps", "dev", ["vendor/a.js", "node_modules/b.js"])).toBe(
+      "noise",
+    );
+  });
+
+  it("should classify normally when no excludePatterns match", () => {
+    const filter = new NoiseFilter({ excludePatterns: ["**/vendor/**"] });
+    expect(filter.classify("fix: resolve issue properly", "dev", ["src/main.ts"])).toBe("normal");
+  });
+});
+
+describe("backward-compatible function exports", () => {
+  it("classifyNoiseLevel should work as before", () => {
+    expect(classifyNoiseLevel("wip", "dev", ["src/a.ts"])).toBe("low-value");
+  });
+  it("isDependabotCommit should work as before", () => {
+    expect(isDependabotCommit("chore(deps): bump lodash", "dependabot[bot]")).toBe(true);
+  });
+  it("isI18nOnlyCommit should work as before", () => {
+    expect(isI18nOnlyCommit(["locales/en.json"])).toBe(true);
+  });
+  it("isShortCommitMessage should work as before", () => {
+    expect(isShortCommitMessage("fix", 10)).toBe(true);
   });
 });
