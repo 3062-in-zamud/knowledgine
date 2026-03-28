@@ -245,6 +245,26 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
   if (ingestSummary.processed === 0) {
     stepProgress.warn("No markdown files found in the directory.");
+
+    // Suggest ingest sources if this is a git repository
+    try {
+      const { execFileSync } = await import("child_process");
+      execFileSync("git", ["rev-parse", "--git-dir"], { cwd: rootPath, stdio: "ignore" });
+      // It's a git repo - suggest ingest sources
+      console.error("");
+      console.error(
+        `${symbols.info} ${colors.info("This is a git repository. Enrich your knowledge base:")}`,
+      );
+      console.error(
+        `  ${symbols.arrow} ${colors.hint(`knowledgine ingest --source git-history --path ${rootPath}`)}`,
+      );
+      console.error(
+        `  ${symbols.arrow} ${colors.hint(`knowledgine ingest --source github --repo <owner/repo> --path ${rootPath}`)}`,
+      );
+      console.error("");
+    } catch {
+      // Not a git repo - no additional hint
+    }
   }
 
   if (ingestSummary.errors > 0) {
