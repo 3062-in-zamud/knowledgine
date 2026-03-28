@@ -9,7 +9,7 @@ TypeScript ESM monorepo (pnpm workspaces). Developer Knowledge Infrastructure.
 
 ## Build Order
 
-mcp-memory-protocol (no deps) -> core -> ingest, mcp-server (parallel) -> cli
+mcp-memory-protocol -> core -> ingest -> mcp-server -> cli
 
 ## Key Rules
 
