@@ -25,6 +25,7 @@ export interface IngestOptions {
   limit?: number;
   since?: string;
   unlimited?: boolean;
+  verbose?: boolean;
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
@@ -126,6 +127,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       let completed = 0;
       let totalProcessed = 0;
       let totalErrors = 0;
+      let totalSkippedLargeDiff = 0;
 
       for (const plugin of plugins) {
         const initResult = initResults.get(plugin.manifest.id);
@@ -141,18 +143,28 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         try {
           const summary = await engine.ingest(plugin.manifest.id, rootPath, {
             full: options.full,
+            verbose: options.verbose,
           });
           completed++;
           totalProcessed += summary.processed;
           totalErrors += summary.errors;
+          totalSkippedLargeDiff += summary.skippedLargeDiff ?? 0;
           progress.update(completed, plugin.manifest.id);
-          if (summary.errors > 0) {
+
+          const parts = [`${summary.processed} events`];
+          if (summary.errors > 0) parts.push(`${summary.errors} errors`);
+          if (summary.skippedLargeDiff && summary.skippedLargeDiff > 0) {
+            parts.push(`${summary.skippedLargeDiff} large diffs skipped`);
+          }
+          parts.push(formatDuration(summary.elapsedMs));
+
+          if (summary.errors > 0 || (summary.skippedLargeDiff && summary.skippedLargeDiff > 0)) {
             console.error(
-              `  ${symbols.warning} ${colors.warning(plugin.manifest.id)}: ${summary.processed} events (${summary.errors} errors, ${formatDuration(summary.elapsedMs)})`,
+              `  ${symbols.warning} ${colors.warning(plugin.manifest.id)}: ${parts.join(", ")}`,
             );
           } else {
             console.error(
-              `  ${symbols.success} ${colors.success(plugin.manifest.id)}: ${summary.processed} events (${formatDuration(summary.elapsedMs)})`,
+              `  ${symbols.success} ${colors.success(plugin.manifest.id)}: ${parts.join(", ")}`,
             );
           }
         } catch (error) {
@@ -175,12 +187,21 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       }
 
       const elapsed = formatDuration(Date.now() - startTime);
-      const report = createSummaryReport("knowledgine ingest", [
+      const reportEntries = [
         { label: "Plugins:", value: `${plugins.length} run` },
         { label: "Events:", value: `${totalProcessed} processed` },
         { label: "Errors:", value: totalErrors },
+        ...(totalSkippedLargeDiff > 0
+          ? [
+              {
+                label: "Skipped:",
+                value: `${totalSkippedLargeDiff} large diffs (metadata indexed only)`,
+              },
+            ]
+          : []),
         { label: "Duration:", value: elapsed },
-      ]);
+      ];
+      const report = createSummaryReport("knowledgine ingest", reportEntries);
       console.error("\n" + report);
     } else {
       const pluginConfig: Record<string, unknown> = {};
@@ -191,6 +212,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       const summary = await engine.ingest(options.source!, sourcePath, {
         full: options.full,
         pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
+        verbose: options.verbose,
       });
 
       // ingest 完了後に対象ノートの増分抽出を実行

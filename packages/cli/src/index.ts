@@ -145,6 +145,7 @@ program
   .option("--limit <n>", "Limit number of items (e.g., commits for git-history)", parseInt)
   .option("--since <date>", "Filter by date (e.g., 2025-01-01, for git-history)")
   .option("--unlimited", "Disable default limits (git-history)")
+  .option("--verbose", "Show details of skipped items")
   .addHelpText(
     "after",
     `

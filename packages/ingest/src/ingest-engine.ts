@@ -27,7 +27,7 @@ export class IngestEngine {
   async ingest(
     pluginId: string,
     sourcePath: string,
-    options?: { full?: boolean; pluginConfig?: Record<string, unknown> },
+    options?: { full?: boolean; pluginConfig?: Record<string, unknown>; verbose?: boolean },
   ): Promise<IngestSummary> {
     const start = Date.now();
     const plugin = this.registry.getOrThrow(pluginId);
@@ -58,10 +58,18 @@ export class IngestEngine {
     for await (const event of generator) {
       if (!event.content || event.content.trim() === "") {
         skipped++;
+        if (options?.verbose) {
+          process.stderr.write(`  [skip] empty content: ${event.sourceUri}\n`);
+        }
         continue;
       }
       if (event.metadata.skippedReason === "large_diff") {
         skippedLargeDiff++;
+        if (options?.verbose) {
+          process.stderr.write(
+            `  [skip] large diff (metadata only): ${event.sourceUri} — ${event.title}\n`,
+          );
+        }
       }
       batch.push(event);
       processedPaths.add(event.sourceUri);
