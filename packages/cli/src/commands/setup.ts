@@ -503,7 +503,23 @@ export async function setupCommand(
   }
 
   // Non-interactive: MCP setup (default)
-  const scope = (options.scope ?? "global") as "global" | "project";
+  const rawScope = options.scope ?? "global";
+  if (rawScope !== "global" && rawScope !== "project") {
+    console.error(
+      `${symbols.error} ${colors.error(`Invalid scope "${rawScope}".`)}`,
+    );
+    console.error(
+      `${symbols.arrow} ${colors.hint('Valid values for --scope are "global" (default) or "project".')}`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const scope: "global" | "project" = rawScope;
+
+  // Validate target before checking scope compatibility so unknown targets
+  // get the correct "Unknown target" error from getConfigPath() instead of
+  // the misleading "does not support project-level configuration" message.
+  const targetLabel = getTargetLabel(target);
   if (scope === "project" && !(target in PROJECT_CONFIG_SUPPORT)) {
     const supported = Object.keys(PROJECT_CONFIG_SUPPORT).join(", ");
     console.error(
@@ -515,7 +531,6 @@ export async function setupCommand(
     return;
   }
   const configPath = getConfigPathForScope(target, scope, rootPath);
-  const targetLabel = getTargetLabel(target);
 
   let existingConfig: McpConfig;
   try {
