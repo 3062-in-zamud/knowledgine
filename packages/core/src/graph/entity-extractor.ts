@@ -112,6 +112,27 @@ export class EntityExtractor {
     "public",
     "assets",
     "static",
+    "com",
+    "org",
+    "net",
+    "io",
+    "dev",
+    "tools",
+    "blob",
+    "tree",
+    "main",
+    "master",
+    "profile",
+    "api",
+    "raw",
+    "releases",
+    "actions",
+    "settings",
+    "examples",
+    "wiki",
+    "issues",
+    "pulls",
+    "packages",
   ]);
 
   constructor(rules?: ExtractionRules) {
@@ -380,18 +401,51 @@ export class EntityExtractor {
 
   private extractOrgRepos(content: string): ExtractedEntity[] {
     const results: ExtractedEntity[] = [];
+    const cleanContent = this.stripUrls(content);
     // org/repo patterns (e.g., facebook/react, microsoft/typescript)
     const orgRepoRe = /\b([a-z][\w-]{1,30})\/([a-z][\w-]{1,30})\b/g;
     let m: RegExpExecArray | null;
-    while ((m = orgRepoRe.exec(content)) !== null) {
+    while ((m = orgRepoRe.exec(cleanContent)) !== null) {
       const org = m[1].toLowerCase();
       const repo = m[2].toLowerCase();
       if (EntityExtractor.MIME_PREFIXES.has(org)) continue;
       if (EntityExtractor.PATH_SEGMENTS.has(org)) continue;
+      if (EntityExtractor.PATH_SEGMENTS.has(repo)) continue;
       const fullName = `${org}/${repo}`;
       if (!this.isStopWord(org) && !this.isStopWord(repo)) {
         results.push({ name: fullName, entityType: "project", sourceType: "code" });
       }
+    }
+    // Also extract org/repo from GitHub URLs specifically
+    results.push(...this.extractOrgReposFromUrls(content));
+    return results;
+  }
+
+  /**
+   * Strip URLs from content, replacing them with whitespace to prevent
+   * URL path fragments from being matched as org/repo.
+   */
+  private stripUrls(content: string): string {
+    // Match http(s):// URLs and protocol-relative //
+    return content.replace(/(?:https?:\/\/|\/\/)[^\s)>\]]+/g, " ");
+  }
+
+  /**
+   * Extract org/repo from GitHub URLs (e.g., github.com/org/repo/...).
+   * Only extracts the org/repo portion, not deeper path segments.
+   */
+  private extractOrgReposFromUrls(content: string): ExtractedEntity[] {
+    const results: ExtractedEntity[] = [];
+    const githubUrlRe = /github\.com\/([a-z][\w-]{1,30})\/([a-z][\w-]{1,30})/gi;
+    let m: RegExpExecArray | null;
+    while ((m = githubUrlRe.exec(content)) !== null) {
+      const org = m[1].toLowerCase();
+      const repo = m[2].toLowerCase();
+      if (EntityExtractor.MIME_PREFIXES.has(org)) continue;
+      if (EntityExtractor.PATH_SEGMENTS.has(org)) continue;
+      if (EntityExtractor.PATH_SEGMENTS.has(repo)) continue;
+      if (this.isStopWord(org) || this.isStopWord(repo)) continue;
+      results.push({ name: `${org}/${repo}`, entityType: "project", sourceType: "code" });
     }
     return results;
   }

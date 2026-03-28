@@ -154,6 +154,76 @@ import { useState } from 'react';
     });
   });
 
+  describe("URL/path fragment exclusion (KNOW-361)", () => {
+    it("should not extract URL path fragments as org/repo", () => {
+      const content = `
+Check out https://github.com/user-attachments/assets/abc.png
+See https://github.com/org/repo/blob/main/file.ts
+Visit https://example.com/tools/badges for details
+      `;
+      const result = extractor.extract(content);
+      const names = result.map((e) => e.name);
+      expect(names).not.toContain("com/user-attachments");
+      expect(names).not.toContain("user-attachments/assets");
+      expect(names).not.toContain("tools/badges");
+      expect(names).not.toContain("blob/main");
+      expect(names).not.toContain("main/file");
+    });
+
+    it("should extract org/repo from GitHub URL correctly", () => {
+      const content = "See https://github.com/facebook/react/blob/main/README.md";
+      const result = extractor.extract(content);
+      const names = result.map((e) => e.name);
+      // org/repo itself should still be extracted
+      expect(names).toContain("facebook/react");
+      // but path fragments after the repo should not
+      expect(names).not.toContain("react/blob");
+      expect(names).not.toContain("blob/main");
+    });
+
+    it("should not extract domain path fragments like com/profile", () => {
+      const content = "Visit https://example.com/profile/settings";
+      const result = extractor.extract(content);
+      const names = result.map((e) => e.name);
+      expect(names).not.toContain("com/profile");
+      expect(names).not.toContain("profile/settings");
+    });
+
+    it("should not extract protocol-relative URL fragments", () => {
+      const content = "Load //cdn.example.com/lib/v2";
+      const result = extractor.extract(content);
+      const names = result.map((e) => e.name);
+      expect(names).not.toContain("com/lib");
+    });
+
+    it("should still extract legitimate org/repo patterns", () => {
+      const content = "We use facebook/react and microsoft/typescript in our project";
+      const result = extractor.extract(content);
+      const names = result.map((e) => e.name);
+      expect(names).toContain("facebook/react");
+      expect(names).toContain("microsoft/typescript");
+    });
+
+    it("should not extract path segments like browser-use/blob or main/examples", () => {
+      const content = `
+browser-use/blob is a path fragment
+main/examples is just a directory listing
+      `;
+      const result = extractor.extract(content);
+      const names = result.map((e) => e.name);
+      expect(names).not.toContain("browser-use/blob");
+      expect(names).not.toContain("main/examples");
+    });
+
+    it("should not extract entities from markdown image URLs", () => {
+      const content = "![screenshot](https://github.com/user-attachments/assets/image.png)";
+      const result = extractor.extract(content);
+      const names = result.map((e) => e.name);
+      expect(names).not.toContain("com/user-attachments");
+      expect(names).not.toContain("user-attachments/assets");
+    });
+  });
+
   describe("extractOrgRepos sourceType", () => {
     it("should have sourceType 'code' for org/repo entities", () => {
       const content = "Check out facebook/react for more details";
