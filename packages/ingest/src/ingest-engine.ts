@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
-import type { KnowledgeRepository } from "@knowledgine/core";
-import type { IngestSummary, NormalizedEvent, SkipReason } from "./types.js";
+import type { KnowledgeRepository, GraphRepository } from "@knowledgine/core";
+import { IncrementalExtractor } from "@knowledgine/core";
+import type { IngestSummary, ExtractionSummary, NormalizedEvent, SkipReason } from "./types.js";
 import type { PluginRegistry } from "./plugin-registry.js";
 import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
@@ -20,6 +21,7 @@ export class IngestEngine {
     private registry: PluginRegistry,
     private db: Database.Database,
     private repository: KnowledgeRepository,
+    private graphRepository?: GraphRepository,
   ) {
     this.cursorStore = new CursorStore(db);
     this.eventWriter = new EventWriter(db, repository);
@@ -34,6 +36,7 @@ export class IngestEngine {
       verbose?: boolean;
       quiet?: boolean;
       excludePatterns?: string[];
+      postProcessExtraction?: boolean;
     },
   ): Promise<IngestSummary> {
     const start = Date.now();
@@ -163,6 +166,12 @@ export class IngestEngine {
       }
     }
 
+    let extractionSummary: ExtractionSummary | undefined;
+    if (this.graphRepository && options?.postProcessExtraction !== false && allNoteIds.length > 0) {
+      const extractor = new IncrementalExtractor(this.repository, this.graphRepository);
+      extractionSummary = await extractor.process(allNoteIds);
+    }
+
     return {
       pluginId,
       processed,
@@ -173,6 +182,7 @@ export class IngestEngine {
       ...(skipReason ? { skipReason } : {}),
       elapsedMs: Date.now() - start,
       noteIds: allNoteIds,
+      ...(extractionSummary ? { extractionSummary } : {}),
     };
   }
 

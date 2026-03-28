@@ -152,6 +152,7 @@ program
   .option("--verbose", "Show details of skipped items")
   .option("--quiet", "Suppress progress output (for CI)")
   .option("--exclude-pattern <patterns...>", "Glob patterns to exclude from ingestion")
+  .option("--skip-extraction", "Skip entity extraction after ingest")
   .option("--observe", "Run Observer/Reflector agents after ingestion")
   .option("--no-observe", "Skip Observer/Reflector agents")
   .option("--observe-limit <n>", "Max notes to process with Observer", parseInt)

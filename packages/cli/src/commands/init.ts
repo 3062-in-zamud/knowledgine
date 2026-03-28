@@ -9,6 +9,7 @@ import {
   Migrator,
   KnowledgeRepository,
   GraphRepository,
+  IncrementalExtractor,
   ALL_MIGRATIONS,
   OnnxEmbeddingProvider,
   ModelManager,
@@ -17,7 +18,6 @@ import {
   VERSION,
 } from "@knowledgine/core";
 import { IngestEngine, PluginRegistry, MarkdownPlugin } from "@knowledgine/ingest";
-import { postIngestProcessing } from "../lib/entity-extractor.js";
 import { createProgress, createStepProgress, formatDuration } from "../lib/progress.js";
 import { copyDemoFixtures } from "../lib/demo-manager.js";
 import { getDemoNotesPath } from "./demo.js";
@@ -307,7 +307,9 @@ export async function initCommand(options: InitOptions): Promise<void> {
   stepProgress.completeStep("Indexing markdown files");
 
   // Entity extraction (post-ingest batch)
-  const postSummary = await postIngestProcessing(repository, graphRepository);
+  const extractor = new IncrementalExtractor(repository, graphRepository);
+  const allNoteIds = ingestSummary.noteIds ?? repository.getAllNoteIds();
+  const postSummary = await extractor.process(allNoteIds);
 
   // ---------------------------------------------------------------------------
   // Auto-detect semantic search capability (when not explicitly set)

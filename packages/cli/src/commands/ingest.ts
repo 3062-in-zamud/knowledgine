@@ -8,7 +8,6 @@ import {
   Migrator,
   KnowledgeRepository,
   GraphRepository,
-  IncrementalExtractor,
   ALL_MIGRATIONS,
   loadRcFile,
   createLLMProvider,
@@ -35,6 +34,7 @@ export interface IngestOptions {
   verbose?: boolean;
   quiet?: boolean;
   excludePattern?: string[];
+  skipExtraction?: boolean;
   observe?: boolean;
   observeLimit?: number;
 }
@@ -131,7 +131,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
   }
 
   // Run ingest
-  const engine = new IngestEngine(registry, db, repository);
+  const engine = new IngestEngine(registry, db, repository, graphRepository);
   const startTime = Date.now();
   const ingestedNoteIds: number[] = [];
 
@@ -159,11 +159,13 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
           const summary = await engine.ingest(plugin.manifest.id, rootPath, {
             full: options.full,
             verbose: options.verbose,
+            postProcessExtraction: !options.skipExtraction,
           });
           completed++;
           totalProcessed += summary.processed;
           totalErrors += summary.errors;
           totalSkippedLargeDiff += summary.skippedLargeDiff ?? 0;
+          if (summary.noteIds) ingestedNoteIds.push(...summary.noteIds);
           progress.update(completed, plugin.manifest.id);
 
           const parts = [`${summary.processed} events`];
@@ -196,14 +198,6 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       }
 
       progress.finish();
-
-      // 全プラグイン完了後に全ノートを対象に増分抽出を実行
-      const allNoteIds = repository.getAllNoteIds();
-      if (allNoteIds.length > 0) {
-        const extractor = new IncrementalExtractor(repository, graphRepository);
-        await extractor.process(allNoteIds);
-      }
-      ingestedNoteIds.push(...allNoteIds);
 
       const elapsed = formatDuration(Date.now() - startTime);
       const reportEntries = [
@@ -239,14 +233,10 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
           options.excludePattern && options.excludePattern.length > 0
             ? options.excludePattern
             : undefined,
+        postProcessExtraction: !options.skipExtraction,
       });
 
-      // ingest 完了後に対象ノートの増分抽出を実行
-      if (summary.noteIds && summary.noteIds.length > 0) {
-        const extractor = new IncrementalExtractor(repository, graphRepository);
-        await extractor.process(summary.noteIds);
-        ingestedNoteIds.push(...summary.noteIds);
-      }
+      if (summary.noteIds) ingestedNoteIds.push(...summary.noteIds);
 
       const elapsed = formatDuration(Date.now() - startTime);
       const entries = [
