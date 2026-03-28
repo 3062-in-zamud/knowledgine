@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **`--observe` / `--no-observe` / `--observe-limit` オプション**: `knowledgine ingest` コマンドに Observer/Reflector エージェントのオプトイン切り替えを追加。`--observe` フラグまたは `.knowledginerc.json` の `observer.enabled: true` で有効化。LLM 未設定時はルールベースモードで動作（KNOW-323）
 - **`--skip-extraction` オプション**: `knowledgine ingest` コマンドに `--skip-extraction` オプションを追加。ingest後のentity抽出をスキップできる（KNOW-324）
 
+#### Docs
+
+- **配信チャネル設計ドキュメント追加**: CLI スタンドアロン・REST API 拡張・VS Code 拡張の 3 チャネルの設計と優先順位ロードマップを `docs/design/distribution-channels.md` に追加
+
 ### Removed
 
 #### CLI (`knowledgine`)
