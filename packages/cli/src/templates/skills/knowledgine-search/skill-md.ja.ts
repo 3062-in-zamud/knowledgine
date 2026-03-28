@@ -112,7 +112,7 @@ find_related(
 knowledgine search "<query>"                     # キーワード検索
 knowledgine search "<query>" --mode semantic     # セマンティック検索
 knowledgine search "<query>" --mode hybrid       # ハイブリッド検索
-knowledgine suggest --file src/commands/setup.ts # ファイルパスによるコンテキストベース検索
+knowledgine suggest --file src/commands/setup.ts  # ファイルパスによるコンテキストベース検索（suggest コマンド）
 \`\`\`
 
 ## 手順
