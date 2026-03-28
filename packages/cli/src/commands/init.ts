@@ -30,6 +30,7 @@ export interface InitOptions {
   skipEmbeddings?: boolean;
   demo?: boolean;
   force?: boolean;
+  yes?: boolean;
   saveConfig?: boolean;
 }
 
@@ -127,12 +128,15 @@ export async function initCommand(options: InitOptions): Promise<void> {
   }
 
   // Determine if semantic search should be enabled
-  const enableSemantic = options.semantic === true;
+  // --no-semantic explicitly disables; --semantic explicitly enables;
+  // default: auto-enable if model is available (prompt for large repos)
+  const semanticExplicitlyDisabled = options.semantic === false;
+  let enableSemantic = options.semantic === true;
 
   // ---------------------------------------------------------------------------
   // Step 1: Create .knowledgine directory
   // ---------------------------------------------------------------------------
-  const totalSteps = enableSemantic ? 5 : 3;
+  const totalSteps = 5; // Always show 5 steps; skip semantic steps if not needed
   const stepProgress = createStepProgress(totalSteps, "Initializing knowledgine...");
 
   const knowledgineDir = resolve(rootPath, ".knowledgine");
@@ -251,6 +255,52 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
   // Entity extraction (post-ingest batch)
   const postSummary = await postIngestProcessing(repository, graphRepository);
+
+  // ---------------------------------------------------------------------------
+  // Auto-detect semantic search capability (when not explicitly set)
+  // ---------------------------------------------------------------------------
+  const SEMANTIC_AUTO_THRESHOLD = 5000;
+  if (!enableSemantic && !semanticExplicitlyDisabled && ingestSummary.processed > 0) {
+    const modelManager = new ModelManager();
+    if (modelManager.isModelAvailable()) {
+      if (ingestSummary.processed < SEMANTIC_AUTO_THRESHOLD) {
+        // Auto-enable for small repos
+        enableSemantic = true;
+        config.embedding.enabled = true;
+        try {
+          await loadSqliteVecExtension(db);
+        } catch {
+          enableSemantic = false;
+          config.embedding.enabled = false;
+        }
+      } else if (options.yes) {
+        // --yes flag: auto-accept
+        enableSemantic = true;
+        config.embedding.enabled = true;
+        try {
+          await loadSqliteVecExtension(db);
+        } catch {
+          enableSemantic = false;
+          config.embedding.enabled = false;
+        }
+      } else {
+        // Large repo: prompt user
+        const shouldEnable = await p.confirm({
+          message: `Enable semantic search? (${ingestSummary.processed} notes, estimated ~${Math.ceil(ingestSummary.processed / 150)}s)`,
+        });
+        if (shouldEnable && !p.isCancel(shouldEnable)) {
+          enableSemantic = true;
+          config.embedding.enabled = true;
+          try {
+            await loadSqliteVecExtension(db);
+          } catch {
+            enableSemantic = false;
+            config.embedding.enabled = false;
+          }
+        }
+      }
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Step 4 & 5 (semantic only): Download model + generate embeddings
@@ -375,6 +425,10 @@ export async function initCommand(options: InitOptions): Promise<void> {
     }
 
     stepProgress.completeStep("Generating embeddings");
+  } else {
+    // Skip semantic steps when not enabled
+    stepProgress.skipStep("Downloading embedding model", "semantic search not enabled");
+    stepProgress.skipStep("Generating embeddings", "semantic search not enabled");
   }
 
   stepProgress.finish();

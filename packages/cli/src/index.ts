@@ -55,12 +55,14 @@ program
   .description("Scan and index markdown files (FTS5 full-text search by default)")
   .option("--path <dir>", "Root directory to scan")
   .option("--semantic", "Enable semantic search (download model + generate embeddings)")
+  .option("--no-semantic", "Skip semantic search setup entirely")
   .option(
     "--skip-embeddings",
     "[deprecated] Use default behavior instead (embeddings are now opt-in)",
   )
   .option("--demo", "Initialize with sample demo notes")
   .option("--force", "Skip confirmation prompts", false)
+  .option("-y, --yes", "Automatically answer yes to all prompts")
   .option("--save-config", "Save defaultPath to .knowledginerc.json in current directory")
   .addHelpText(
     "after",
