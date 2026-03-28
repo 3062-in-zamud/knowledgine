@@ -284,4 +284,154 @@ describe("LocalLinkGenerator", () => {
       expect(() => generator.findRelatedNotes(id1)).not.toThrow();
     });
   });
+
+  describe("scoring saturation fix (KNOW-351)", () => {
+    it("should produce score variance when notes share multiple signals", () => {
+      const now = new Date().toISOString();
+      // Note with multiple signals: tags + title keywords
+      const id1 = ctx.repository.saveNote({
+        filePath: "sat1.md",
+        title: "TypeScript Testing Guide",
+        content: "content",
+        frontmatter: { tags: ["typescript", "testing", "jest"] },
+        createdAt: now,
+      });
+      // Shares both tags AND title keywords — high overlap
+      ctx.repository.saveNote({
+        filePath: "sat2.md",
+        title: "TypeScript Testing Patterns",
+        content: "content",
+        frontmatter: { tags: ["typescript", "testing", "jest"] },
+        createdAt: now,
+      });
+      // Shares only tags, no title overlap
+      ctx.repository.saveNote({
+        filePath: "sat3.md",
+        title: "React Hooks",
+        content: "content",
+        frontmatter: { tags: ["typescript"] },
+        createdAt: now,
+      });
+      // No tag overlap, only time proximity
+      ctx.repository.saveNote({
+        filePath: "sat4.md",
+        title: "Docker Setup",
+        content: "content",
+        frontmatter: { tags: ["docker", "devops"] },
+        createdAt: now,
+      });
+
+      const related = generator.findRelatedNotes(id1, 10);
+      expect(related.length).toBeGreaterThanOrEqual(2);
+
+      // Score variance: NOT all the same score (the original bug)
+      const scores = related.map((r) => r.similarity);
+      const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+      const variance = scores.reduce((a, b) => a + (b - mean) ** 2, 0) / scores.length;
+      const stddev = Math.sqrt(variance);
+      expect(stddev).toBeGreaterThan(0.05);
+
+      // The note with more overlap should rank higher
+      const sat2 = related.find((r) => r.filePath === "sat2.md");
+      const sat3 = related.find((r) => r.filePath === "sat3.md");
+      if (sat2 && sat3) {
+        expect(sat2.similarity).toBeGreaterThan(sat3.similarity);
+      }
+
+      // No score should be exactly 1.00 (unless it's a problem-solution pair)
+      for (const r of related) {
+        expect(r.similarity).toBeLessThan(1.0);
+      }
+    });
+  });
+
+  describe("time-proximity bias fix (KNOW-364)", () => {
+    it("should reduce time-proximity weight when all timestamps are identical (clone scenario)", () => {
+      // Simulate clone: all notes created at exact same time
+      const now = new Date().toISOString();
+      const id1 = ctx.repository.saveNote({
+        filePath: "clone1.md",
+        title: "Clone Note Alpha",
+        content: "content about alpha",
+        frontmatter: { tags: ["alpha"] },
+        createdAt: now,
+      });
+      ctx.repository.saveNote({
+        filePath: "clone2.md",
+        title: "Clone Note Beta",
+        content: "content about beta",
+        frontmatter: { tags: ["alpha"] },
+        createdAt: now,
+      });
+      ctx.repository.saveNote({
+        filePath: "clone3.md",
+        title: "Clone Note Gamma",
+        content: "content about gamma",
+        frontmatter: { tags: ["gamma"] },
+        createdAt: now,
+      });
+      ctx.repository.saveNote({
+        filePath: "clone4.md",
+        title: "Clone Note Delta",
+        content: "content about delta",
+        frontmatter: { tags: ["delta"] },
+        createdAt: now,
+      });
+
+      const related = generator.findRelatedNotes(id1, 10);
+
+      // With all-same timestamps, time proximity should NOT dominate
+      // Notes sharing tags (clone2) should score higher than unrelated notes (clone3, clone4)
+      const clone2 = related.find((r) => r.filePath === "clone2.md");
+      const unrelated = related.filter(
+        (r) => r.filePath === "clone3.md" || r.filePath === "clone4.md",
+      );
+
+      if (clone2 && unrelated.length > 0) {
+        for (const u of unrelated) {
+          expect(clone2.similarity).toBeGreaterThan(u.similarity);
+        }
+      }
+
+      // Scores should NOT all be 1.00
+      const allOne = related.every((r) => r.similarity >= 0.99);
+      expect(allOne).toBe(false);
+    });
+
+    it("should use time-proximity normally when timestamps have natural variance", () => {
+      const base = new Date("2026-01-15");
+      const id1 = ctx.repository.saveNote({
+        filePath: "timevar1.md",
+        title: "TimeVar Alpha",
+        content: "content",
+        frontmatter: {},
+        createdAt: base.toISOString(),
+      });
+      // 1 day apart
+      ctx.repository.saveNote({
+        filePath: "timevar2.md",
+        title: "TimeVar Beta",
+        content: "content",
+        frontmatter: {},
+        createdAt: new Date(base.getTime() + 1 * 86400000).toISOString(),
+      });
+      // 6 days apart
+      ctx.repository.saveNote({
+        filePath: "timevar3.md",
+        title: "TimeVar Gamma",
+        content: "content",
+        frontmatter: {},
+        createdAt: new Date(base.getTime() + 6 * 86400000).toISOString(),
+      });
+
+      const related = generator.findRelatedNotes(id1, 10);
+      const tv2 = related.find((r) => r.filePath === "timevar2.md");
+      const tv3 = related.find((r) => r.filePath === "timevar3.md");
+
+      // Closer note should have higher score
+      if (tv2 && tv3) {
+        expect(tv2.similarity).toBeGreaterThan(tv3.similarity);
+      }
+    });
+  });
 });

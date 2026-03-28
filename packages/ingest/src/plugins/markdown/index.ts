@@ -11,6 +11,12 @@ import type {
   SourceURI,
 } from "../../types.js";
 
+/** Maximum file size to process (10 MB). Files larger than this are skipped. */
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
+/** Directories to skip during file enumeration */
+const IGNORE_DIRS = new Set(["node_modules", "vendor", "__pycache__", "dist", "build", ".git"]);
+
 export class MarkdownPlugin implements IngestPlugin {
   readonly manifest: PluginManifest = {
     id: "markdown",
@@ -31,6 +37,7 @@ export class MarkdownPlugin implements IngestPlugin {
   async *ingestAll(sourcePath: SourceURI): AsyncGenerator<NormalizedEvent> {
     const mdFiles = await this.findMarkdownFiles(sourcePath);
     for (const filePath of mdFiles) {
+      if (await this.isOversized(filePath, sourcePath)) continue;
       const event = await this.processFile(filePath, sourcePath);
       if (event) yield event;
     }
@@ -45,6 +52,7 @@ export class MarkdownPlugin implements IngestPlugin {
     for (const filePath of mdFiles) {
       const fileStat = await stat(filePath);
       if (fileStat.mtimeMs > sinceDate.getTime()) {
+        if (await this.isOversized(filePath, sourcePath)) continue;
         const event = await this.processFile(filePath, sourcePath);
         if (event) yield event;
       }
@@ -101,12 +109,27 @@ export class MarkdownPlugin implements IngestPlugin {
     return results;
   }
 
+  private async isOversized(filePath: string, basePath: string): Promise<boolean> {
+    try {
+      const fileStat = await stat(filePath);
+      if (fileStat.size > MAX_FILE_SIZE_BYTES) {
+        const rel = relative(basePath, filePath);
+        const sizeMB = (fileStat.size / (1024 * 1024)).toFixed(1);
+        process.stderr.write(`  ⚠ Skipped (too large: ${sizeMB} MB): ${rel}\n`);
+        return true;
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  }
+
   private async walkDir(dir: string, results: string[]): Promise<void> {
     const entries = await readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (!entry.name.startsWith(".") && entry.name !== "node_modules") {
+        if (!entry.name.startsWith(".") && !IGNORE_DIRS.has(entry.name)) {
           await this.walkDir(fullPath, results);
         }
       } else if (entry.name.endsWith(".md")) {

@@ -1,4 +1,4 @@
-import type { KnowledgeRepository } from "../storage/knowledge-repository.js";
+import type { KnowledgeRepository, KnowledgeNoteSummary } from "../storage/knowledge-repository.js";
 import type { EmbeddingProvider } from "../embedding/embedding-provider.js";
 import type { SemanticSearchResult } from "./semantic-searcher.js";
 
@@ -56,9 +56,14 @@ export class HybridSearcher {
     scored.sort((a, b) => b.score - a.score);
     const topN = scored.slice(0, limit);
 
+    // N+1解消: IDリストを先に集めてバッチ取得
+    const topNIds = topN.map(({ noteId }) => noteId);
+    const notes = this.repository.getNotesSummaryByIds(topNIds);
+    const noteMap = new Map<number, KnowledgeNoteSummary>(notes.map((n) => [n.id, n]));
+
     const results: SemanticSearchResult[] = [];
     for (const { noteId, score } of topN) {
-      const note = this.repository.getNoteById(noteId);
+      const note = noteMap.get(noteId);
       if (!note) continue;
       const hasFts = ftsMap.has(noteId);
       const hasVec = vecMap.has(noteId);

@@ -20,9 +20,8 @@ export async function postIngestProcessing(
   graphRepository: GraphRepository,
   onProgress?: (current: number, total: number) => void,
 ): Promise<PostIngestSummary> {
-  const notes = repository.getAllNotes();
-  const allNoteIds = notes.map((n) => n.id);
-  const totalNotes = notes.length;
+  const allNoteIds = repository.getAllNoteIds();
+  const totalNotes = allNoteIds.length;
 
   const incrementalExtractor = new IncrementalExtractor(repository, graphRepository);
   const summary = await incrementalExtractor.process(allNoteIds, onProgress);

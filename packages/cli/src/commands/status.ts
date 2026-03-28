@@ -8,7 +8,9 @@ import {
   KnowledgeRepository,
   ALL_MIGRATIONS,
   ModelManager,
+  checkSemanticReadiness,
 } from "@knowledgine/core";
+import type { SemanticReadiness } from "@knowledgine/core";
 import { createBox, colors, symbols } from "../lib/ui/index.js";
 import { getConfigPath, TARGETS, PROJECT_CONFIG_SUPPORT } from "./setup.js";
 import * as TOML from "smol-toml";
@@ -64,10 +66,13 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const dbStat = statSync(dbPath);
   const sizeStr = formatBytes(dbStat.size);
 
+  const config = loadConfig(rootPath);
+
   // Open DB and get stats
   let totalNotes = 0;
   let totalPatterns = 0;
-  let notesWithoutEmbeddings = 0;
+  let notesBySource: Record<string, number> = {};
+  let readiness: SemanticReadiness | undefined;
   try {
     const db = createDatabase(dbPath);
     new Migrator(db, ALL_MIGRATIONS).migrate();
@@ -76,7 +81,10 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const stats = repository.getStats();
     totalNotes = stats.totalNotes;
     totalPatterns = stats.totalPatterns;
-    notesWithoutEmbeddings = repository.getNotesWithoutEmbeddings().length;
+    notesBySource = stats.notesBySource;
+
+    const modelManager = new ModelManager();
+    readiness = checkSemanticReadiness(config, modelManager, repository);
 
     db.close();
   } catch (error) {
@@ -87,15 +95,9 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     return;
   }
 
-  const embeddingsGenerated = totalNotes - notesWithoutEmbeddings;
-
-  // Model check
-  const modelManager = new ModelManager();
-  const modelAvailable = modelManager.isModelAvailable();
-
-  // Semantic search mode
-  const config = loadConfig(rootPath);
-  const semanticMode = config.embedding.enabled || modelAvailable;
+  // readiness is always set if we reach here (no early return from catch)
+  const { modelAvailable, embeddingsCount: embeddingsGenerated } = readiness!;
+  const semanticMode = readiness!.ready;
 
   // MCP config checks — check all supported targets (global + project level)
   const configuredTools: string[] = [];
@@ -122,11 +124,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
   // Overall status
   const isReady = totalNotes > 0;
-  const statusLabel = isReady
-    ? semanticMode
-      ? "Ready (semantic + FTS5)"
-      : "Ready (FTS5 only)"
-    : "Not initialized";
+  const statusLabel = readiness!.label;
 
   // Build content
   const modelLine = modelAvailable
@@ -156,10 +154,17 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
       ? `${symbols.success} ${colors.success(configuredTools.join(", "))}`
       : colors.hint("none configured");
 
+  // Build source breakdown lines
+  const sourceEntries = Object.entries(notesBySource).sort(([, a], [, b]) => b - a);
+  const sourceLines = sourceEntries.map(
+    ([source, count]) => `    ${colors.dim(source.padEnd(16))}${count}`,
+  );
+
   const contentParts = [
     `${colors.bold("Database")}`,
     `  ${pad("Path:")}${dbPath} (${sizeStr})`,
     `  ${pad("Notes:")}${colors.info(String(totalNotes))} indexed`,
+    ...(sourceEntries.length > 1 ? sourceLines : []),
     `  ${pad("Patterns:")}${colors.info(String(totalPatterns))} extracted`,
     `  ${pad("Embeddings:")}${colors.info(`${embeddingsGenerated}/${totalNotes}`)} generated`,
     "",

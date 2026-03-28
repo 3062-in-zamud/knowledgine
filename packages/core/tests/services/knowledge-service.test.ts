@@ -100,9 +100,9 @@ describe("KnowledgeService", () => {
       expect(result.noteId).toBe(1);
     });
 
-    it("should throw error when neither noteId nor filePath provided", async () => {
+    it("should throw error when neither noteId nor filePath nor entityName provided", async () => {
       await expect(service.findRelated({})).rejects.toThrow(
-        "Either noteId or filePath is required",
+        "Either noteId, filePath, or entityName is required",
       );
     });
 
@@ -121,6 +121,30 @@ describe("KnowledgeService", () => {
     it("should return graphRelations when graphRepository is provided", async () => {
       const result = await service.findRelated({ noteId: 1 });
       expect(Array.isArray(result.graphRelations)).toBe(true);
+    });
+
+    it("should resolve entityName to a noteId via graph (KNOW-357)", async () => {
+      const entityId = graphRepository.createEntity({
+        name: "Docker",
+        entityType: "technology",
+        createdAt: new Date().toISOString(),
+      });
+      graphRepository.linkEntityToNote(entityId, 1);
+
+      const result = await service.findRelated({ entityName: "Docker" });
+      expect(result.noteId).toBe(1);
+      expect(result).toHaveProperty("relatedNotes");
+    });
+
+    it("should throw when entityName matches no entity", async () => {
+      await expect(service.findRelated({ entityName: "NonExistentXYZ" })).rejects.toThrow(
+        "No entity found matching: NonExistentXYZ",
+      );
+    });
+
+    it("should still accept integer noteId (backward compat)", async () => {
+      const result = await service.findRelated({ noteId: 1 });
+      expect(result.noteId).toBe(1);
     });
   });
 

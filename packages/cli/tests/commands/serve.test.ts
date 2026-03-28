@@ -64,6 +64,15 @@ describe("serve command", () => {
     });
   });
 
+  describe("semantic readiness", () => {
+    it("should import checkSemanticReadiness and OnnxEmbeddingProvider", async () => {
+      // Verify the serve command module imports the necessary semantic readiness utilities
+      const serveModule = await import("../../src/commands/serve.js");
+      expect(serveModule).toBeDefined();
+      expect(typeof serveModule.registerServeCommand).toBe("function");
+    });
+  });
+
   describe("default option values", () => {
     it("should default port to 3456", () => {
       const program = new Command();

@@ -5,9 +5,24 @@ import type { NormalizedEvent } from "./types.js";
 const SECRET_PATTERNS: RegExp[] = [
   /(?:api[_-]?key|apikey|secret|token|password)['":\s]*[=:]\s*['"]?([a-zA-Z0-9_\-/.]{16,})/gi,
   /(?:sk|pk|rk|ak)[-_][a-zA-Z0-9]{20,}/g,
-  /ghp_[a-zA-Z0-9]{36}/g,
+  /gh[pousr]_[a-zA-Z0-9_]{36,}/g,
   /xoxb-[0-9]+-[a-zA-Z0-9]+/g,
   /glpat-[a-zA-Z0-9\-_]{20,}/g,
+  // AWS Access Key ID
+  /AKIA[0-9A-Z]{16}/g,
+  // JWT Token (3-part base64url)
+  /eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]+/g,
+  // Database connection strings (any URL with scheme://)
+  /(?:mongodb|postgres|postgresql|mysql|redis|amqp):\/\/[^\s'")\]]+/gi,
+  // Private key headers
+  /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
+  // Generic secrets in assignment context (KEY="value" or KEY: value)
+  // matches patterns like SECRET_KEY="value", TOKEN="value", PASSWORD: "value"
+  // Uses bounded quantifiers to prevent ReDoS
+  /(?:SECRET|TOKEN|PASSWORD|CREDENTIAL|API_KEY|APIKEY|AUTH)[\w]{0,30}\s{0,3}[=:]\s{0,3}['"][^'"]{8,128}['"]/gi,
+  // GitHub tokens: ghp_ (PAT), gho_ (OAuth), ghu_ (user-to-server), ghs_ (server), ghr_ (refresh) — already covered above by gh[pousr]_
+  // Slack tokens (xoxp-, xoxs-, xoxa-, xoxr-)
+  /xox[poras]-[A-Za-z0-9-]+/g,
 ];
 
 export function sanitizeContent(content: string): string {

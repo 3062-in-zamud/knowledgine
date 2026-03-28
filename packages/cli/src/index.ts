@@ -55,12 +55,14 @@ program
   .description("Scan and index markdown files (FTS5 full-text search by default)")
   .option("--path <dir>", "Root directory to scan")
   .option("--semantic", "Enable semantic search (download model + generate embeddings)")
+  .option("--no-semantic", "Skip semantic search setup entirely")
   .option(
     "--skip-embeddings",
     "[deprecated] Use default behavior instead (embeddings are now opt-in)",
   )
   .option("--demo", "Initialize with sample demo notes")
   .option("--force", "Skip confirmation prompts", false)
+  .option("-y, --yes", "Automatically answer yes to all prompts")
   .option("--save-config", "Save defaultPath to .knowledginerc.json in current directory")
   .addHelpText(
     "after",
@@ -77,12 +79,14 @@ program
   .description("Start MCP server with file watching")
   .option("--path <dir>", "Root directory to serve")
   .option("--ingest", "Enable IngestEngine for all plugins")
+  .option("--no-watch", "Disable file watcher (useful for large repos to avoid EMFILE errors)")
   .addHelpText(
     "after",
     `
 Example:
   knowledgine start --path ~/notes
-  knowledgine start --path ~/notes --ingest`,
+  knowledgine start --path ~/notes --ingest
+  knowledgine start --path ~/notes --no-watch`,
   )
   .action(startCommand);
 
@@ -138,6 +142,12 @@ program
   .option("--full", "Force full re-ingest (ignore cursor)")
   .option("--all", "Run all registered plugins")
   .option("--repo <owner/repo>", "GitHub repository (required for --source github)")
+  .option("--limit <n>", "Limit number of items (e.g., commits for git-history)", parseInt)
+  .option("--since <date>", "Filter by date (e.g., 2025-01-01, for git-history)")
+  .option("--unlimited", "Disable default limits (git-history)")
+  .option("--force", "Force full re-ingest (alias for --full)")
+  .option("--verbose", "Show details of skipped items")
+  .option("--quiet", "Suppress progress output (for CI)")
   .addHelpText(
     "after",
     `
@@ -147,9 +157,15 @@ Examples:
   knowledgine ingest --source claude-sessions --path ~/notes
   knowledgine ingest --all --path ~/notes
   knowledgine ingest --source markdown --full --path ~/notes
+  knowledgine ingest --source git-history --limit 500 --path ~/notes
+  knowledgine ingest --source git-history --since 2025-01-01 --path ~/notes
+  knowledgine ingest --source git-history --unlimited --path ~/notes
 
 Source-specific options:
-  --source github --repo owner/repo  Ingest GitHub PRs and issues (requires GITHUB_TOKEN env var)`,
+  --source github --repo owner/repo  Ingest GitHub PRs and issues (requires GITHUB_TOKEN env var)
+  --limit <n>                        Limit number of commits (git-history, default: 100)
+  --since <date>                     Filter commits by date (git-history)
+  --unlimited                        Disable default commit limit (git-history)`,
   )
   .action(ingestCommand);
 

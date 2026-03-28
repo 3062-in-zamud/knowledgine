@@ -20,11 +20,20 @@ export interface IngestOptions {
   source?: string;
   path?: string;
   full?: boolean;
+  force?: boolean;
   all?: boolean;
   repo?: string;
+  limit?: number;
+  since?: string;
+  unlimited?: boolean;
+  verbose?: boolean;
+  quiet?: boolean;
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
+  // --force is an alias for --full
+  if (options.force) options.full = true;
+
   // Validate mutually exclusive options
   if (options.source && options.all) {
     console.error(colors.error("Error: --source and --all cannot be used together"));
@@ -123,6 +132,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       let completed = 0;
       let totalProcessed = 0;
       let totalErrors = 0;
+      let totalSkippedLargeDiff = 0;
 
       for (const plugin of plugins) {
         const initResult = initResults.get(plugin.manifest.id);
@@ -138,18 +148,31 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         try {
           const summary = await engine.ingest(plugin.manifest.id, rootPath, {
             full: options.full,
+            verbose: options.verbose,
           });
           completed++;
           totalProcessed += summary.processed;
           totalErrors += summary.errors;
+          totalSkippedLargeDiff += summary.skippedLargeDiff ?? 0;
           progress.update(completed, plugin.manifest.id);
-          if (summary.errors > 0) {
+
+          const parts = [`${summary.processed} events`];
+          if (summary.errors > 0) parts.push(`${summary.errors} errors`);
+          if (summary.skippedLargeDiff && summary.skippedLargeDiff > 0) {
+            parts.push(`${summary.skippedLargeDiff} large diffs skipped`);
+          }
+          if (summary.skipReason === "already_indexed") {
+            parts.push("already indexed");
+          }
+          parts.push(formatDuration(summary.elapsedMs));
+
+          if (summary.errors > 0 || (summary.skippedLargeDiff && summary.skippedLargeDiff > 0)) {
             console.error(
-              `  ${symbols.warning} ${colors.warning(plugin.manifest.id)}: ${summary.processed} events (${summary.errors} errors, ${formatDuration(summary.elapsedMs)})`,
+              `  ${symbols.warning} ${colors.warning(plugin.manifest.id)}: ${parts.join(", ")}`,
             );
           } else {
             console.error(
-              `  ${symbols.success} ${colors.success(plugin.manifest.id)}: ${summary.processed} events (${formatDuration(summary.elapsedMs)})`,
+              `  ${symbols.success} ${colors.success(plugin.manifest.id)}: ${parts.join(", ")}`,
             );
           }
         } catch (error) {
@@ -165,24 +188,39 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       progress.finish();
 
       // 全プラグイン完了後に全ノートを対象に増分抽出を実行
-      const allNotes = repository.getAllNotes();
-      const allNoteIds = allNotes.map((n) => n.id);
+      const allNoteIds = repository.getAllNoteIds();
       if (allNoteIds.length > 0) {
         const extractor = new IncrementalExtractor(repository, graphRepository);
         await extractor.process(allNoteIds);
       }
 
       const elapsed = formatDuration(Date.now() - startTime);
-      const report = createSummaryReport("knowledgine ingest", [
+      const reportEntries = [
         { label: "Plugins:", value: `${plugins.length} run` },
         { label: "Events:", value: `${totalProcessed} processed` },
         { label: "Errors:", value: totalErrors },
+        ...(totalSkippedLargeDiff > 0
+          ? [
+              {
+                label: "Skipped:",
+                value: `${totalSkippedLargeDiff} large diffs (metadata indexed only)`,
+              },
+            ]
+          : []),
         { label: "Duration:", value: elapsed },
-      ]);
+      ];
+      const report = createSummaryReport("knowledgine ingest", reportEntries);
       console.error("\n" + report);
     } else {
+      const pluginConfig: Record<string, unknown> = {};
+      if (options.limit !== undefined) pluginConfig.limit = options.limit;
+      if (options.since !== undefined) pluginConfig.since = options.since;
+      if (options.unlimited) pluginConfig.unlimited = true;
+
       const summary = await engine.ingest(options.source!, sourcePath, {
         full: options.full,
+        pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
+        verbose: options.verbose,
       });
 
       // ingest 完了後に対象ノートの増分抽出を実行
@@ -199,10 +237,45 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         ...(summary.deleted > 0
           ? [{ label: "Removed:", value: `${summary.deleted} stale notes` }]
           : []),
+        ...(summary.skippedLargeDiff && summary.skippedLargeDiff > 0
+          ? [
+              {
+                label: "Skipped:",
+                value: `${summary.skippedLargeDiff} large diffs (metadata indexed only)`,
+              },
+            ]
+          : []),
         { label: "Duration:", value: elapsed },
       ];
       const report = createSummaryReport("knowledgine ingest", entries);
       console.error("\n" + report);
+
+      // Show skip reason when 0 events processed
+      if (summary.processed === 0 && summary.skipReason) {
+        const reasons: Record<string, string> = {
+          already_indexed: `All data already indexed (${summary.skipped} skipped). Use --force to re-ingest.`,
+          no_source_data:
+            "No source data found. Check that the path contains data for this plugin.",
+          all_filtered: `All ${summary.skipped} events were filtered (empty content or noise). Use --verbose for details.`,
+        };
+        console.error(
+          `\n${symbols.info} ${colors.hint(reasons[summary.skipReason] ?? "Unknown skip reason")}`,
+        );
+      }
+
+      // Show default limit hint for git-history when no explicit limit was set
+      if (
+        options.source === "git-history" &&
+        options.limit === undefined &&
+        options.since === undefined &&
+        !options.unlimited
+      ) {
+        console.error(
+          `${symbols.info} ${colors.hint(
+            `Default: latest 100 commits. Use --unlimited for all, --limit N for a custom limit, or --since YYYY-MM-DD for date-based filtering.`,
+          )}`,
+        );
+      }
     }
   } catch (error) {
     console.error(

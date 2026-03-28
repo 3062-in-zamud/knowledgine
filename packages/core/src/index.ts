@@ -61,7 +61,11 @@ export type { RcConfig } from "./config/config-loader.js";
 // Storage
 export { createDatabase, loadSqliteVecExtension } from "./storage/database.js";
 export { KnowledgeRepository } from "./storage/knowledge-repository.js";
-export type { KnowledgeNote, ExtractedPatternRow } from "./storage/knowledge-repository.js";
+export type {
+  KnowledgeNote,
+  KnowledgeNoteSummary,
+  ExtractedPatternRow,
+} from "./storage/knowledge-repository.js";
 export { Migrator } from "./storage/migrator.js";
 export type { Migration, MigrationStatus } from "./storage/migrator.js";
 export { SCHEMA_SQL } from "./storage/schema.js";
@@ -77,6 +81,8 @@ export { migration007 } from "./storage/migrations/007_spec_alignment.js";
 export { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
 export { migration009 } from "./storage/migrations/009_extraction_metadata.js";
 export { migration010 } from "./storage/migrations/010_memory_protocol.js";
+export { migration011 } from "./storage/migrations/011_fts_unicode61.js";
+export { migration012 } from "./storage/migrations/012_fts_trigram_cjk.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -100,6 +106,8 @@ import { migration007 } from "./storage/migrations/007_spec_alignment.js";
 import { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
 import { migration009 } from "./storage/migrations/009_extraction_metadata.js";
 import { migration010 } from "./storage/migrations/010_memory_protocol.js";
+import { migration011 } from "./storage/migrations/011_fts_unicode61.js";
+import { migration012 } from "./storage/migrations/012_fts_trigram_cjk.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -114,6 +122,8 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration008,
   migration009,
   migration010,
+  migration011,
+  migration012,
 ];
 
 // Provenance
@@ -211,6 +221,8 @@ export type { ProcessedFile } from "./processing/file-processor.js";
 // Utils
 export { CodeBlockDetector } from "./utils/code-block-detector.js";
 export type { CodeBlockRange } from "./utils/code-block-detector.js";
+export { checkSemanticReadiness } from "./utils/semantic-readiness.js";
+export type { SemanticReadiness } from "./utils/semantic-readiness.js";
 
 // Agents
 export type {

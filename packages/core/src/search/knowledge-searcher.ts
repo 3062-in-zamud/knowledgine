@@ -1,4 +1,9 @@
-import type { KnowledgeRepository, KnowledgeNote } from "../storage/knowledge-repository.js";
+import { basename } from "path";
+import type {
+  KnowledgeRepository,
+  KnowledgeNote,
+  KnowledgeNoteSummary,
+} from "../storage/knowledge-repository.js";
 import type { GraphRepository } from "../graph/graph-repository.js";
 import type { EmbeddingProvider } from "../embedding/embedding-provider.js";
 import type { LLMProvider } from "../llm/types.js";
@@ -22,7 +27,7 @@ export interface SearchOptions {
 }
 
 export interface SearchResult {
-  note: KnowledgeNote;
+  note: KnowledgeNote | KnowledgeNoteSummary;
   score: number;
   matchReason: string[];
   fellBack?: boolean;
@@ -113,26 +118,44 @@ export class KnowledgeSearcher {
         return [];
       }
 
-      // FTSスコアをmin-max正規化
-      const rawRanks = rows.map((r) => Math.abs(r.rank));
-      const minRank = Math.min(...rawRanks);
-      const maxRank = Math.max(...rawRanks);
-      const range = maxRank - minRank;
+      // BM25 rank はマイナス値で、より負の値ほど良いスコア
+      // CHANGELOG / CHANGES / HISTORY は 70% discount: rank を 0.3 倍して 0 に近づける（悪くする）
+      // newness bonus: 新しいノートの rank をより負にして良くする（乗算ボーナス）
+      const CHANGELOG_PATTERN = /^(CHANGELOG|CHANGES|HISTORY)\.(md|txt|rst)$/i;
+      const CHANGELOG_DISCOUNT = 0.3;
+      const adjustedRanks = rows.map(({ note, rank }) => {
+        let adjusted = rank;
 
-      const now = Date.now();
-      results = rows.map(({ note, rank }) => {
-        const normalized = range > 0 ? (Math.abs(rank) - minRank) / range : 1.0;
-        let score = 1 - normalized;
-
-        // valid_from スコアボーナス: 新しいほど高スコア (最大+0.5)
-        // yearsSinceNow が小さいほど (= より新しい) ボーナスが大きい
+        // newness boost: 新しいノートの rank をより負に（係数 > 1 で乗算）
         const validFrom = note.valid_from ?? note.created_at;
         if (validFrom) {
-          const ageMs = now - new Date(validFrom).getTime();
-          const yearsSinceNow = ageMs / (1000 * 60 * 60 * 24 * 365);
-          // 新しさボーナス: 経過年数が少ないほど高い (上限0.5、最低0)
-          score += Math.max(0, 0.5 - yearsSinceNow * 0.1);
+          const yearsSinceNow =
+            (Date.now() - new Date(validFrom).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+          if (!Number.isFinite(yearsSinceNow)) return adjusted; // skip NaN / Infinity dates (no boost)
+          // boost factor: 最大 1.3x（新しいほど rank が大きくなる = より負に近い）
+          // Math.min(0.3, ...) で未来日付によるブーストが 1.3x を超えないようクランプ
+          const boost = 1 + Math.min(0.3, Math.max(0, 0.3 - yearsSinceNow * 0.06));
+          adjusted = adjusted * boost; // rank はマイナスなので * boost でより負になる
         }
+
+        // CHANGELOG discount: rank をより0に近づける（0.3倍）
+        if (CHANGELOG_PATTERN.test(basename(note.file_path))) {
+          adjusted = adjusted * CHANGELOG_DISCOUNT;
+        }
+
+        return adjusted;
+      });
+
+      // FTSスコアをmin-max正規化（より負の値ほど良い）
+      // minRank = 最も負の値 = 最良スコア → normalized=0 → score=1.0
+      // maxRank = 最も0に近い値 = 最悪スコア → normalized=1 → score=0
+      const minRank = Math.min(...adjustedRanks);
+      const maxRank = Math.max(...adjustedRanks);
+      const range = maxRank - minRank;
+
+      results = rows.map(({ note }, i) => {
+        const normalized = range > 0 ? (adjustedRanks[i] - minRank) / range : 0;
+        const score = 1 - normalized;
 
         const reasons: string[] = [`キーワード一致: "${query}"`];
         if (fellBack) {
@@ -147,6 +170,9 @@ export class KnowledgeSearcher {
           fellBack,
         };
       });
+
+      // newness bonus 等の事後スコア調整後に降順ソート
+      results.sort((a, b) => b.score - a.score);
     }
 
     // agentic モード: LLMベース ReasoningReranker を使用

@@ -1,8 +1,12 @@
-import type { KnowledgeRepository, KnowledgeNote } from "../storage/knowledge-repository.js";
+import type {
+  KnowledgeRepository,
+  KnowledgeNote,
+  KnowledgeNoteSummary,
+} from "../storage/knowledge-repository.js";
 import type { EmbeddingProvider } from "../embedding/embedding-provider.js";
 
 export interface SemanticSearchResult {
-  note: KnowledgeNote;
+  note: KnowledgeNote | KnowledgeNoteSummary;
   score: number;
   matchReason: string[];
 }
@@ -21,9 +25,14 @@ export class SemanticSearcher {
       return [];
     }
 
+    // N+1解消: IDリストを先に集めてバッチ取得
+    const noteIds = vecResults.map(({ note_id }) => note_id);
+    const notes = this.repository.getNotesSummaryByIds(noteIds);
+    const noteMap = new Map(notes.map((n) => [n.id, n]));
+
     const results: SemanticSearchResult[] = [];
     for (const { note_id, distance } of vecResults) {
-      const note = this.repository.getNoteById(note_id);
+      const note = noteMap.get(note_id);
       if (!note) continue;
 
       // sqlite-vec distance (0=identical, higher=less similar)

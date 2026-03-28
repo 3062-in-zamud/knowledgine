@@ -1,4 +1,9 @@
-import type { KnowledgeNote, KnowledgeRepository } from "../storage/knowledge-repository.js";
+import { basename } from "path";
+import type {
+  KnowledgeNote,
+  KnowledgeNoteSummary,
+  KnowledgeRepository,
+} from "../storage/knowledge-repository.js";
 import type { GraphRepository } from "../graph/graph-repository.js";
 import type { EmbeddingProvider } from "../embedding/embedding-provider.js";
 import type { LLMProvider } from "../llm/types.js";
@@ -11,7 +16,7 @@ import { ReasoningReranker } from "./reasoning-reranker.js";
 import { classifyQuery, getWeightsForQueryType } from "./query-classifier.js";
 
 export interface OrchestratedResult {
-  note: KnowledgeNote;
+  note: KnowledgeNote | KnowledgeNoteSummary;
   score: number;
   layerScores: Record<string, number>;
   matchReason: string[];
@@ -102,13 +107,36 @@ export class QueryOrchestrator {
       return [];
     }
 
-    const rawRanks = rows.map((r) => Math.abs(r.rank));
-    const minRank = Math.min(...rawRanks);
-    const maxRank = Math.max(...rawRanks);
+    // CHANGELOG discount + newness bonus (knowledge-searcher.ts と同一ロジック)
+    const CHANGELOG_PATTERN = /^(CHANGELOG|CHANGES|HISTORY)\.(md|txt|rst)$/i;
+    const CHANGELOG_DISCOUNT = 0.3;
+
+    const adjustedRanks = rows.map(({ note, rank }) => {
+      let adjusted = rank;
+
+      const validFrom = note.valid_from ?? note.created_at;
+      if (validFrom) {
+        const yearsSinceNow =
+          (Date.now() - new Date(validFrom).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+        if (Number.isFinite(yearsSinceNow)) {
+          const boost = 1 + Math.min(0.3, Math.max(0, 0.3 - yearsSinceNow * 0.06));
+          adjusted = adjusted * boost;
+        }
+      }
+
+      if (CHANGELOG_PATTERN.test(basename(note.file_path))) {
+        adjusted = adjusted * CHANGELOG_DISCOUNT;
+      }
+
+      return adjusted;
+    });
+
+    const minRank = Math.min(...adjustedRanks);
+    const maxRank = Math.max(...adjustedRanks);
     const range = maxRank - minRank;
 
-    return rows.map(({ note, rank }) => {
-      const normalized = range > 0 ? (Math.abs(rank) - minRank) / range : 1.0;
+    return rows.map(({ note }, i) => {
+      const normalized = range > 0 ? (adjustedRanks[i] - minRank) / range : 0;
       const score = 1 - normalized;
       return {
         note,
@@ -172,18 +200,18 @@ export class QueryOrchestrator {
         });
       }
 
-      // 関連ノートを新規候補として追加
-      for (const additionalNoteId of linkedNoteIds) {
-        if (!graphResultMap.has(additionalNoteId)) {
-          const note = this.repository.getNoteById(additionalNoteId);
-          if (note) {
-            const graphScore = 0.3; // 間接的な関連のスコア
-            graphResultMap.set(additionalNoteId, {
-              score: graphScore,
-              graphContext: entityGraphs,
-              matchReason: [`グラフ経由の関連ノート (entity: ${linkedEntities[0]?.name ?? ""})`],
-            });
-          }
+      // 関連ノートを新規候補として追加（バッチ取得）
+      const newLinkedNoteIds = [...linkedNoteIds].filter((id) => !graphResultMap.has(id));
+      if (newLinkedNoteIds.length > 0) {
+        const linkedNotes = this.repository.getNotesSummaryByIds(newLinkedNoteIds);
+        const entityName = linkedEntities[0]?.name ?? "";
+        for (const note of linkedNotes) {
+          const graphScore = 0.3; // 間接的な関連のスコア
+          graphResultMap.set(note.id, {
+            score: graphScore,
+            graphContext: entityGraphs,
+            matchReason: [`グラフ経由の関連ノート (entity: ${entityName})`],
+          });
         }
       }
     }
@@ -239,16 +267,18 @@ export class QueryOrchestrator {
       });
     }
 
-    // graphResultMapに含まれる新規ノート（vectorになかったもの）を追加
-    for (const [noteId, graphData] of graphResultMap) {
-      if (!noteMap.has(noteId)) {
-        const note = this.repository.getNoteById(noteId);
-        if (!note) continue;
+    // graphResultMapに含まれる新規ノート（vectorになかったもの）をバッチ取得して追加
+    const newGraphNoteIds = [...graphResultMap.keys()].filter((id) => !noteMap.has(id));
+    if (newGraphNoteIds.length > 0) {
+      const newGraphNotes = this.repository.getNotesSummaryByIds(newGraphNoteIds);
+      for (const note of newGraphNotes) {
+        const graphData = graphResultMap.get(note.id);
+        if (!graphData) continue;
 
         const graphScore = graphData.score;
         const finalScore = weights.graph * graphScore;
 
-        noteMap.set(noteId, {
+        noteMap.set(note.id, {
           note,
           score: finalScore,
           layerScores: {

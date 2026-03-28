@@ -75,6 +75,7 @@ export interface EventMetadata {
   tags?: string[];
   confidence?: number;
   extra?: Record<string, unknown>;
+  skippedReason?: string;
 }
 
 export interface NormalizedEvent {
@@ -110,12 +111,18 @@ export interface IngestCursorData {
   lastIngestAt: Date;
 }
 
+export type SkipReason = "already_indexed" | "no_source_data" | "all_filtered";
+
 export interface IngestSummary {
   pluginId: string;
   processed: number;
   errors: number;
   deleted: number;
   skipped: number;
+  /** Number of commits skipped due to maxBuffer (large diff); metadata indexed only */
+  skippedLargeDiff?: number;
+  /** Reason why 0 events were processed, if applicable */
+  skipReason?: SkipReason;
   elapsedMs: number;
   /** IDs of knowledge_notes records created/updated during this ingest run */
   noteIds?: number[];

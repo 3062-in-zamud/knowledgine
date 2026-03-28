@@ -22,10 +22,6 @@ export interface UpgradeOptions {
   path?: string;
 }
 
-function sanitizeForLog(value: string): string {
-  return value.replace(/[\r\n]+/g, " ");
-}
-
 export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
   const rootPath = resolveDefaultPath(options.path);
 
@@ -125,9 +121,10 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
         },
       });
       console.error(`${symbols.success} ${colors.success("Model download complete.")}`);
-    } catch (error) {
-      const message = sanitizeForLog(error instanceof Error ? error.message : String(error));
-      console.error(colors.error(`\nModel download failed: ${message}`));
+    } catch {
+      console.error(
+        colors.error("\nModel download failed. Check your network connection and try again."),
+      );
       console.error(colors.error("Semantic search upgrade aborted."));
       db.close();
       process.exitCode = 1;
@@ -139,27 +136,40 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
 
   // Generate embeddings for notes that don't have them
   const embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
-  const notesWithout = repository.getNotesWithoutEmbeddings();
+  const noteIds = repository.getNotesWithoutEmbeddingIds();
 
-  if (notesWithout.length > 0) {
+  if (noteIds.length > 0) {
     // Warm up the ONNX session (first call is slow due to model loading)
     console.error(colors.info("\nLoading embedding model..."));
     await embeddingProvider.embed("warmup");
     console.error("");
 
-    const embProgress = createProgress(notesWithout.length, "Generating embeddings");
+    const BATCH_SIZE = 20;
+    const embProgress = createProgress(noteIds.length, "Generating embeddings");
     let generated = 0;
     let failed = 0;
 
-    for (const note of notesWithout) {
+    for (let i = 0; i < noteIds.length; i += BATCH_SIZE) {
+      const batchIds = noteIds.slice(i, i + BATCH_SIZE);
+      const noteRows = repository.getNotesByIds(batchIds);
+      // getNotesByIds の返り順は不定なので id→note Map で安全にマッピング
+      const noteMap = new Map(noteRows.map((n) => [n.id, n]));
+      const orderedNotes = batchIds.map((id) => noteMap.get(id)).filter((n) => n != null);
       try {
-        const embedding = await embeddingProvider.embed(note.content);
-        repository.saveEmbedding(note.id, embedding, config.embedding.modelName);
-        generated++;
-        embProgress.update(generated);
+        const embeddings = await embeddingProvider.embedBatch(orderedNotes.map((n) => n.content));
+        const result = repository.saveEmbeddingBatch(
+          orderedNotes.map((n, j) => ({
+            noteId: n.id,
+            embedding: embeddings[j],
+            modelName: config.embedding.modelName,
+          })),
+        );
+        generated += result.saved;
+        failed += result.failed;
       } catch {
-        failed++;
+        failed += orderedNotes.length;
       }
+      embProgress.update(generated + failed > noteIds.length ? noteIds.length : generated + failed);
     }
 
     embProgress.finish();

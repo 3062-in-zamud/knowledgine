@@ -15,6 +15,7 @@ import {
   validateCheckpoint,
   getGitLogFormat,
 } from "./git-parser.js";
+import { classifyNoiseLevel } from "../../noise-filter.js";
 
 export class GitHistoryPlugin implements IngestPlugin {
   readonly manifest: PluginManifest = {
@@ -30,9 +31,25 @@ export class GitHistoryPlugin implements IngestPlugin {
     { type: "git_hook", hook: "post-merge" },
   ];
 
-  async initialize(_config?: PluginConfig): Promise<PluginInitResult> {
+  private limit: number = 100;
+  private since?: string;
+  private unlimited: boolean = false;
+
+  async initialize(config?: PluginConfig): Promise<PluginInitResult> {
     try {
       await execGit(["--version"], { cwd: process.cwd(), timeout: 5000 });
+
+      if (config) {
+        if (typeof config.limit === "number") {
+          if (!Number.isFinite(config.limit) || config.limit <= 0) {
+            return { ok: false, error: "Invalid limit: must be a finite positive number" };
+          }
+          this.limit = config.limit;
+        }
+        if (typeof config.since === "string") this.since = config.since;
+        if (config.unlimited === true) this.unlimited = true;
+      }
+
       return { ok: true };
     } catch {
       return { ok: false, error: "git is not installed or not in PATH" };
@@ -48,14 +65,18 @@ export class GitHistoryPlugin implements IngestPlugin {
 
     const currentBranch = await this.getBranch(sourcePath);
 
+    const logArgs = ["log", "--reverse", "--date=iso-strict", `--format=${getGitLogFormat()}`];
+    if (this.since) {
+      logArgs.push(`--since=${this.since}`);
+    } else if (!this.unlimited) {
+      logArgs.push(`-${this.limit}`);
+    }
+
     let raw: string;
     try {
-      raw = await execGit(
-        ["log", "--reverse", "--date=iso-strict", `--format=${getGitLogFormat()}`],
-        {
-          cwd: sourcePath,
-        },
-      );
+      raw = await execGit(logArgs, {
+        cwd: sourcePath,
+      });
     } catch (err: unknown) {
       // コミットが0件の場合、git logがエラーを返すケースがある（初期ブランチでコミットなし）
       const errObj = err as { stderr?: string; code?: number };
@@ -74,9 +95,31 @@ export class GitHistoryPlugin implements IngestPlugin {
     const hashes = commits.map((c) => c.hash);
     const diffs = await getDiffsParallel(hashes, { cwd: sourcePath });
 
-    for (const commit of commits) {
-      const diff = diffs.get(commit.hash) ?? "";
-      yield commitToNormalizedEvent(commit, diff, sourcePath, currentBranch);
+    const total = commits.length;
+    for (let i = 0; i < commits.length; i++) {
+      const commit = commits[i];
+      const diffResult = diffs.get(commit.hash) ?? { diff: "" };
+      const event = commitToNormalizedEvent(commit, diffResult.diff, sourcePath, currentBranch);
+      if (diffResult.skipped) {
+        event.metadata.skippedReason = "large_diff";
+      }
+
+      const noiseLevel = classifyNoiseLevel(
+        commit.subject,
+        commit.authorName,
+        event.relatedPaths ?? [],
+      );
+      if (noiseLevel === "noise") {
+        event.metadata.skippedReason = "noise";
+        event.content = "";
+      } else if (noiseLevel === "low-value") {
+        event.metadata.confidence = 0.3;
+      }
+
+      if ((i + 1) % 50 === 0 || i + 1 === total) {
+        process.stderr.write(`  Processing commit ${i + 1}/${total}...\n`);
+      }
+      yield event;
     }
   }
 
@@ -105,9 +148,31 @@ export class GitHistoryPlugin implements IngestPlugin {
     const hashes = commits.map((c) => c.hash);
     const diffs = await getDiffsParallel(hashes, { cwd: sourcePath });
 
-    for (const commit of commits) {
-      const diff = diffs.get(commit.hash) ?? "";
-      yield commitToNormalizedEvent(commit, diff, sourcePath, currentBranch);
+    const totalIncr = commits.length;
+    for (let i = 0; i < commits.length; i++) {
+      const commit = commits[i];
+      const diffResult = diffs.get(commit.hash) ?? { diff: "" };
+      const event = commitToNormalizedEvent(commit, diffResult.diff, sourcePath, currentBranch);
+      if (diffResult.skipped) {
+        event.metadata.skippedReason = "large_diff";
+      }
+
+      const noiseLevel = classifyNoiseLevel(
+        commit.subject,
+        commit.authorName,
+        event.relatedPaths ?? [],
+      );
+      if (noiseLevel === "noise") {
+        event.metadata.skippedReason = "noise";
+        event.content = "";
+      } else if (noiseLevel === "low-value") {
+        event.metadata.confidence = 0.3;
+      }
+
+      if ((i + 1) % 50 === 0 || i + 1 === totalIncr) {
+        process.stderr.write(`  Processing commit ${i + 1}/${totalIncr}...\n`);
+      }
+      yield event;
     }
   }
 

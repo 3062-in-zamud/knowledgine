@@ -366,6 +366,14 @@ export class GraphRepository {
     return rows.map((r) => ({ entityId: r.entity_id, noteId: r.note_id }));
   }
 
+  getEntityNoteCount(entityId: number): number {
+    const result = this.db
+      .prepare("SELECT COUNT(*) FROM entity_note_links WHERE entity_id = ?")
+      .pluck()
+      .get(entityId);
+    return (result as number) ?? 0;
+  }
+
   getLinkedEntities(noteId: number): Array<Entity & { id: number }> {
     const rows = this.db
       .prepare(

@@ -80,15 +80,20 @@ export function parseGitLog(raw: string): ParsedCommit[] {
   return commits;
 }
 
+export interface DiffResult {
+  diff: string;
+  skipped?: boolean;
+}
+
 export async function getDiffsParallel(
   hashes: string[],
   options: { cwd: string; concurrency?: number; maxDiffSize?: number },
-): Promise<Map<string, string>> {
+): Promise<Map<string, DiffResult>> {
   if (hashes.length === 0) return new Map();
 
   const concurrency = options.concurrency ?? 5;
   const maxDiffSize = options.maxDiffSize ?? 50 * 1024;
-  const result = new Map<string, string>();
+  const result = new Map<string, DiffResult>();
 
   for (let i = 0; i < hashes.length; i += concurrency) {
     const batch = hashes.slice(i, i + concurrency);
@@ -99,10 +104,18 @@ export async function getDiffsParallel(
             ["-c", "core.quotepath=false", "show", "--format=", "--diff-filter=ACDMRT", hash],
             { cwd: options.cwd },
           );
-          result.set(hash, truncateDiff(diff, maxDiffSize));
+          result.set(hash, { diff: truncateDiff(diff, maxDiffSize) });
         } catch (err) {
-          console.error(`Failed to get diff for commit ${hash}:`, err);
-          result.set(hash, "");
+          const errMsg = err instanceof Error ? err.message : String(err);
+          const isMaxBuffer =
+            errMsg.toLowerCase().includes("maxbuffer") ||
+            errMsg.toLowerCase().includes("max buffer");
+          if (isMaxBuffer) {
+            result.set(hash, { diff: "", skipped: true });
+          } else {
+            console.error(`Failed to get diff for commit ${hash}:`, err);
+            result.set(hash, { diff: "" });
+          }
         }
       }),
     );
