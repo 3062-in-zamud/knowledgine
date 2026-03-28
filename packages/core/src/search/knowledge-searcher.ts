@@ -1,5 +1,9 @@
 import { basename } from "path";
-import type { KnowledgeRepository, KnowledgeNote } from "../storage/knowledge-repository.js";
+import type {
+  KnowledgeRepository,
+  KnowledgeNote,
+  KnowledgeNoteSummary,
+} from "../storage/knowledge-repository.js";
 import type { GraphRepository } from "../graph/graph-repository.js";
 import type { EmbeddingProvider } from "../embedding/embedding-provider.js";
 import type { LLMProvider } from "../llm/types.js";
@@ -23,7 +27,7 @@ export interface SearchOptions {
 }
 
 export interface SearchResult {
-  note: KnowledgeNote;
+  note: KnowledgeNote | KnowledgeNoteSummary;
   score: number;
   matchReason: string[];
   fellBack?: boolean;
