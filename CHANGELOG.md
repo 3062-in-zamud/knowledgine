@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-28
+
+### Added
+
+#### Core (`@knowledgine/core`)
+
+- **CJK検索サポート**: 中国語・日本語・韓国語テキスト向けに dual FTS テーブル構成を採用（KNOW-366）
+- **`--related` エンティティ名指定**: ファイルパスに加えエンティティ名文字列でも `--related` クエリを実行可能に（KNOW-357）
+
+#### CLI (`@knowledgine/cli`)
+
+- **status コマンド ソース別内訳**: `knowledgine status` にソース（git-history / GitHub / markdown 等）別のノート件数を表示（KNOW-363）
+- **init 時の ingest ヒント表示**: markdown ファイルが見つからない場合に適切なデータソースを案内（KNOW-367）
+- **init 時のセマンティック検索自動有効化**: ONNX モデルが利用可能な場合、init 時に自動でセマンティック検索を有効化（KNOW-356）
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **スキップ理由の表示**: 処理件数が 0 件の場合にスキップ理由を明示（KNOW-358）
+- **ノイズ削減**: i18n ファイル、Dependabot コミット、短すぎるメッセージを自動フィルタ（KNOW-359）
+- **進捗表示**: GitHub および git-history プラグインでの取り込み進捗をリアルタイム表示（KNOW-353）
+- **git-history コミット上限の設定化**: `--limit` オプションで取得するコミット数を制限可能に（KNOW-352）
+
+### Changed
+
+#### Core (`@knowledgine/core`)
+
+- **プリペアドステートメントキャッシュ**: 繰り返し実行されるクエリを `stmt()` ヘルパーでキャッシュし、3.7x のクエリ速度向上（perf）
+- **N+1 クエリ排除**: content projection とバッチフェッチにより、検索結果取得時の N+1 問題を解消（perf）
+- **embedding pipeline 最適化**: バッチ処理パイプラインを最適化し、embedding 生成スループットを改善（perf）
+
+### Fixed
+
+#### Core (`@knowledgine/core`)
+
+- **`--related` スコアリング修正**: スコア飽和と時間近接バイアスを修正し、より精度の高い関連ノード検索を実現（KNOW-351, KNOW-364）
+- **URL パスフラグメントのエンティティ抽出除外**: URL のパス部分が誤ってエンティティとして抽出される問題を修正（KNOW-361）
+- **CHANGELOG 長さバイアス補正**: オーケストレーター検索パスでの長さによるスコアバイアスを修正（KNOW-354）
+- **migration012 の公開**: `@knowledgine/core` のエクスポートに migration012 を追加（他 migration との整合性）
+
+#### CLI (`@knowledgine/cli`)
+
+- **セマンティック検索の準備状態チェック統一**: 全コマンドで一貫したセマンティック検索の利用可否判定を実施（KNOW-346）
+- **serve コマンドの sqlite-vec ロード修正**: セマンティック検索の自動検出時に sqlite-vec 拡張を正しくロードするよう修正（KNOW-355）
+- **embedding provider の受け渡し修正**: serve コマンドが embedding provider を正しく引き渡すよう修正（KNOW-355）
+- **init 時の暗黙的な `.knowledginerc.json` 生成を停止**: 意図しない設定ファイルの自動生成を廃止（KNOW-360）
+- **EMFILE エラー処理と watch 除外パターンの改善**: ファイルディスクリプタ枯渇時の挙動とファイル監視の除外設定を改善（KNOW-347）
+- **embedding と noteId の不一致修正**: バッチ処理パイプラインで embedding と対応するノート ID のズレを修正
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **GitHub ページネーション完全実装**: 1000 件の上限を撤廃し全件取得を実現（KNOW-349）
+- **同一タイムスタンプでの無限ループ防止**: ページネーション時の stall guard を追加（KNOW-349）
+- **エラー件数の正確なカウント**: maxBuffer スキップを含むエラーを正しく計上（KNOW-350）
+- **heap 監視と OOM 防止**: 全プラグインに heap 使用量監視と OOM 予防処理を追加（KNOW-348）
+- **markdown バッチ処理**: 大規模リポジトリでの OOM を防ぐため markdown 処理をバッチ化（KNOW-365）
+- **quiet オプションの実装**: stderr 出力を抑制する `--quiet` オプションを追加
+
 ## [0.4.1] - 2026-03-27
 
 ### Changed
