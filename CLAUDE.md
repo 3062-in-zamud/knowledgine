@@ -14,7 +14,7 @@ mcp-memory-protocol -> core -> ingest -> mcp-server -> cli
 ## Key Rules
 
 - ESM only. Use `.js` extensions in relative imports.
-- Conventional Commits: `feat:`, `fix:`, `chore(deps):`, etc. No ticket IDs in subject.
+- Conventional Commits: `feat:`, `fix:`, `chore(deps):`, etc.
 - PRs target `develop`, not `main`. Main is releases only.
 - See CONTRIBUTING.md for full coding standards.
 
