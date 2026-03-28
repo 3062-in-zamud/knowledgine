@@ -54,7 +54,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_notes_fts USING fts5(
   content,
   content='knowledge_notes',
   content_rowid='id',
-  tokenize='trigram'
+  tokenize='unicode61 remove_diacritics 2'
 );
 
 -- FTS5 triggers

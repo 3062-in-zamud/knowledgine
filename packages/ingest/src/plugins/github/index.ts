@@ -21,6 +21,8 @@ import {
   parseReviewComments,
 } from "./gh-parser.js";
 
+const PAGE_SIZE = 100;
+
 export class GitHubPlugin implements IngestPlugin {
   readonly manifest: PluginManifest = {
     id: "github",
@@ -50,96 +52,144 @@ export class GitHubPlugin implements IngestPlugin {
   async *ingestAll(sourceUri: SourceURI): AsyncGenerator<NormalizedEvent> {
     const { owner, repo } = parseGitHubSourceUri(sourceUri);
 
-    // PRs
-    const prJson = await this.execWithRetry([
-      "pr",
-      "list",
-      "-R",
-      `${owner}/${repo}`,
-      "--json",
-      "number,title,body,author,labels,createdAt,updatedAt,url,state,reviewDecision",
-      "--limit",
-      "1000",
-      "--state",
-      "all",
-    ]);
-    for (const pr of parsePRList(prJson)) {
-      // PR 本体のイベント
-      yield prToNormalizedEvent(pr, owner, repo);
+    // PRs with date-based cursor pagination
+    let oldestPRSeen: string | undefined;
+    let totalPRs = 0;
 
-      // PR のコメントとレビューを取得
-      try {
-        const detailJson = await this.execWithRetry([
-          "pr",
-          "view",
-          String(pr.number),
-          "-R",
-          `${owner}/${repo}`,
-          "--json",
-          "comments,reviews",
-        ]);
-        const details = JSON.parse(detailJson) as {
-          comments?: Array<{ body: string; author: { login: string }; createdAt: string }>;
-          reviews?: Array<{
-            body: string;
-            author: { login: string };
-            state: string;
-            createdAt: string;
-          }>;
-        };
-        if (details.comments) {
-          for (const comment of details.comments) {
-            yield commentToNormalizedEvent(comment, pr.number, owner, repo, "pr");
-          }
-        }
-        if (details.reviews) {
-          for (const review of details.reviews) {
-            yield reviewToNormalizedEvent(review, pr.number, owner, repo);
-          }
-        }
-      } catch {
-        // 詳細取得失敗は警告のみ（PR本体は既にyield済み）
+    while (true) {
+      const prArgs = [
+        "pr",
+        "list",
+        "-R",
+        `${owner}/${repo}`,
+        "--json",
+        "number,title,body,author,labels,createdAt,updatedAt,url,state,reviewDecision",
+        "--limit",
+        String(PAGE_SIZE),
+        "--state",
+        "all",
+      ];
+      if (oldestPRSeen) {
+        // created:<= to include items with the exact same timestamp.
+        // Duplicates from boundary overlap are deduplicated by IngestEngine via sourceUri uniqueness.
+        prArgs.push("--search", `created:<=${oldestPRSeen}`);
       }
 
-      // インラインレビューコメント（ファイル位置情報付き）
-      try {
-        const reviewCommentsJson = await execGh([
-          "api",
-          `repos/${owner}/${repo}/pulls/${pr.number}/comments`,
-          "--paginate",
-        ]);
-        const reviewComments = parseReviewComments(reviewCommentsJson);
-        for (const rc of reviewComments) {
-          yield commentToNormalizedEvent(
-            { body: rc.body, author: { login: rc.user.login }, createdAt: rc.created_at },
-            pr.number,
-            owner,
-            repo,
+      const prJson = await this.execWithRetry(prArgs);
+      const prs = parsePRList(prJson);
+      if (prs.length === 0) break;
+
+      for (const pr of prs) {
+        // PR 本体のイベント
+        yield prToNormalizedEvent(pr, owner, repo);
+
+        // PR のコメントとレビューを取得
+        try {
+          const detailJson = await this.execWithRetry([
             "pr",
-            { path: rc.path, line: rc.line, side: rc.side, diffHunk: rc.diff_hunk },
-          );
+            "view",
+            String(pr.number),
+            "-R",
+            `${owner}/${repo}`,
+            "--json",
+            "comments,reviews",
+          ]);
+          const details = JSON.parse(detailJson) as {
+            comments?: Array<{ body: string; author: { login: string }; createdAt: string }>;
+            reviews?: Array<{
+              body: string;
+              author: { login: string };
+              state: string;
+              createdAt: string;
+            }>;
+          };
+          if (details.comments) {
+            for (const comment of details.comments) {
+              yield commentToNormalizedEvent(comment, pr.number, owner, repo, "pr");
+            }
+          }
+          if (details.reviews) {
+            for (const review of details.reviews) {
+              yield reviewToNormalizedEvent(review, pr.number, owner, repo);
+            }
+          }
+        } catch {
+          // 詳細取得失敗は警告のみ（PR本体は既にyield済み）
         }
-      } catch {
-        // graceful degradation: warn only
-        process.stderr.write(`  Could not fetch inline review comments for PR #${pr.number}\n`);
+
+        // インラインレビューコメント（ファイル位置情報付き）
+        try {
+          const reviewCommentsJson = await execGh([
+            "api",
+            `repos/${owner}/${repo}/pulls/${pr.number}/comments`,
+            "--paginate",
+          ]);
+          const reviewComments = parseReviewComments(reviewCommentsJson);
+          for (const rc of reviewComments) {
+            yield commentToNormalizedEvent(
+              { body: rc.body, author: { login: rc.user.login }, createdAt: rc.created_at },
+              pr.number,
+              owner,
+              repo,
+              "pr",
+              { path: rc.path, line: rc.line, side: rc.side, diffHunk: rc.diff_hunk },
+            );
+          }
+        } catch {
+          // graceful degradation: warn only
+          process.stderr.write(`  Could not fetch inline review comments for PR #${pr.number}\n`);
+        }
       }
+
+      totalPRs += prs.length;
+      process.stderr.write(`  Fetching PRs... (${totalPRs} fetched)\n`);
+
+      // 取得件数が PAGE_SIZE 未満なら最終ページ
+      if (prs.length < PAGE_SIZE) break;
+
+      // カーソルを最古の createdAt に更新
+      oldestPRSeen = prs[prs.length - 1].createdAt;
     }
 
-    // Issues
-    const issueJson = await this.execWithRetry([
-      "issue",
-      "list",
-      "-R",
-      `${owner}/${repo}`,
-      "--json",
-      "number,title,body,author,labels,createdAt,updatedAt,url,state",
-      "--limit",
-      "1000",
-      "--state",
-      "all",
-    ]);
-    for (const issue of parseIssueList(issueJson)) {
-      yield issueToNormalizedEvent(issue, owner, repo);
+    // Issues with date-based cursor pagination
+    let oldestIssueSeen: string | undefined;
+    let totalIssues = 0;
+
+    while (true) {
+      const issueArgs = [
+        "issue",
+        "list",
+        "-R",
+        `${owner}/${repo}`,
+        "--json",
+        "number,title,body,author,labels,createdAt,updatedAt,url,state",
+        "--limit",
+        String(PAGE_SIZE),
+        "--state",
+        "all",
+      ];
+      if (oldestIssueSeen) {
+        // created:<= to include items with the exact same timestamp.
+        // Duplicates from boundary overlap are deduplicated by IngestEngine via sourceUri uniqueness.
+        issueArgs.push("--search", `created:<=${oldestIssueSeen}`);
+      }
+
+      const issueJson = await this.execWithRetry(issueArgs);
+      const issues = parseIssueList(issueJson);
+      if (issues.length === 0) break;
+
+      for (const issue of issues) {
+        yield issueToNormalizedEvent(issue, owner, repo);
+      }
+
+      totalIssues += issues.length;
+      process.stderr.write(`  Fetching issues... (${totalIssues} fetched)\n`);
+
+      // 取得件数が PAGE_SIZE 未満なら最終ページ
+      if (issues.length < PAGE_SIZE) break;
+
+      // カーソルを最古の createdAt に更新
+      oldestIssueSeen = issues[issues.length - 1].createdAt;
     }
   }
 
@@ -154,42 +204,72 @@ export class GitHubPlugin implements IngestPlugin {
     checkpointDate.setMinutes(checkpointDate.getMinutes() - 1);
     const adjustedCheckpoint = checkpointDate.toISOString().replace(/\.\d{3}Z$/, "Z");
 
-    // PRs (incremental)
-    const prJson = await this.execWithRetry([
-      "pr",
-      "list",
-      "-R",
-      `${owner}/${repo}`,
-      "--json",
-      "number,title,body,author,labels,createdAt,updatedAt,url,state,reviewDecision",
-      "--limit",
-      "1000",
-      "--state",
-      "all",
-      "--search",
-      `updated:>=${adjustedCheckpoint}`,
-    ]);
-    for (const pr of parsePRList(prJson)) {
-      yield prToNormalizedEvent(pr, owner, repo);
+    // PRs (incremental) with pagination
+    let oldestPRSeen: string | undefined;
+
+    while (true) {
+      const prArgs = [
+        "pr",
+        "list",
+        "-R",
+        `${owner}/${repo}`,
+        "--json",
+        "number,title,body,author,labels,createdAt,updatedAt,url,state,reviewDecision",
+        "--limit",
+        String(PAGE_SIZE),
+        "--state",
+        "all",
+        "--search",
+        oldestPRSeen
+          ? // created:<= to include boundary items; dedup handled by IngestEngine via sourceUri
+            `updated:>=${adjustedCheckpoint} created:<=${oldestPRSeen}`
+          : `updated:>=${adjustedCheckpoint}`,
+      ];
+
+      const prJson = await this.execWithRetry(prArgs);
+      const prs = parsePRList(prJson);
+      if (prs.length === 0) break;
+
+      for (const pr of prs) {
+        yield prToNormalizedEvent(pr, owner, repo);
+      }
+
+      if (prs.length < PAGE_SIZE) break;
+      oldestPRSeen = prs[prs.length - 1].createdAt;
     }
 
-    // Issues (incremental)
-    const issueJson = await this.execWithRetry([
-      "issue",
-      "list",
-      "-R",
-      `${owner}/${repo}`,
-      "--json",
-      "number,title,body,author,labels,createdAt,updatedAt,url,state",
-      "--limit",
-      "1000",
-      "--state",
-      "all",
-      "--search",
-      `updated:>=${adjustedCheckpoint}`,
-    ]);
-    for (const issue of parseIssueList(issueJson)) {
-      yield issueToNormalizedEvent(issue, owner, repo);
+    // Issues (incremental) with pagination
+    let oldestIssueSeen: string | undefined;
+
+    while (true) {
+      const issueArgs = [
+        "issue",
+        "list",
+        "-R",
+        `${owner}/${repo}`,
+        "--json",
+        "number,title,body,author,labels,createdAt,updatedAt,url,state",
+        "--limit",
+        String(PAGE_SIZE),
+        "--state",
+        "all",
+        "--search",
+        oldestIssueSeen
+          ? // created:<= to include boundary items; dedup handled by IngestEngine via sourceUri
+            `updated:>=${adjustedCheckpoint} created:<=${oldestIssueSeen}`
+          : `updated:>=${adjustedCheckpoint}`,
+      ];
+
+      const issueJson = await this.execWithRetry(issueArgs);
+      const issues = parseIssueList(issueJson);
+      if (issues.length === 0) break;
+
+      for (const issue of issues) {
+        yield issueToNormalizedEvent(issue, owner, repo);
+      }
+
+      if (issues.length < PAGE_SIZE) break;
+      oldestIssueSeen = issues[issues.length - 1].createdAt;
     }
   }
 

@@ -493,7 +493,7 @@ export class KnowledgeRepository {
 
     try {
       const stmt = this.db.prepare(`
-        SELECT n.*, fts.rank
+        SELECT n.*, bm25(knowledge_notes_fts, 10.0, 1.0) AS rank
         FROM knowledge_notes n
         JOIN knowledge_notes_fts fts ON n.id = fts.rowid
         WHERE knowledge_notes_fts MATCH ?
@@ -561,6 +561,24 @@ export class KnowledgeRepository {
   getAllNotes(): KnowledgeNote[] {
     const stmt = this.db.prepare("SELECT * FROM knowledge_notes");
     return stmt.all() as KnowledgeNote[];
+  }
+
+  /**
+   * 全ノートの ID のみを取得する（content をロードしないため OOM 対策）
+   */
+  getAllNoteIds(): number[] {
+    const stmt = this.db.prepare("SELECT id FROM knowledge_notes");
+    return stmt.pluck().all() as number[];
+  }
+
+  /**
+   * 埋め込みがまだ生成されていないノートの ID のみを取得する（OOM 対策）
+   */
+  getNotesWithoutEmbeddingIds(): number[] {
+    const stmt = this.db.prepare(
+      "SELECT n.id FROM knowledge_notes n WHERE NOT EXISTS (SELECT 1 FROM note_embeddings e WHERE e.note_id = n.id)",
+    );
+    return stmt.pluck().all() as number[];
   }
 
   /**

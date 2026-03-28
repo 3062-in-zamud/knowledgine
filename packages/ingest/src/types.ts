@@ -75,6 +75,7 @@ export interface EventMetadata {
   tags?: string[];
   confidence?: number;
   extra?: Record<string, unknown>;
+  skippedReason?: string;
 }
 
 export interface NormalizedEvent {
@@ -116,6 +117,8 @@ export interface IngestSummary {
   errors: number;
   deleted: number;
   skipped: number;
+  /** Number of commits skipped due to maxBuffer (large diff); metadata indexed only */
+  skippedLargeDiff?: number;
   elapsedMs: number;
   /** IDs of knowledge_notes records created/updated during this ingest run */
   noteIds?: number[];

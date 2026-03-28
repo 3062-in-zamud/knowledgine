@@ -6,12 +6,17 @@ import {
   loadConfig,
   resolveDefaultPath,
   createDatabase,
+  loadSqliteVecExtension,
   Migrator,
   ALL_MIGRATIONS,
   KnowledgeRepository,
   GraphRepository,
   KnowledgeService,
+  OnnxEmbeddingProvider,
+  ModelManager,
+  DEFAULT_MODEL_NAME,
   VERSION,
+  checkSemanticReadiness,
 } from "@knowledgine/core";
 import { createRestApp } from "@knowledgine/mcp-server";
 
@@ -45,16 +50,36 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
   const db = createDatabase(config.dbPath);
 
   try {
+    // Load sqlite-vec if semantic search is enabled
+    if (config.embedding?.enabled) {
+      await loadSqliteVecExtension(db);
+    }
+
     new Migrator(db, ALL_MIGRATIONS).migrate();
     const repository = new KnowledgeRepository(db);
     const graphRepository = new GraphRepository(db);
-    const service = new KnowledgeService({ repository, rootPath, graphRepository });
+
+    // Initialize embedding provider based on actual semantic readiness
+    const modelManager = new ModelManager();
+    const semanticReadiness = checkSemanticReadiness(config, modelManager, repository);
+    let embeddingProvider: OnnxEmbeddingProvider | undefined;
+    if (semanticReadiness.ready) {
+      embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
+    }
+
+    const service = new KnowledgeService({
+      repository,
+      rootPath,
+      graphRepository,
+      embeddingProvider,
+    });
 
     const app = createRestApp(service, VERSION);
     const port = parseInt(options.port ?? "3456", 10);
     const hostname = options.host ?? "127.0.0.1";
 
     const stats = service.getStats();
+    const searchMode = embeddingProvider ? "semantic + FTS5" : "FTS5 only";
 
     const server = serve(
       {
@@ -66,12 +91,16 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
         console.error(`knowledgine REST API server running`);
         console.error(`  URL:    http://${hostname}:${port}`);
         console.error(`  Notes:  ${stats.totalNotes} indexed`);
+        console.error(`  Search: ${searchMode}`);
       },
     );
 
     // Graceful shutdown
-    const shutdown = () => {
+    const shutdown = async () => {
       console.error("\nShutting down...");
+      if (embeddingProvider) {
+        await embeddingProvider.close();
+      }
       server.close();
       db.close();
       process.exit(0);

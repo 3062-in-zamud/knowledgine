@@ -340,21 +340,30 @@ export async function initCommand(options: InitOptions): Promise<void> {
     stepProgress.startStep("Generating embeddings");
     if (modelManager.isModelAvailable()) {
       const embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
-      const notesWithout = repository.getNotesWithoutEmbeddings();
+      const noteIds = repository.getNotesWithoutEmbeddingIds();
 
-      if (notesWithout.length > 0) {
-        const embProgress = createProgress(notesWithout.length, "  Embeddings");
+      if (noteIds.length > 0) {
+        const EMBED_BATCH = 100;
+        const embProgress = createProgress(noteIds.length, "  Embeddings");
         let generated = 0;
         let failed = 0;
 
-        for (const note of notesWithout) {
-          try {
-            const embedding = await embeddingProvider.embed(note.content);
-            repository.saveEmbedding(note.id, embedding, config.embedding.modelName);
-            generated++;
-            embProgress.update(generated);
-          } catch {
-            failed++;
+        for (let i = 0; i < noteIds.length; i += EMBED_BATCH) {
+          const batchIds = noteIds.slice(i, i + EMBED_BATCH);
+          for (const id of batchIds) {
+            try {
+              const note = repository.getNoteById(id);
+              if (!note) {
+                failed++;
+                continue;
+              }
+              const embedding = await embeddingProvider.embed(note.content);
+              repository.saveEmbedding(id, embedding, config.embedding.modelName);
+              generated++;
+              embProgress.update(generated);
+            } catch {
+              failed++;
+            }
           }
         }
 

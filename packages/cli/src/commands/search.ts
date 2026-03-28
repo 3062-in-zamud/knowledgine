@@ -13,6 +13,7 @@ import {
   OnnxEmbeddingProvider,
   ModelManager,
   DEFAULT_MODEL_NAME,
+  checkSemanticReadiness,
 } from "@knowledgine/core";
 import type { EmbeddingProvider } from "@knowledgine/core";
 import { getDemoNotesPath } from "./demo.js";
@@ -94,11 +95,12 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       return;
     }
 
-    // Initialize embedding provider if semantic is enabled and requested
+    // Initialize embedding provider if semantic is enabled, model is available, and embeddings exist
     let embeddingProvider: EmbeddingProvider | undefined;
-    if (mode !== "keyword" && config.embedding?.enabled) {
+    if (mode !== "keyword") {
       const modelManager = new ModelManager();
-      if (modelManager.isModelAvailable()) {
+      const semanticReadiness = checkSemanticReadiness(config, modelManager, repository);
+      if (semanticReadiness.ready) {
         embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
       }
     }

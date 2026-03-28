@@ -35,6 +35,7 @@ export class LocalLinkGenerator {
 
   /**
    * グラフトラバーサルで同じエンティティを共有するノートを取得する。
+   * IDF重み付け（対数減衰）により稀なエンティティほど高スコアを付与する。
    */
   private findByGraphTraversal(noteId: number, limit: number): RelatedNote[] {
     if (!this.graphRepository) return [];
@@ -43,6 +44,10 @@ export class LocalLinkGenerator {
     const seen = new Set<number>([noteId]);
 
     for (const entity of linkedEntities) {
+      // IDF-based scoring: 稀なエンティティ（df小）ほど高スコア
+      const df = this.graphRepository.getEntityNoteCount(entity.id!);
+      const similarity = 1 / (1 + Math.log(1 + df)); // df=0→1.0, df=1→0.59, df=10→0.29, df=100→0.18
+
       const entityNotes = this.graphRepository.getLinkedNotes(entity.id!);
       for (const { noteId: linkedNoteId } of entityNotes) {
         if (seen.has(linkedNoteId)) continue;
@@ -53,7 +58,7 @@ export class LocalLinkGenerator {
             id: note.id,
             filePath: note.file_path,
             title: note.title,
-            similarity: 0.6,
+            similarity,
             reason: `共通エンティティ: ${entity.name}`,
           });
         }
@@ -121,14 +126,29 @@ export class LocalLinkGenerator {
       7,
       limit,
     );
-    const relatedNotes: RelatedNote[] = [];
+    if (results.length === 0) return [];
 
-    for (const note of results) {
+    const relatedNotes: RelatedNote[] = [];
+    const DAY_MS = 1000 * 60 * 60 * 24;
+
+    // 全ノートの日数差を計算
+    const allDaysDiffs = results.map((note) => {
       const noteDate = new Date(note.created_at);
-      const daysDiff = Math.abs(
-        (currentDate.getTime() - noteDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
-      const similarity = Math.max(0, 1 - daysDiff / 7);
+      return Math.abs((currentDate.getTime() - noteDate.getTime()) / DAY_MS);
+    });
+
+    // 中央値をハーフライフとして使用（全て同日の場合は 1 でフォールバック）
+    const sorted = [...allDaysDiffs].sort((a, b) => a - b);
+    const medianDiff = sorted[Math.floor(sorted.length / 2)] || 1;
+    const lambda = Math.LN2 / Math.max(medianDiff, 0.1);
+
+    for (let i = 0; i < results.length; i++) {
+      const note = results[i];
+      const daysDiff = allDaysDiffs[i];
+      // 指数減衰: base 0.2, scale 0.8
+      // 全て同日（daysDiff=0）のとき lambda は大きくなるが exp(0)=1 なので similarity = 0.8 * 1 + 0.2 = 1.0
+      // medianDiff=0 のとき lambda=Math.LN2/0.1 と大きくなり、daysDiff>0 のノートは急速に減衰する
+      const similarity = Math.exp(-lambda * daysDiff) * 0.8 + 0.2;
 
       relatedNotes.push({
         id: note.id,
@@ -175,7 +195,8 @@ export class LocalLinkGenerator {
 
       if (noteMap.has(note.id)) {
         const existing = noteMap.get(note.id)!;
-        existing.similarity = Math.max(existing.similarity, note.similarity);
+        // 確率的結合: 1 - (1-a)(1-b) — 自然に [0, 1] に収まる
+        existing.similarity = 1 - (1 - existing.similarity) * (1 - note.similarity);
         existing.reason += `, ${note.reason}`;
       } else {
         noteMap.set(note.id, { ...note });

@@ -30,7 +30,17 @@ export async function downloadDataset(): Promise<void> {
     throw new Error(`Download failed: HTTP ${res.status} ${res.statusText}`);
   }
 
+  // Validate content type to ensure we received JSON data (not an error page)
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("json") && !contentType.includes("text/plain")) {
+    throw new Error(`Unexpected content type: ${contentType}`);
+  }
+
   const data = await res.text();
+
+  // Validate that the downloaded content is valid JSON before writing
+  JSON.parse(data);
+
   // Use exclusive flag to atomically write only if file doesn't exist (avoids TOCTOU race)
   try {
     writeFileSync(OUTPUT_PATH, data, { flag: "wx", encoding: "utf-8" });
