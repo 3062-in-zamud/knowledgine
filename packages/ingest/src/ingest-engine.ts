@@ -5,7 +5,7 @@ import type { PluginRegistry } from "./plugin-registry.js";
 import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
 
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 50;
 
 /** Plugin IDs that represent file-based sources (eligible for stale cleanup) */
 const FILE_BASED_PLUGINS = new Set(["markdown", "obsidian"]);
@@ -69,6 +69,7 @@ export class IngestEngine {
         errors += result.errors;
         allNoteIds.push(...result.noteIds);
         batch = [];
+        global.gc?.();
       }
     }
 
