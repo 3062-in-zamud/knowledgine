@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { KnowledgeRepository } from "@knowledgine/core";
-import type { IngestSummary, NormalizedEvent } from "./types.js";
+import type { IngestSummary, NormalizedEvent, SkipReason } from "./types.js";
 import type { PluginRegistry } from "./plugin-registry.js";
 import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
@@ -60,7 +60,9 @@ export class IngestEngine {
     const processedPaths = new Set<string>();
     let batch: NormalizedEvent[] = [];
     let heapWarned = false;
+    let totalEventsFromGenerator = 0;
     for await (const event of generator) {
+      totalEventsFromGenerator++;
       if (!event.content || event.content.trim() === "") {
         skipped++;
         if (options?.verbose) {
@@ -121,6 +123,17 @@ export class IngestEngine {
       lastIngestAt: new Date(),
     });
 
+    let skipReason: SkipReason | undefined;
+    if (processed === 0) {
+      if (totalEventsFromGenerator === 0 && cursor) {
+        skipReason = "already_indexed";
+      } else if (totalEventsFromGenerator === 0) {
+        skipReason = "no_source_data";
+      } else if (skipped > 0 || errors > 0) {
+        skipReason = "all_filtered";
+      }
+    }
+
     return {
       pluginId,
       processed,
@@ -128,6 +141,7 @@ export class IngestEngine {
       deleted,
       skipped,
       ...(skippedLargeDiff > 0 ? { skippedLargeDiff } : {}),
+      ...(skipReason ? { skipReason } : {}),
       elapsedMs: Date.now() - start,
       noteIds: allNoteIds,
     };

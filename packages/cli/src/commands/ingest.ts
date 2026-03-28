@@ -20,6 +20,7 @@ export interface IngestOptions {
   source?: string;
   path?: string;
   full?: boolean;
+  force?: boolean;
   all?: boolean;
   repo?: string;
   limit?: number;
@@ -30,6 +31,9 @@ export interface IngestOptions {
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
+  // --force is an alias for --full
+  if (options.force) options.full = true;
+
   // Validate mutually exclusive options
   if (options.source && options.all) {
     console.error(colors.error("Error: --source and --all cannot be used together"));
@@ -157,6 +161,9 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
           if (summary.skippedLargeDiff && summary.skippedLargeDiff > 0) {
             parts.push(`${summary.skippedLargeDiff} large diffs skipped`);
           }
+          if (summary.skipReason === "already_indexed") {
+            parts.push("already indexed");
+          }
           parts.push(formatDuration(summary.elapsedMs));
 
           if (summary.errors > 0 || (summary.skippedLargeDiff && summary.skippedLargeDiff > 0)) {
@@ -242,6 +249,19 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       ];
       const report = createSummaryReport("knowledgine ingest", entries);
       console.error("\n" + report);
+
+      // Show skip reason when 0 events processed
+      if (summary.processed === 0 && summary.skipReason) {
+        const reasons: Record<string, string> = {
+          already_indexed: `All data already indexed (${summary.skipped} skipped). Use --force to re-ingest.`,
+          no_source_data:
+            "No source data found. Check that the path contains data for this plugin.",
+          all_filtered: `All ${summary.skipped} events were filtered (empty content or noise). Use --verbose for details.`,
+        };
+        console.error(
+          `\n${symbols.info} ${colors.hint(reasons[summary.skipReason] ?? "Unknown skip reason")}`,
+        );
+      }
 
       // Show default limit hint for git-history when no explicit limit was set
       if (
