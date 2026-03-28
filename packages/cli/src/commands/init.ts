@@ -241,7 +241,40 @@ export async function initCommand(options: InitOptions): Promise<void> {
     await mdPlugin.initialize();
   }
   const engine = new IngestEngine(registry, db, repository);
-  const ingestSummary = await engine.ingest("markdown", rootPath, { full: true });
+  let ingestSummary;
+  try {
+    ingestSummary = await engine.ingest("markdown", rootPath, { full: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (
+      message.includes("heap") ||
+      message.includes("out of memory") ||
+      message.includes("allocation failed")
+    ) {
+      stepProgress.failStep("Indexing markdown files", "Out of memory");
+      console.error("");
+      console.error(
+        colors.error(
+          "Error: Ran out of memory while indexing. The repository may be too large for the default heap.",
+        ),
+      );
+      console.error("");
+      console.error(`${symbols.warning} ${colors.warning("Try increasing the Node.js heap:")}`);
+      console.error(
+        `  NODE_OPTIONS='--max-old-space-size=4096' knowledgine init${options.path ? ` --path ${options.path}` : ""}`,
+      );
+      console.error("");
+      console.error(
+        `${symbols.info} ${colors.info("For very large repositories (10,000+ files), use 8GB or more:")}`,
+      );
+      console.error(
+        `  NODE_OPTIONS='--max-old-space-size=8192' knowledgine init${options.path ? ` --path ${options.path}` : ""}`,
+      );
+      db.close();
+      process.exit(1);
+    }
+    throw err;
+  }
 
   if (ingestSummary.processed === 0) {
     stepProgress.warn("No markdown files found in the directory.");

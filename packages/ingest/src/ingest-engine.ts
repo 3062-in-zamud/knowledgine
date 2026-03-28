@@ -4,8 +4,9 @@ import type { IngestSummary, NormalizedEvent } from "./types.js";
 import type { PluginRegistry } from "./plugin-registry.js";
 import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
+import { getHeapUsageRatio, getAdaptiveBatchSize } from "./heap-monitor.js";
 
-const BATCH_SIZE = 50;
+const DEFAULT_BATCH_SIZE = 50;
 
 /** Plugin IDs that represent file-based sources (eligible for stale cleanup) */
 const FILE_BASED_PLUGINS = new Set(["markdown", "obsidian"]);
@@ -53,6 +54,7 @@ export class IngestEngine {
 
     const processedPaths = new Set<string>();
     let batch: NormalizedEvent[] = [];
+    let heapWarned = false;
     for await (const event of generator) {
       if (!event.content || event.content.trim() === "") {
         skipped++;
@@ -63,7 +65,20 @@ export class IngestEngine {
       }
       batch.push(event);
       processedPaths.add(event.sourceUri);
-      if (batch.length >= BATCH_SIZE) {
+
+      const heapRatio = getHeapUsageRatio();
+      const currentBatchSize = getAdaptiveBatchSize(DEFAULT_BATCH_SIZE, heapRatio);
+
+      if (!heapWarned && heapRatio > 0.8) {
+        heapWarned = true;
+        process.stderr.write(
+          `  ⚠ High heap usage (${(heapRatio * 100).toFixed(0)}%). ` +
+            `Reducing batch size to ${currentBatchSize}. ` +
+            `Consider: NODE_OPTIONS='--max-old-space-size=4096' knowledgine init\n`,
+        );
+      }
+
+      if (batch.length >= currentBatchSize) {
         const result = this.processBatch(batch);
         processed += result.processed;
         errors += result.errors;
