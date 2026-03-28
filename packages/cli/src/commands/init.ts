@@ -380,24 +380,17 @@ export async function initCommand(options: InitOptions): Promise<void> {
   stepProgress.finish();
 
   // ---------------------------------------------------------------------------
-  // Auto-configure defaultPath so users don't need --path every time
+  // Write .knowledginerc.json only when explicitly requested (--save-config)
   // ---------------------------------------------------------------------------
-  const cwd = process.cwd();
-  const resolvedRoot = resolve(rootPath);
-  // Write defaultPath to cwd's .knowledginerc.json (where resolveDefaultPath reads from)
-  // Only if rootPath differs from cwd (otherwise cwd fallback already works)
-  if (resolvedRoot !== resolve(cwd)) {
-    writeRcConfig(cwd, { defaultPath: resolvedRoot });
-  }
-  // Also write semantic flag to rootPath's .knowledginerc.json if semantic enabled
-  // (this is where loadConfig reads from)
-  if (enableSemantic && config.embedding.enabled) {
-    writeRcConfig(rootPath, { semantic: true });
-  }
-
-  // --save-config: write defaultPath to .knowledginerc.json in cwd
   if (options.saveConfig) {
-    writeRcConfig(process.cwd(), { defaultPath: rootPath });
+    const cwd = process.cwd();
+    const resolvedRoot = resolve(rootPath);
+    if (resolvedRoot !== resolve(cwd)) {
+      writeRcConfig(cwd, { defaultPath: resolvedRoot });
+    }
+    if (enableSemantic && config.embedding.enabled) {
+      writeRcConfig(rootPath, { semantic: true });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -447,22 +440,22 @@ export async function initCommand(options: InitOptions): Promise<void> {
       "Try these searches",
     );
   } else {
-    p.note(
-      [
-        `${symbols.arrow} ${colors.info("knowledgine setup")}          ${colors.dim("Configure your AI tools")}`,
-        `${symbols.arrow} ${colors.info('knowledgine search "query"')}  ${colors.dim("Search your notes")}`,
-      ].join("\n"),
-      "Next steps",
-    );
+    const nextStepLines = [
+      `${symbols.arrow} ${colors.info("knowledgine setup")}          ${colors.dim("Configure your AI tools")}`,
+      `${symbols.arrow} ${colors.info('knowledgine search "query"')}  ${colors.dim("Search your notes")}`,
+    ];
     if (options.saveConfig) {
-      p.note(
-        [
-          `${symbols.arrow} ${colors.info(`knowledgine setup --target claude-code --path ${rootPath} --write`)}`,
-          `${symbols.arrow} ${colors.info(`knowledgine start --path ${rootPath}`)}`,
-        ].join("\n"),
-        "Next steps",
+      nextStepLines.push(
+        `${symbols.arrow} ${colors.info(`knowledgine setup --target claude-code --path ${rootPath} --write`)}`,
+        `${symbols.arrow} ${colors.info(`knowledgine start --path ${rootPath}`)}`,
+      );
+    } else if (resolve(rootPath) !== resolve(process.cwd())) {
+      nextStepLines.push(
+        "",
+        `${colors.dim("Tip: Use --save-config to save the path so you don't need --path every time.")}`,
       );
     }
+    p.note(nextStepLines.join("\n"), "Next steps");
   }
 
   // Suggest adding .knowledgine/ to .gitignore
