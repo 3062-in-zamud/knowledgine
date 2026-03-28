@@ -10,6 +10,12 @@ import {
   GraphRepository,
   IncrementalExtractor,
   ALL_MIGRATIONS,
+  loadRcFile,
+  createLLMProvider,
+  ObserverAgent,
+  ReflectorAgent,
+  PatternExtractor,
+  EntityExtractor,
 } from "@knowledgine/core";
 import { IngestEngine } from "@knowledgine/ingest";
 import { createDefaultRegistry, initializePlugins } from "../lib/plugin-loader.js";
@@ -29,6 +35,8 @@ export interface IngestOptions {
   verbose?: boolean;
   quiet?: boolean;
   excludePattern?: string[];
+  observe?: boolean;
+  observeLimit?: number;
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
@@ -125,6 +133,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
   // Run ingest
   const engine = new IngestEngine(registry, db, repository);
   const startTime = Date.now();
+  const ingestedNoteIds: number[] = [];
 
   try {
     if (options.all) {
@@ -194,6 +203,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         const extractor = new IncrementalExtractor(repository, graphRepository);
         await extractor.process(allNoteIds);
       }
+      ingestedNoteIds.push(...allNoteIds);
 
       const elapsed = formatDuration(Date.now() - startTime);
       const reportEntries = [
@@ -235,6 +245,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       if (summary.noteIds && summary.noteIds.length > 0) {
         const extractor = new IncrementalExtractor(repository, graphRepository);
         await extractor.process(summary.noteIds);
+        ingestedNoteIds.push(...summary.noteIds);
       }
 
       const elapsed = formatDuration(Date.now() - startTime);
@@ -282,6 +293,57 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
           `${symbols.info} ${colors.hint(
             `Default: latest 100 commits. Use --unlimited for all, --limit N for a custom limit, or --since YYYY-MM-DD for date-based filtering.`,
           )}`,
+        );
+      }
+    }
+
+    // Observer/Reflector post-processing
+    const rcConfig = loadRcFile(rootPath);
+    const shouldObserve = options.observe ?? rcConfig?.observer?.enabled ?? false;
+
+    if (shouldObserve && ingestedNoteIds.length > 0) {
+      const observeLimit = options.observeLimit ?? rcConfig?.observer?.limit ?? 50;
+      const noteIdsToObserve = ingestedNoteIds.slice(0, observeLimit);
+
+      let llmProvider: ReturnType<typeof createLLMProvider>;
+      try {
+        if (rcConfig?.llm) {
+          llmProvider = createLLMProvider(rcConfig.llm);
+        }
+      } catch {
+        // LLM not configured — rule-based mode
+      }
+
+      if (!llmProvider) {
+        console.log("Observer running in rule-based mode (no LLM configured)");
+      }
+
+      const patternExtractor = new PatternExtractor();
+      const entityExtractor = new EntityExtractor();
+      const observer = new ObserverAgent({
+        patternExtractor,
+        entityExtractor,
+        llmProvider,
+        repository,
+      });
+
+      const notes = noteIdsToObserve
+        .map((id) => repository.getNoteById(id))
+        .filter((n): n is NonNullable<typeof n> => n !== null && n !== undefined);
+      const observerOutputs = await observer.observeBatch(notes);
+
+      const reflector = new ReflectorAgent({ repository, graphRepository, llmProvider });
+      const reflectorOutputs = await reflector.reflectBatch(observerOutputs);
+
+      const contradictions = reflectorOutputs.reduce((sum, r) => sum + r.contradictions.length, 0);
+      const deprecations = reflectorOutputs.reduce(
+        (sum, r) => sum + r.deprecationCandidates.length,
+        0,
+      );
+      console.log(`Observer: processed ${observerOutputs.length} notes`);
+      if (contradictions > 0 || deprecations > 0) {
+        console.log(
+          `Reflector: ${contradictions} contradictions, ${deprecations} deprecation candidates`,
         );
       }
     }

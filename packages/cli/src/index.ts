@@ -152,6 +152,9 @@ program
   .option("--verbose", "Show details of skipped items")
   .option("--quiet", "Suppress progress output (for CI)")
   .option("--exclude-pattern <patterns...>", "Glob patterns to exclude from ingestion")
+  .option("--observe", "Run Observer/Reflector agents after ingestion")
+  .option("--no-observe", "Skip Observer/Reflector agents")
+  .option("--observe-limit <n>", "Max notes to process with Observer", parseInt)
   .addHelpText(
     "after",
     `
@@ -165,13 +168,18 @@ Examples:
   knowledgine ingest --source git-history --since 2025-01-01 --path ~/notes
   knowledgine ingest --source git-history --unlimited --path ~/notes
   knowledgine ingest --source git-history --exclude-pattern "**/vendor/**" --path ~/notes
+  knowledgine ingest --source markdown --observe --path ~/notes
+  knowledgine ingest --source markdown --observe --observe-limit 20 --path ~/notes
 
 Source-specific options:
   --source github --repo owner/repo  Ingest GitHub PRs and issues (requires GITHUB_TOKEN env var)
   --limit <n>                        Limit number of commits (git-history, default: 100)
   --since <date>                     Filter commits by date (git-history)
   --unlimited                        Disable default commit limit (git-history)
-  --exclude-pattern <patterns...>    Glob patterns to exclude (e.g., "**/vendor/**")`,
+  --exclude-pattern <patterns...>    Glob patterns to exclude (e.g., "**/vendor/**")
+  --observe                          Run Observer/Reflector agents after ingestion
+  --no-observe                       Skip Observer/Reflector agents (overrides rc config)
+  --observe-limit <n>                Max notes for Observer (default: 50)`,
   )
   .action(ingestCommand);
 

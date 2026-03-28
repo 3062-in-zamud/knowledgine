@@ -111,7 +111,7 @@ function validateRcConfig(raw: unknown, filePath: string): RcConfig | null {
   return null;
 }
 
-function loadRcFile(startDir: string): RcConfig | null {
+export function loadRcFile(startDir: string): RcConfig | null {
   let dir = startDir;
   for (let i = 0; i < 5; i++) {
     const jsonPath = resolve(dir, ".knowledginerc.json");
