@@ -206,6 +206,8 @@ export type {
 // Search
 export { KnowledgeSearcher } from "./search/knowledge-searcher.js";
 export type { SearchOptions } from "./search/knowledge-searcher.js";
+export { CrossProjectSearcher } from "./search/cross-project-searcher.js";
+export type { ProjectEntry, CrossProjectResult } from "./search/cross-project-searcher.js";
 export { ReasoningReranker } from "./search/reasoning-reranker.js";
 export type {
   RerankInput,

@@ -1,8 +1,14 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { KnowledgeService } from "@knowledgine/core";
+import { CrossProjectSearcher } from "@knowledgine/core";
+import type { ProjectEntry } from "@knowledgine/core";
 
-export function createRestApp(service: KnowledgeService, version: string): Hono {
+export function createRestApp(
+  service: KnowledgeService,
+  version: string,
+  projects?: ProjectEntry[],
+): Hono {
   const app = new Hono();
 
   // CORS: localhostのみ許可
@@ -14,14 +20,29 @@ export function createRestApp(service: KnowledgeService, version: string): Hono 
     return c.json({ ok: true, version, notes: stats.totalNotes });
   });
 
-  // GET /search?q=...&mode=keyword&limit=20
+  // GET /search?q=...&mode=keyword&limit=20&projects=a,b
   app.get("/search", async (c) => {
     const q = c.req.query("q");
     if (!q) return c.json({ error: "q parameter is required" }, 400);
     const mode = c.req.query("mode") ?? "keyword";
     const limit = parseInt(c.req.query("limit") ?? "20", 10);
     if (isNaN(limit) || limit < 1) return c.json({ error: "Invalid limit" }, 400);
+    const projectsParam = c.req.query("projects");
     const start = Date.now();
+
+    if (projectsParam && projects) {
+      const requestedNames = new Set(
+        projectsParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+      const projectsToSearch = projects.filter((p) => requestedNames.has(p.name));
+      const searcher = new CrossProjectSearcher(projectsToSearch);
+      const results = await searcher.search(q, { limit });
+      return c.json({ results, query: q, crossProject: true, took_ms: Date.now() - start });
+    }
+
     const result = await service.search({
       query: q,
       limit,

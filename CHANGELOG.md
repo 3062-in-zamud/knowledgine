@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 #### Core (`@knowledgine/core`)
 
+- **クロスプロジェクト横断検索 (`CrossProjectSearcher`)**: 複数プロジェクトの SQLite DB を read-only で横断検索する `CrossProjectSearcher` クラスを追加。スキーマバージョン 8 未満の DB は自動スキップ、DB 接続を try/finally で確実にクローズ、最大 10 プロジェクトまで同時検索をサポート（KNOW-338）
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **`search_knowledge` に `projects` パラメータ追加**: クロスプロジェクト検索を MCP ツールから実行可能に。`projects: string[]` でプロジェクト名を指定すると `CrossProjectSearcher` を使用（KNOW-338）
+- **REST `/search` に `projects` クエリパラメータ追加**: `GET /search?q=...&projects=a,b` でカンマ区切りプロジェクト名を指定してクロスプロジェクト検索（KNOW-338）
+
+#### CLI (`knowledgine`)
+
+- **`search --projects` オプション**: `knowledgine search <query> --projects <names>` でコンマ区切りのプロジェクト名を指定して横断検索。`.knowledginerc` の `projects` 設定を参照（KNOW-338）
+
+#### Core (`@knowledgine/core`)
+
 - **RcConfig拡張 + Zodバリデーション**: `serve.authToken`、`noise`、`observer`、`projects` フィールドをRcConfigに追加。Zodスキーマによるランタイムバリデーションを実装し、不正な設定値はデフォルトにフォールバック + 警告ログを出力
 - **Migration 013 — `unknown` entityタイプ追加**: `entities` テーブルのCHECK制約に `'unknown'` を追加（SQLiteのALTER COLUMN非サポートによりテーブル再作成）（KNOW-362）
 - **entityタイプ推定の保守化**: `@mention` のフォールバック分類を `person` → `unknown` に変更。TECH_DICTIONARY に `vscode`・`neovim` を追加、NOT_PERSON_LISTに `linter`・`formatter`・`bundler`・`transpiler` を追加（KNOW-362）
