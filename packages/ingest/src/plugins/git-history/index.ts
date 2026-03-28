@@ -15,6 +15,7 @@ import {
   validateCheckpoint,
   getGitLogFormat,
 } from "./git-parser.js";
+import { classifyNoiseLevel } from "../../noise-filter.js";
 
 export class GitHistoryPlugin implements IngestPlugin {
   readonly manifest: PluginManifest = {
@@ -102,6 +103,19 @@ export class GitHistoryPlugin implements IngestPlugin {
       if (diffResult.skipped) {
         event.metadata.skippedReason = "large_diff";
       }
+
+      const noiseLevel = classifyNoiseLevel(
+        commit.subject,
+        commit.authorName,
+        event.relatedPaths ?? [],
+      );
+      if (noiseLevel === "noise") {
+        event.metadata.skippedReason = "noise";
+        event.content = "";
+      } else if (noiseLevel === "low-value") {
+        event.metadata.confidence = 0.3;
+      }
+
       if ((i + 1) % 50 === 0 || i + 1 === total) {
         process.stderr.write(`  Processing commit ${i + 1}/${total}...\n`);
       }
@@ -142,6 +156,19 @@ export class GitHistoryPlugin implements IngestPlugin {
       if (diffResult.skipped) {
         event.metadata.skippedReason = "large_diff";
       }
+
+      const noiseLevel = classifyNoiseLevel(
+        commit.subject,
+        commit.authorName,
+        event.relatedPaths ?? [],
+      );
+      if (noiseLevel === "noise") {
+        event.metadata.skippedReason = "noise";
+        event.content = "";
+      } else if (noiseLevel === "low-value") {
+        event.metadata.confidence = 0.3;
+      }
+
       if ((i + 1) % 50 === 0 || i + 1 === totalIncr) {
         process.stderr.write(`  Processing commit ${i + 1}/${totalIncr}...\n`);
       }
