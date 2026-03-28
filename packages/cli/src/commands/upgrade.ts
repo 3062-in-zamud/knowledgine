@@ -151,11 +151,14 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
 
     for (let i = 0; i < noteIds.length; i += BATCH_SIZE) {
       const batchIds = noteIds.slice(i, i + BATCH_SIZE);
-      const notes = repository.getNotesByIds(batchIds);
+      const noteRows = repository.getNotesByIds(batchIds);
+      // getNotesByIds の返り順は不定なので id→note Map で安全にマッピング
+      const noteMap = new Map(noteRows.map((n) => [n.id, n]));
+      const orderedNotes = batchIds.map((id) => noteMap.get(id)).filter((n) => n != null);
       try {
-        const embeddings = await embeddingProvider.embedBatch(notes.map((n) => n.content));
+        const embeddings = await embeddingProvider.embedBatch(orderedNotes.map((n) => n.content));
         const result = repository.saveEmbeddingBatch(
-          notes.map((n, j) => ({
+          orderedNotes.map((n, j) => ({
             noteId: n.id,
             embedding: embeddings[j],
             modelName: config.embedding.modelName,
