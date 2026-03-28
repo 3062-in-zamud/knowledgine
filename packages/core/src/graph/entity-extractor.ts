@@ -256,6 +256,8 @@ export class EntityExtractor {
     "issues",
     "pulls",
     "packages",
+    "user-attachments",
+    "badges",
   ]);
 
   constructor(rules?: ExtractionRules) {
@@ -559,8 +561,11 @@ export class EntityExtractor {
    * URL path fragments from being matched as org/repo.
    */
   private stripUrls(content: string): string {
+    // Strip Markdown image links first to prevent URL path fragments from matching
+    let result = content.replace(/!\[[^\]]*\]\([^)]+\)/g, " ");
     // Match http(s):// URLs and protocol-relative //
-    return content.replace(/(?:https?:\/\/|\/\/)[^\s)>\]]+/g, " ");
+    result = result.replace(/(?:https?:\/\/|\/\/)[^\s)>\]]+/g, " ");
+    return result;
   }
 
   /**
