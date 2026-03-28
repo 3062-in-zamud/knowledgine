@@ -2,7 +2,14 @@ import { join } from "path";
 import { existsSync, writeFileSync, mkdirSync } from "fs";
 import * as p from "@clack/prompts";
 import { colors, symbols } from "../lib/ui/index.js";
-import { SKILL_NAMES, getSkillTemplate, type SkillName } from "../templates/skills/index.js";
+import {
+  SKILL_NAMES,
+  getSkillTemplate,
+  type SkillName,
+  type SupportedLocale,
+  SUPPORTED_LOCALES,
+  DEFAULT_LOCALE,
+} from "../templates/skills/index.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -155,9 +162,9 @@ export function writeSkills(
   target: SkillSetupTarget,
   projectRoot: string,
   skillNames: SkillName[],
-  options: { dryRun?: boolean; force?: boolean },
+  options: { dryRun?: boolean; force?: boolean; locale?: SupportedLocale },
 ): SkillWriteResult {
-  const { dryRun = false, force = false } = options;
+  const { dryRun = false, force = false, locale = DEFAULT_LOCALE } = options;
   const skillDir = target.getSkillDir(projectRoot);
 
   // Guard: skip if the skill dir exists and force is not set
@@ -185,7 +192,7 @@ export function writeSkills(
     let writtenCount = 0;
 
     for (const name of skillNames) {
-      const template = getSkillTemplate(name);
+      const template = getSkillTemplate(name, locale);
       const skillNameDir = join(skillDir, name);
       const refsDir = join(skillNameDir, "references");
 
@@ -240,6 +247,25 @@ export async function interactiveSkillsSetup(
   if (p.isCancel(shouldInstall) || !shouldInstall) {
     return [];
   }
+
+  // Step 1.5: select language
+  const selectedLocale = await p.select({
+    message: "Which language for skill instructions?",
+    options: [
+      { value: "en", label: "English" },
+      { value: "ja", label: "Japanese (日本語)" },
+    ],
+    initialValue: "en" as string,
+  });
+
+  if (p.isCancel(selectedLocale)) {
+    p.cancel("Skills setup cancelled.");
+    return [];
+  }
+
+  const locale = (
+    SUPPORTED_LOCALES.includes(selectedLocale as SupportedLocale) ? selectedLocale : DEFAULT_LOCALE
+  ) as SupportedLocale;
 
   // Step 2: select target agents
   const supportedTargets = SKILL_TARGETS.filter((t) => t.supported);
@@ -329,7 +355,7 @@ export async function interactiveSkillsSetup(
     const s = p.spinner();
     s.start(`Installing skills for ${target.label}...`);
 
-    const result = writeSkills(target, projectRoot, skillsToInstall, { force: false });
+    const result = writeSkills(target, projectRoot, skillsToInstall, { force: false, locale });
 
     if (result.status === "ok") {
       s.stop(
@@ -388,7 +414,7 @@ export async function interactiveSkillsSetup(
 export function nonInteractiveSkillsSetup(
   target: string,
   projectRoot: string,
-  options: { write?: boolean },
+  options: { write?: boolean; lang?: string },
 ): void {
   const skillTarget = SKILL_TARGETS.find((t) => t.value === target);
 
@@ -410,14 +436,19 @@ export function nonInteractiveSkillsSetup(
     return;
   }
 
+  const locale: SupportedLocale = SUPPORTED_LOCALES.includes(options.lang as SupportedLocale)
+    ? (options.lang as SupportedLocale)
+    : DEFAULT_LOCALE;
   const skillDir = skillTarget.getSkillDir(projectRoot);
 
   if (!options.write) {
     // Preview mode: list what would be written
-    console.error(`\n${colors.bold("Skills preview")} for ${colors.accent(skillTarget.label)}\n`);
+    console.error(
+      `\n${colors.bold("Skills preview")} for ${colors.accent(skillTarget.label)} (${locale})\n`,
+    );
     console.error(`${colors.hint("Skill directory:")} ${skillDir}\n`);
     for (const name of SKILL_NAMES) {
-      const template = getSkillTemplate(name);
+      const template = getSkillTemplate(name, locale);
       const refCount = Object.keys(template.references).length;
       console.error(
         `  ${symbols.bullet} ${name}  ${colors.dim(`(SKILL.md + ${refCount} reference file(s))`)}`,
@@ -431,7 +462,7 @@ export function nonInteractiveSkillsSetup(
   }
 
   // Write mode
-  const result = writeSkills(skillTarget, projectRoot, [...SKILL_NAMES], { force: false });
+  const result = writeSkills(skillTarget, projectRoot, [...SKILL_NAMES], { force: false, locale });
 
   if (result.status === "ok") {
     console.error(

@@ -1,5 +1,7 @@
 export const SKILL_MD = `---
 name: knowledgine-ingest
+version: "1.0.0"
+lang: en
 description: >
   Import knowledge from external sources into the local knowledge base. Invoke when
   the user wants to import from Git commit history, GitHub PRs and issues, Obsidian

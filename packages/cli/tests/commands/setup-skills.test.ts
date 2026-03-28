@@ -3,7 +3,11 @@ import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "fs
 import { join } from "path";
 import { tmpdir } from "os";
 import { writeSkills, SKILL_TARGETS } from "../../src/commands/setup-skills.js";
-import { SKILL_NAMES, getSkillTemplate } from "../../src/templates/skills/index.js";
+import {
+  SKILL_NAMES,
+  getSkillTemplate,
+  SUPPORTED_LOCALES,
+} from "../../src/templates/skills/index.js";
 
 describe("writeSkills", () => {
   let testDir: string;
@@ -187,12 +191,53 @@ describe("writeSkills", () => {
     it("all SKILL_NAMES available: 7 skills defined", () => {
       expect(SKILL_NAMES).toHaveLength(7);
       expect(SKILL_NAMES).toContain("knowledgine-capture");
-      expect(SKILL_NAMES).toContain("knowledgine-recall");
-      expect(SKILL_NAMES).toContain("knowledgine-suggest");
-      expect(SKILL_NAMES).toContain("knowledgine-explain");
+      expect(SKILL_NAMES).toContain("knowledgine-search");
+      expect(SKILL_NAMES).toContain("knowledgine-explore");
       expect(SKILL_NAMES).toContain("knowledgine-debrief");
       expect(SKILL_NAMES).toContain("knowledgine-ingest");
       expect(SKILL_NAMES).toContain("knowledgine-feedback");
+      expect(SKILL_NAMES).toContain("knowledgine-memory");
+    });
+  });
+
+  describe("locale support", () => {
+    it("getSkillTemplate defaults to English", () => {
+      const defaultTemplate = getSkillTemplate("knowledgine-capture");
+      const enTemplate = getSkillTemplate("knowledgine-capture", "en");
+      expect(defaultTemplate.skillMd).toBe(enTemplate.skillMd);
+    });
+
+    it("getSkillTemplate returns different content for en and ja", () => {
+      const en = getSkillTemplate("knowledgine-capture", "en");
+      const ja = getSkillTemplate("knowledgine-capture", "ja");
+      expect(en.skillMd).not.toBe(ja.skillMd);
+      expect(Object.keys(en.references).sort()).toEqual(Object.keys(ja.references).sort());
+    });
+
+    it("Japanese content contains Japanese characters", () => {
+      const ja = getSkillTemplate("knowledgine-capture", "ja");
+      expect(ja.skillMd).toMatch(/[\u3000-\u9FFF]/);
+    });
+
+    it("all skills have both en and ja templates", () => {
+      for (const name of SKILL_NAMES) {
+        for (const locale of SUPPORTED_LOCALES) {
+          const template = getSkillTemplate(name, locale);
+          expect(template.skillMd).toBeTruthy();
+          expect(Object.keys(template.references).length).toBeGreaterThan(0);
+        }
+      }
+    });
+
+    it("writeSkills with locale ja writes Japanese content", () => {
+      const result = writeSkills(claudeCodeTarget, testDir, ["knowledgine-capture"], {
+        force: true,
+        locale: "ja",
+      });
+      expect(result.status).toBe("ok");
+      const skillDir = claudeCodeTarget.getSkillDir(testDir);
+      const content = readFileSync(join(skillDir, "knowledgine-capture", "SKILL.md"), "utf-8");
+      expect(content).toMatch(/[\u3000-\u9FFF]/);
     });
   });
 });

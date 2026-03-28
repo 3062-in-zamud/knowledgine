@@ -1,5 +1,7 @@
 export const SKILL_MD = `---
 name: knowledgine-debrief
+version: "1.0.0"
+lang: en
 description: >
   Summarize and record all learnings from the current session at its end. Invoke when
   the user signals the session is complete, after finishing a major task, or when asked
@@ -33,10 +35,16 @@ Use \`capture_knowledge\` to save the session summary:
 \`\`\`
 capture_knowledge(
   content: string,    // Full structured debrief using the template
-  title: string,      // "Session Debrief: <date> — <main topic>"
-  tags: string[],     // ["debrief", "<primary-area>", ...]
+  title?: string,     // "Session Debrief: <date> — <main topic>"
+  tags?: string[],    // ["debrief", "<primary-area>", ...]
   source?: string     // Optional: session identifier
 )
+\`\`\`
+
+## How to Debrief (CLI Alternative)
+
+\`\`\`bash
+knowledgine capture add "<debrief content>" --title "Session Debrief: <date>" --tags "debrief,<area>"
 \`\`\`
 
 ## Step-by-Step Instructions
