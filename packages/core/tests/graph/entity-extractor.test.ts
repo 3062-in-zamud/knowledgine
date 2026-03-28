@@ -215,6 +215,25 @@ main/examples is just a directory listing
       expect(names).not.toContain("main/examples");
     });
 
+    it("should not extract entities from shields.io badge image", () => {
+      const entities = extractor.extract("![badge](https://img.shields.io/npm/v/pkg)");
+      const names = entities.map((e) => e.name);
+      expect(names).not.toContain("shields/npm");
+      expect(names).not.toContain("img/shields");
+    });
+
+    it("should not extract user-attachments as org in plain text", () => {
+      const entities = extractor.extract("user-attachments/some-repo is mentioned");
+      const names = entities.map((e) => e.name);
+      expect(names).not.toContain("user-attachments/some-repo");
+    });
+
+    it("should not extract org/badges pattern", () => {
+      const entities = extractor.extract("shields/badges endpoint");
+      const names = entities.map((e) => e.name);
+      expect(names).not.toContain("shields/badges");
+    });
+
     it("should not extract entities from markdown image URLs", () => {
       const content = "![screenshot](https://github.com/user-attachments/assets/image.png)";
       const result = extractor.extract(content);
