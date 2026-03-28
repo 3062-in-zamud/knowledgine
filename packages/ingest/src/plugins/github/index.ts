@@ -163,8 +163,15 @@ export class GitHubPlugin implements IngestPlugin {
       // 取得件数が PAGE_SIZE 未満なら最終ページ
       if (prs.length < PAGE_SIZE) break;
 
-      // カーソルを最古の createdAt に更新
-      oldestPRSeen = prs[prs.length - 1].createdAt;
+      // カーソルを最古の createdAt に更新（無限ループ防止）
+      const newCursor = prs[prs.length - 1].createdAt;
+      if (newCursor === oldestPRSeen) {
+        process.stderr.write(
+          `  ⚠ Pagination stalled: ${PAGE_SIZE}+ PRs share timestamp ${newCursor}. Breaking.\n`,
+        );
+        break;
+      }
+      oldestPRSeen = newCursor;
     }
 
     // Issues with date-based cursor pagination
@@ -210,8 +217,15 @@ export class GitHubPlugin implements IngestPlugin {
       // 取得件数が PAGE_SIZE 未満なら最終ページ
       if (issues.length < PAGE_SIZE) break;
 
-      // カーソルを最古の createdAt に更新
-      oldestIssueSeen = issues[issues.length - 1].createdAt;
+      // カーソルを最古の createdAt に更新（無限ループ防止）
+      const newIssueCursor = issues[issues.length - 1].createdAt;
+      if (newIssueCursor === oldestIssueSeen) {
+        process.stderr.write(
+          `  ⚠ Pagination stalled: ${PAGE_SIZE}+ issues share timestamp ${newIssueCursor}. Breaking.\n`,
+        );
+        break;
+      }
+      oldestIssueSeen = newIssueCursor;
     }
   }
 
