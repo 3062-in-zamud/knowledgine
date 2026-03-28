@@ -19,10 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 #### Ingest (`@knowledgine/ingest`)
 
 - **NoiseFilter設定可能化**: `NoiseFilter` クラスを追加。`shortMessageThreshold`、`botAuthors`、`noiseSubjectPatterns`、`excludePatterns` を設定可能に。既存の関数エクスポート（`classifyNoiseLevel` 等）は後方互換を維持。
+- **entity抽出をIngestEngineパイプラインに統合**: `IngestEngine` のコンストラクタにオプショナルな `graphRepository` パラメータを追加。`graphRepository` が提供された場合、ingest完了後に `IncrementalExtractor` を自動実行する。`IngestSummary` に `extractionSummary` フィールドを追加。`ingest()` のオプションに `postProcessExtraction` (default: true) を追加し、抽出をスキップ可能に（KNOW-324）
 
 #### CLI (`knowledgine`)
 
 - **`--exclude-pattern` オプション**: `knowledgine ingest` コマンドに `--exclude-pattern <patterns...>` オプションを追加。Globパターンでパスをフィルタできる（例: `**/vendor/**`）。
+- **`--skip-extraction` オプション**: `knowledgine ingest` コマンドに `--skip-extraction` オプションを追加。ingest後のentity抽出をスキップできる（KNOW-324）
+
+### Removed
+
+#### CLI (`knowledgine`)
+
+- **`packages/cli/src/lib/entity-extractor.ts` 削除**: `postIngestProcessing` を提供していたdeprecatedファイルを削除。`init` コマンドは `IncrementalExtractor` を直接使用するよう移行（KNOW-324）
 
 ## [0.5.0] - 2026-03-28
 

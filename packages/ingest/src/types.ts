@@ -113,6 +113,14 @@ export interface IngestCursorData {
 
 export type SkipReason = "already_indexed" | "no_source_data" | "all_filtered";
 
+export interface ExtractionSummary {
+  processedNotes: number;
+  totalEntities: number;
+  totalRelations: number;
+  totalPatterns: number;
+  errors: number;
+}
+
 export interface IngestSummary {
   pluginId: string;
   processed: number;
@@ -126,4 +134,6 @@ export interface IngestSummary {
   elapsedMs: number;
   /** IDs of knowledge_notes records created/updated during this ingest run */
   noteIds?: number[];
+  /** Summary of entity extraction run after ingest (only present when graphRepository is provided) */
+  extractionSummary?: ExtractionSummary;
 }
