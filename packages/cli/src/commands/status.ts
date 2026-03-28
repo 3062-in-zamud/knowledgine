@@ -71,6 +71,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   // Open DB and get stats
   let totalNotes = 0;
   let totalPatterns = 0;
+  let notesBySource: Record<string, number> = {};
   let readiness: SemanticReadiness | undefined;
   try {
     const db = createDatabase(dbPath);
@@ -80,6 +81,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const stats = repository.getStats();
     totalNotes = stats.totalNotes;
     totalPatterns = stats.totalPatterns;
+    notesBySource = stats.notesBySource;
 
     const modelManager = new ModelManager();
     readiness = checkSemanticReadiness(config, modelManager, repository);
@@ -152,10 +154,17 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
       ? `${symbols.success} ${colors.success(configuredTools.join(", "))}`
       : colors.hint("none configured");
 
+  // Build source breakdown lines
+  const sourceEntries = Object.entries(notesBySource).sort(([, a], [, b]) => b - a);
+  const sourceLines = sourceEntries.map(
+    ([source, count]) => `    ${colors.dim(source.padEnd(16))}${count}`,
+  );
+
   const contentParts = [
     `${colors.bold("Database")}`,
     `  ${pad("Path:")}${dbPath} (${sizeStr})`,
     `  ${pad("Notes:")}${colors.info(String(totalNotes))} indexed`,
+    ...(sourceEntries.length > 1 ? sourceLines : []),
     `  ${pad("Patterns:")}${colors.info(String(totalPatterns))} extracted`,
     `  ${pad("Embeddings:")}${colors.info(`${embeddingsGenerated}/${totalNotes}`)} generated`,
     "",

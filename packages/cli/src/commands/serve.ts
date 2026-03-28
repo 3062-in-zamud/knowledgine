@@ -50,20 +50,24 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
   const db = createDatabase(config.dbPath);
 
   try {
-    // Load sqlite-vec if semantic search is enabled
-    if (config.embedding?.enabled) {
-      await loadSqliteVecExtension(db);
-    }
-
     new Migrator(db, ALL_MIGRATIONS).migrate();
     const repository = new KnowledgeRepository(db);
     const graphRepository = new GraphRepository(db);
 
-    // Initialize embedding provider based on actual semantic readiness
+    // Auto-detect model for backward compatibility (without mutating config)
     const modelManager = new ModelManager();
-    const semanticReadiness = checkSemanticReadiness(config, modelManager, repository);
+    const autoDetected =
+      !config.embedding?.enabled && modelManager.isModelAvailable(config.embedding?.modelName);
+    const effectiveConfig = autoDetected
+      ? { ...config, embedding: { ...config.embedding, enabled: true } }
+      : config;
+
+    // Initialize embedding provider based on actual semantic readiness
+    const semanticReadiness = checkSemanticReadiness(effectiveConfig, modelManager, repository);
     let embeddingProvider: OnnxEmbeddingProvider | undefined;
     if (semanticReadiness.ready) {
+      // Load sqlite-vec when semantic search is effectively enabled (config or auto-detected)
+      await loadSqliteVecExtension(db);
       embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
     }
 

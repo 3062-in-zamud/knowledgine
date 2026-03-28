@@ -84,6 +84,129 @@ const STOP_LIST = new Set([
 /**
  * Extracts entities from note text, with optional post-processing via ExtractionRules.
  */
+/**
+ * Known technology/tool names that should never be classified as person.
+ * Maps to preferred entity type.
+ */
+const TECH_DICTIONARY = new Map<string, EntityType>([
+  // Databases
+  ["redis", "technology"],
+  ["postgresql", "technology"],
+  ["postgres", "technology"],
+  ["mongodb", "technology"],
+  ["mysql", "technology"],
+  ["sqlite", "technology"],
+  ["elasticsearch", "technology"],
+  ["dynamodb", "technology"],
+  ["cassandra", "technology"],
+  // Containers & orchestration
+  ["docker", "technology"],
+  ["kubernetes", "technology"],
+  ["podman", "technology"],
+  // Web servers & proxies
+  ["nginx", "technology"],
+  ["apache", "technology"],
+  ["caddy", "technology"],
+  ["traefik", "technology"],
+  // Languages & runtimes
+  ["python", "technology"],
+  ["golang", "technology"],
+  ["rust", "technology"],
+  ["swift", "technology"],
+  ["kotlin", "technology"],
+  ["deno", "technology"],
+  ["bun", "technology"],
+  // Frameworks & libraries
+  ["react", "technology"],
+  ["angular", "technology"],
+  ["vue", "technology"],
+  ["svelte", "technology"],
+  ["django", "technology"],
+  ["flask", "technology"],
+  ["express", "technology"],
+  ["fastapi", "technology"],
+  ["nextjs", "technology"],
+  ["nuxt", "technology"],
+  // Tools
+  ["webpack", "tool"],
+  ["vite", "tool"],
+  ["eslint", "tool"],
+  ["prettier", "tool"],
+  ["babel", "tool"],
+  ["terraform", "tool"],
+  ["ansible", "tool"],
+  ["grafana", "tool"],
+  ["prometheus", "tool"],
+  // Cloud & services
+  ["vercel", "technology"],
+  ["netlify", "technology"],
+  ["heroku", "technology"],
+  ["supabase", "technology"],
+  ["firebase", "technology"],
+]);
+
+/**
+ * Programming concepts that should not be classified as person.
+ */
+const NOT_PERSON_LIST = new Set([
+  "sandbox",
+  "middleware",
+  "proxy",
+  "daemon",
+  "worker",
+  "handler",
+  "listener",
+  "observer",
+  "adapter",
+  "bridge",
+  "factory",
+  "builder",
+  "parser",
+  "compiler",
+  "runtime",
+  "kernel",
+  "scheduler",
+  "dispatcher",
+  "controller",
+  "resolver",
+  "navigator",
+  "provider",
+  "consumer",
+  "producer",
+  "generator",
+  "iterator",
+  "executor",
+  "loader",
+  "renderer",
+  "emitter",
+  "pipeline",
+  "gateway",
+  "registry",
+  "container",
+  "server",
+  "client",
+  "agent",
+  "bot",
+  "cli",
+  "api",
+  "sdk",
+  "env",
+  "config",
+  "admin",
+  "debug",
+  "staging",
+  "production",
+  "development",
+  "localhost",
+  "webhook",
+  "cron",
+  "cache",
+  "queue",
+  "stack",
+  "heap",
+  "buffer",
+]);
+
 export class EntityExtractor {
   private rules?: ExtractionRules;
 
@@ -112,6 +235,27 @@ export class EntityExtractor {
     "public",
     "assets",
     "static",
+    "com",
+    "org",
+    "net",
+    "io",
+    "dev",
+    "tools",
+    "blob",
+    "tree",
+    "main",
+    "master",
+    "profile",
+    "api",
+    "raw",
+    "releases",
+    "actions",
+    "settings",
+    "examples",
+    "wiki",
+    "issues",
+    "pulls",
+    "packages",
   ]);
 
   constructor(rules?: ExtractionRules) {
@@ -371,27 +515,70 @@ export class EntityExtractor {
     let m: RegExpExecArray | null;
     while ((m = mentionRe.exec(content)) !== null) {
       const username = m[1].trim().toLowerCase();
-      if (!this.isStopWord(username)) {
-        results.push({ name: username, entityType: "person", sourceType: "mention" });
-      }
+      if (this.isStopWord(username)) continue;
+      const { entityType, sourceType } = this.classifyMention(username);
+      results.push({ name: username, entityType, sourceType });
     }
     return results;
   }
 
+  private classifyMention(name: string): {
+    entityType: EntityType;
+    sourceType: ExtractedEntity["sourceType"];
+  } {
+    const techType = TECH_DICTIONARY.get(name);
+    if (techType) return { entityType: techType, sourceType: "mention" };
+    if (NOT_PERSON_LIST.has(name)) return { entityType: "concept", sourceType: "mention" };
+    return { entityType: "person", sourceType: "mention" };
+  }
+
   private extractOrgRepos(content: string): ExtractedEntity[] {
     const results: ExtractedEntity[] = [];
+    const cleanContent = this.stripUrls(content);
     // org/repo patterns (e.g., facebook/react, microsoft/typescript)
     const orgRepoRe = /\b([a-z][\w-]{1,30})\/([a-z][\w-]{1,30})\b/g;
     let m: RegExpExecArray | null;
-    while ((m = orgRepoRe.exec(content)) !== null) {
+    while ((m = orgRepoRe.exec(cleanContent)) !== null) {
       const org = m[1].toLowerCase();
       const repo = m[2].toLowerCase();
       if (EntityExtractor.MIME_PREFIXES.has(org)) continue;
       if (EntityExtractor.PATH_SEGMENTS.has(org)) continue;
+      if (EntityExtractor.PATH_SEGMENTS.has(repo)) continue;
       const fullName = `${org}/${repo}`;
       if (!this.isStopWord(org) && !this.isStopWord(repo)) {
         results.push({ name: fullName, entityType: "project", sourceType: "code" });
       }
+    }
+    // Also extract org/repo from GitHub URLs specifically
+    results.push(...this.extractOrgReposFromUrls(content));
+    return results;
+  }
+
+  /**
+   * Strip URLs from content, replacing them with whitespace to prevent
+   * URL path fragments from being matched as org/repo.
+   */
+  private stripUrls(content: string): string {
+    // Match http(s):// URLs and protocol-relative //
+    return content.replace(/(?:https?:\/\/|\/\/)[^\s)>\]]+/g, " ");
+  }
+
+  /**
+   * Extract org/repo from GitHub URLs (e.g., github.com/org/repo/...).
+   * Only extracts the org/repo portion, not deeper path segments.
+   */
+  private extractOrgReposFromUrls(content: string): ExtractedEntity[] {
+    const results: ExtractedEntity[] = [];
+    const githubUrlRe = /github\.com\/([a-z][\w-]{1,30})\/([a-z][\w-]{1,30})/gi;
+    let m: RegExpExecArray | null;
+    while ((m = githubUrlRe.exec(content)) !== null) {
+      const org = m[1].toLowerCase();
+      const repo = m[2].toLowerCase();
+      if (EntityExtractor.MIME_PREFIXES.has(org)) continue;
+      if (EntityExtractor.PATH_SEGMENTS.has(org)) continue;
+      if (EntityExtractor.PATH_SEGMENTS.has(repo)) continue;
+      if (this.isStopWord(org) || this.isStopWord(repo)) continue;
+      results.push({ name: `${org}/${repo}`, entityType: "project", sourceType: "code" });
     }
     return results;
   }

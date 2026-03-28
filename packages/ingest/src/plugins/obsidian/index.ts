@@ -15,6 +15,9 @@ import { sanitizeContent } from "../../normalizer.js";
 import { parseWikiLinks, resolveWikiLinkPath } from "./wikilink-parser.js";
 import { parseObsidianFrontmatter, extractInlineTags } from "./frontmatter-parser.js";
 
+/** Maximum file size to process (10 MB) */
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
 export class ObsidianPlugin implements IngestPlugin {
   readonly manifest: PluginManifest = {
     id: "obsidian",
@@ -51,6 +54,7 @@ export class ObsidianPlugin implements IngestPlugin {
     const vaultName = basename(sourcePath);
 
     for (const filePath of mdFiles) {
+      if (await this.isOversized(filePath, sourcePath)) continue;
       const event = await this.processFile(filePath, sourcePath, vaultName);
       if (event) yield event;
     }
@@ -71,6 +75,7 @@ export class ObsidianPlugin implements IngestPlugin {
     for (const filePath of mdFiles) {
       const fileStat = await stat(filePath);
       if (fileStat.mtimeMs > sinceDate.getTime()) {
+        if (await this.isOversized(filePath, sourcePath)) continue;
         const event = await this.processFile(filePath, sourcePath, vaultName);
         if (event) yield event;
       }
@@ -152,7 +157,16 @@ export class ObsidianPlugin implements IngestPlugin {
 
   private async walkDir(dir: string, vaultRoot: string, results: string[]): Promise<void> {
     const entries = await readdir(dir, { withFileTypes: true });
-    const SKIP_DIRS = new Set([".obsidian", "node_modules", ".git", ".trash"]);
+    const SKIP_DIRS = new Set([
+      ".obsidian",
+      "node_modules",
+      ".git",
+      ".trash",
+      "vendor",
+      "__pycache__",
+      "dist",
+      "build",
+    ]);
 
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
@@ -180,5 +194,20 @@ export class ObsidianPlugin implements IngestPlugin {
         results.push(fullPath);
       }
     }
+  }
+
+  private async isOversized(filePath: string, basePath: string): Promise<boolean> {
+    try {
+      const fileStat = await stat(filePath);
+      if (fileStat.size > MAX_FILE_SIZE_BYTES) {
+        const rel = relative(basePath, filePath);
+        const sizeMB = (fileStat.size / (1024 * 1024)).toFixed(1);
+        process.stderr.write(`  ⚠ Skipped (too large: ${sizeMB} MB): ${rel}\n`);
+        return true;
+      }
+    } catch {
+      return false;
+    }
+    return false;
   }
 }

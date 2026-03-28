@@ -167,7 +167,7 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
         generated += result.saved;
         failed += result.failed;
       } catch {
-        failed += notes.length;
+        failed += orderedNotes.length;
       }
       embProgress.update(generated + failed > noteIds.length ? noteIds.length : generated + failed);
     }

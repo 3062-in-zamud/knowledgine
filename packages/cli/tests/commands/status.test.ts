@@ -107,4 +107,52 @@ describe("status command", () => {
     // Status should contain "Ready" regardless of semantic mode
     expect(output).toContain("Ready");
   });
+
+  it("should show 'FTS5 only' when notes exist but no embeddings", async () => {
+    const knowledgineDir = join(testDir, ".knowledgine");
+    mkdirSync(knowledgineDir, { recursive: true });
+
+    const dbPath = join(knowledgineDir, "index.sqlite");
+    const db = createDatabase(dbPath, { enableVec: true });
+    new Migrator(db, ALL_MIGRATIONS).migrate();
+    const repo = new KnowledgeRepository(db);
+    repo.saveNote({
+      filePath: "test.md",
+      title: "Test",
+      content: "Content",
+      frontmatter: {},
+      createdAt: new Date().toISOString(),
+    });
+    db.close();
+
+    await statusCommand({ path: testDir });
+
+    const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
+    // With notes but no embeddings, should show FTS5 only (not semantic + FTS5)
+    expect(output).toContain("FTS5 only");
+    expect(output).not.toContain("semantic + FTS5");
+  });
+
+  it("should show upgrade hint when semantic is not ready", async () => {
+    const knowledgineDir = join(testDir, ".knowledgine");
+    mkdirSync(knowledgineDir, { recursive: true });
+
+    const dbPath = join(knowledgineDir, "index.sqlite");
+    const db = createDatabase(dbPath, { enableVec: true });
+    new Migrator(db, ALL_MIGRATIONS).migrate();
+    const repo = new KnowledgeRepository(db);
+    repo.saveNote({
+      filePath: "test.md",
+      title: "Test",
+      content: "Content",
+      frontmatter: {},
+      createdAt: new Date().toISOString(),
+    });
+    db.close();
+
+    await statusCommand({ path: testDir });
+
+    const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(output).toContain("upgrade --semantic");
+  });
 });

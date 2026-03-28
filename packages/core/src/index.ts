@@ -82,6 +82,7 @@ export { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
 export { migration009 } from "./storage/migrations/009_extraction_metadata.js";
 export { migration010 } from "./storage/migrations/010_memory_protocol.js";
 export { migration011 } from "./storage/migrations/011_fts_unicode61.js";
+export { migration012 } from "./storage/migrations/012_fts_trigram_cjk.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -106,6 +107,7 @@ import { migration008 } from "./storage/migrations/008_knowledge_versioning.js";
 import { migration009 } from "./storage/migrations/009_extraction_metadata.js";
 import { migration010 } from "./storage/migrations/010_memory_protocol.js";
 import { migration011 } from "./storage/migrations/011_fts_unicode61.js";
+import { migration012 } from "./storage/migrations/012_fts_trigram_cjk.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -121,6 +123,7 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration009,
   migration010,
   migration011,
+  migration012,
 ];
 
 // Provenance
