@@ -17,6 +17,7 @@ export interface SetupOptions {
   rules?: boolean;
   skills?: boolean;
   scope?: string;
+  lang?: string;
 }
 
 interface McpServerConfig {
@@ -498,7 +499,7 @@ export async function setupCommand(
 
   // Non-interactive: --skills flag
   if (options.skills) {
-    nonInteractiveSkillsSetup(target, rootPath, { write: shouldWrite });
+    nonInteractiveSkillsSetup(target, rootPath, { write: shouldWrite, lang: options.lang });
     return;
   }
 

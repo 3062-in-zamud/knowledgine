@@ -98,6 +98,7 @@ program
   .option("--write", "Write configuration to file (default: dry-run)")
   .option("--rules", "Configure agent rules (instruction files)")
   .option("--skills", "Install agent skill packages (SKILL.md)")
+  .option("--lang <locale>", "Language for skills: en or ja (default: en)")
   .option("--scope <scope>", "Configuration scope: global or project (default: global)")
   .addHelpText(
     "after",

@@ -1,5 +1,7 @@
 export const SKILL_MD = `---
 name: knowledgine-feedback
+version: "1.0.0"
+lang: en
 description: >
   Report incorrect, missing, or misclassified entity extractions to improve knowledge
   base quality. Invoke when you notice an entity that should not exist (false positive),
@@ -36,10 +38,10 @@ Use the \`report_extraction_error\` MCP tool:
 \`\`\`
 report_extraction_error(
   entityName: string,      // The entity name as it appears in the note
-  errorType: string,       // "false_positive" | "wrong_type" | "missed_entity"
+  errorType: "false_positive" | "wrong_type" | "missed_entity",
   entityType?: string,     // Current entity type (for wrong_type and false_positive)
   correctType?: string,    // What the type should be (for wrong_type)
-  noteId?: string,         // ID of the note where the issue was observed
+  noteId?: number,         // ID of the note where the issue was observed
   details?: string         // Additional context about the error
 )
 \`\`\`
