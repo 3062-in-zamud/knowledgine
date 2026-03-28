@@ -21,6 +21,6 @@ mcp-memory-protocol -> core -> ingest -> mcp-server -> cli
 ## Gotchas
 
 - `better-sqlite3` requires C++ build tools (xcode-select --install on macOS)
-- onnxruntime-node is optional -- embedding tests skip without it
+- `onnxruntime-node` is optional for consumers, but required to run ONNX-based embedding tests when model files are present (tests are skipped based on model availability, not this package)
 - Migrations must be registered in ALL_MIGRATIONS array (packages/core/src/index.ts)
 - Migration `version` field (not filename prefix) determines execution order. Current max: 13
