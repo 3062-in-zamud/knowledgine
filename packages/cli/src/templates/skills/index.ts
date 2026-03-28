@@ -104,5 +104,9 @@ export function getSkillTemplate(name: SkillName, locale: SupportedLocale = "en"
 export function getAllSkillTemplates(
   locale: SupportedLocale = "en",
 ): Record<SkillName, SkillTemplate> {
-  return { ...SKILL_TEMPLATES[locale] };
+  const localeTemplates = SKILL_TEMPLATES[locale];
+  if (!localeTemplates) {
+    throw new Error(`Unsupported locale: ${locale}. Available: en, ja`);
+  }
+  return { ...localeTemplates };
 }
