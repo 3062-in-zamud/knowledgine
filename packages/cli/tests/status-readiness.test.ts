@@ -32,7 +32,7 @@ function makeModelManager(available: boolean): ModelManager {
 function makeRepository(totalNotes: number, notesWithoutEmbeddings: number): KnowledgeRepository {
   return {
     getStats: vi.fn().mockReturnValue({ totalNotes, totalPatterns: 0 }),
-    getNotesWithoutEmbeddings: vi.fn().mockReturnValue(new Array(notesWithoutEmbeddings)),
+    getNotesWithoutEmbeddingIds: vi.fn().mockReturnValue(new Array(notesWithoutEmbeddings)),
   } as unknown as KnowledgeRepository;
 }
 

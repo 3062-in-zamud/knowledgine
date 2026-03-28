@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { Command } from "commander";
 import { registerServeCommand } from "../src/commands/serve.js";
 
@@ -22,7 +21,10 @@ vi.mock("@knowledgine/core", () => {
   const mockEmbeddingProviderInstance = { close: vi.fn() };
   const mockModelManagerInstance = { isModelAvailable: vi.fn().mockReturnValue(true) };
   const mockMigrator = { migrate: vi.fn() };
-  const mockRepository = { getStats: vi.fn().mockReturnValue({ totalNotes: 5 }) };
+  const mockRepository = {
+    getStats: vi.fn().mockReturnValue({ totalNotes: 5 }),
+    getNotesWithoutEmbeddingIds: vi.fn().mockReturnValue([]),
+  };
   const mockGraphRepository = {};
 
   return {
@@ -42,6 +44,14 @@ vi.mock("@knowledgine/core", () => {
     ModelManager: vi.fn().mockImplementation(() => mockModelManagerInstance),
     DEFAULT_MODEL_NAME: "all-MiniLM-L6-v2",
     VERSION: "0.0.0-test",
+    checkSemanticReadiness: vi.fn().mockReturnValue({
+      ready: true,
+      modelAvailable: true,
+      configEnabled: true,
+      embeddingsCount: 5,
+      totalNotes: 5,
+      label: "Ready (semantic + FTS5)",
+    }),
   };
 });
 
@@ -50,7 +60,7 @@ describe("serve-semantic", () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
-    testDir = join(tmpdir(), `knowledgine-serve-semantic-${randomUUID()}`);
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-serve-semantic-"));
     mkdirSync(resolve(testDir, ".knowledgine"), { recursive: true });
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -90,6 +100,16 @@ describe("serve-semantic", () => {
           isModelAvailable: vi.fn().mockReturnValue(true),
         }) as unknown as InstanceType<typeof core.ModelManager>,
     );
+
+    // Reset checkSemanticReadiness to default (ready=true, semantic available)
+    vi.mocked(core.checkSemanticReadiness).mockReturnValue({
+      ready: true,
+      modelAvailable: true,
+      configEnabled: true,
+      embeddingsCount: 5,
+      totalNotes: 5,
+      label: "Ready (semantic + FTS5)",
+    });
   });
 
   afterEach(() => {
@@ -156,6 +176,16 @@ describe("serve-semantic", () => {
         embedding: { enabled: false, modelName: "all-MiniLM-L6-v2" },
       } as ReturnType<typeof core.loadConfig>);
 
+      // checkSemanticReadiness returns not-ready when config disabled
+      vi.mocked(core.checkSemanticReadiness).mockReturnValueOnce({
+        ready: false,
+        modelAvailable: false,
+        configEnabled: false,
+        embeddingsCount: 0,
+        totalNotes: 5,
+        label: "Ready (FTS5 only)",
+      });
+
       writeFileSync(join(testDir, ".knowledgine", ".gitkeep"), "");
 
       const program = new Command();
@@ -179,10 +209,15 @@ describe("serve-semantic", () => {
         embedding: { enabled: true, modelName: "all-MiniLM-L6-v2" },
       } as ReturnType<typeof core.loadConfig>);
 
-      // ModelManager returns false for isModelAvailable
-      vi.mocked(core.ModelManager).mockImplementationOnce(() => ({
-        isModelAvailable: vi.fn().mockReturnValue(false),
-      }));
+      // checkSemanticReadiness returns not-ready when model unavailable
+      vi.mocked(core.checkSemanticReadiness).mockReturnValueOnce({
+        ready: false,
+        modelAvailable: false,
+        configEnabled: true,
+        embeddingsCount: 0,
+        totalNotes: 5,
+        label: "Ready (FTS5 only)",
+      });
 
       writeFileSync(join(testDir, ".knowledgine", ".gitkeep"), "");
 

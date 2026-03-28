@@ -5,7 +5,7 @@ import type { NormalizedEvent } from "./types.js";
 const SECRET_PATTERNS: RegExp[] = [
   /(?:api[_-]?key|apikey|secret|token|password)['":\s]*[=:]\s*['"]?([a-zA-Z0-9_\-/.]{16,})/gi,
   /(?:sk|pk|rk|ak)[-_][a-zA-Z0-9]{20,}/g,
-  /ghp_[a-zA-Z0-9]{36}/g,
+  /gh[pousr]_[a-zA-Z0-9_]{36,}/g,
   /xoxb-[0-9]+-[a-zA-Z0-9]+/g,
   /glpat-[a-zA-Z0-9\-_]{20,}/g,
   // AWS Access Key ID
@@ -19,8 +19,7 @@ const SECRET_PATTERNS: RegExp[] = [
   // Generic secrets in assignment context (KEY="value" or KEY: value)
   // matches patterns like SECRET_KEY="value", TOKEN="value", PASSWORD: "value"
   /(?:SECRET|TOKEN|PASSWORD|CREDENTIAL|API_KEY|APIKEY|AUTH)(?:[\w]*\s*)?[=:]\s*['"][^'"]{8,}['"]/gi,
-  // GitHub personal access tokens (ghs_, ghp_ already covered, adding ghs_ and ghx_)
-  /gh[ps]_[A-Za-z0-9_]{36,}/g,
+  // GitHub tokens: ghp_ (PAT), gho_ (OAuth), ghu_ (user-to-server), ghs_ (server), ghr_ (refresh) — already covered above by gh[pousr]_
   // Slack tokens (xoxp-, xoxs-, xoxa-, xoxr-)
   /xox[poras]-[A-Za-z0-9-]+/g,
 ];

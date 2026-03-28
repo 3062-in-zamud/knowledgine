@@ -39,7 +39,12 @@ export class GitHistoryPlugin implements IngestPlugin {
       await execGit(["--version"], { cwd: process.cwd(), timeout: 5000 });
 
       if (config) {
-        if (typeof config.limit === "number") this.limit = config.limit;
+        if (typeof config.limit === "number") {
+          if (!Number.isFinite(config.limit) || config.limit <= 0) {
+            return { ok: false, error: "Invalid limit: must be a finite positive number" };
+          }
+          this.limit = config.limit;
+        }
         if (typeof config.since === "string") this.since = config.since;
         if (config.unlimited === true) this.unlimited = true;
       }

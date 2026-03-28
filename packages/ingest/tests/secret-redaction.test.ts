@@ -3,19 +3,24 @@ import { sanitizeContent } from "../src/normalizer.js";
 
 describe("secret redaction 強化", () => {
   it("AWS Access Key ID をマスクする", () => {
-    const content = "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE";
+    // 動的に組み立てて GitHub Secret Scanning の誤検知を回避
+    const fakeAwsKey = "AKIA" + "IOSFODNN7EXAMPLE";
+    const content = `AWS_ACCESS_KEY_ID=${fakeAwsKey}`;
     const result = sanitizeContent(content);
     expect(result).toContain("[REDACTED]");
-    expect(result).not.toContain("AKIAIOSFODNN7EXAMPLE");
+    expect(result).not.toContain(fakeAwsKey);
   });
 
   it("JWT Token をマスクする", () => {
-    const jwtToken =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U";
-    const content = `Authorization: Bearer ${jwtToken}`;
+    // 動的に組み立てて GitHub Secret Scanning の誤検知を回避
+    const fakeJwt =
+      "eyJhbGci" +
+      "OiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIi" +
+      "OiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U";
+    const content = `Authorization: Bearer ${fakeJwt}`;
     const result = sanitizeContent(content);
     expect(result).toContain("[REDACTED]");
-    expect(result).not.toContain(jwtToken);
+    expect(result).not.toContain(fakeJwt);
   });
 
   it("Database connection string (postgres) をマスクする", () => {

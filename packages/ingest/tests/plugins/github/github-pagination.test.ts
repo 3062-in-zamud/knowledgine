@@ -207,7 +207,8 @@ describe("GitHub pagination", () => {
       // consume
     }
 
-    // 2回目の PR リスト呼び出しに created:< カーソルが含まれること
+    // 2回目の PR リスト呼び出しに created:<= カーソルが含まれること
+    // (created:<= を使って境界上のアイテムを取り逃さない; 重複は IngestEngine が sourceUri で除去)
     const prListCalls = mockedExecGh.mock.calls.filter(
       ([args]) => args[0] === "pr" && args[1] === "list",
     );
@@ -216,6 +217,6 @@ describe("GitHub pagination", () => {
     const searchIndex = secondCallArgs.indexOf("--search");
     expect(searchIndex).toBeGreaterThan(-1);
     const searchValue = secondCallArgs[searchIndex + 1];
-    expect(searchValue).toContain(`created:<${oldestDate}`);
+    expect(searchValue).toContain(`created:<=${oldestDate}`);
   });
 });

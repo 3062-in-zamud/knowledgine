@@ -16,6 +16,7 @@ import {
   ModelManager,
   DEFAULT_MODEL_NAME,
   VERSION,
+  checkSemanticReadiness,
 } from "@knowledgine/core";
 import { createRestApp } from "@knowledgine/mcp-server";
 
@@ -58,13 +59,12 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
     const repository = new KnowledgeRepository(db);
     const graphRepository = new GraphRepository(db);
 
-    // Initialize embedding provider for semantic search
+    // Initialize embedding provider based on actual semantic readiness
+    const modelManager = new ModelManager();
+    const semanticReadiness = checkSemanticReadiness(config, modelManager, repository);
     let embeddingProvider: OnnxEmbeddingProvider | undefined;
-    if (config.embedding?.enabled) {
-      const modelManager = new ModelManager();
-      if (modelManager.isModelAvailable()) {
-        embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
-      }
+    if (semanticReadiness.ready) {
+      embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
     }
 
     const service = new KnowledgeService({

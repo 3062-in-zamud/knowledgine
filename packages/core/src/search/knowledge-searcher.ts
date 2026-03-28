@@ -119,18 +119,18 @@ export class KnowledgeSearcher {
       // newness bonus: 新しいノートの rank をより負にして良くする（乗算ボーナス）
       const CHANGELOG_PATTERN = /^(CHANGELOG|CHANGES|HISTORY)\.(md|txt|rst)$/i;
       const CHANGELOG_DISCOUNT = 0.3;
-      const nowForRank = Date.now();
-
       const adjustedRanks = rows.map(({ note, rank }) => {
         let adjusted = rank;
 
         // newness boost: 新しいノートの rank をより負に（係数 > 1 で乗算）
         const validFrom = note.valid_from ?? note.created_at;
         if (validFrom) {
-          const ageMs = nowForRank - new Date(validFrom).getTime();
-          const yearsSinceNow = ageMs / (1000 * 60 * 60 * 24 * 365);
+          const yearsSinceNow =
+            (Date.now() - new Date(validFrom).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+          if (!Number.isFinite(yearsSinceNow)) return adjusted; // skip NaN / Infinity dates (no boost)
           // boost factor: 最大 1.3x（新しいほど rank が大きくなる = より負に近い）
-          const boost = 1 + Math.max(0, 0.3 - yearsSinceNow * 0.06);
+          // Math.min(0.3, ...) で未来日付によるブーストが 1.3x を超えないようクランプ
+          const boost = 1 + Math.min(0.3, Math.max(0, 0.3 - yearsSinceNow * 0.06));
           adjusted = adjusted * boost; // rank はマイナスなので * boost でより負になる
         }
 

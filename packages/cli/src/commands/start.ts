@@ -73,26 +73,28 @@ export async function startCommand(options: StartOptions): Promise<void> {
   let embeddingProvider: OnnxEmbeddingProvider | undefined;
   const modelManager = new ModelManager();
   const semanticReadiness = checkSemanticReadiness(config, modelManager, repository);
+  // Sync config.embedding.enabled with actual readiness to prevent downstream misreporting
+  config.embedding.enabled = semanticReadiness.ready;
   if (semanticReadiness.ready) {
     embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
   } else if (semanticReadiness.configEnabled) {
     if (!semanticReadiness.modelAvailable) {
       // Config enabled but model not downloaded
-      const notesWithout = repository.getNotesWithoutEmbeddings();
-      if (notesWithout.length > 0) {
+      const notesWithoutCount = repository.getNotesWithoutEmbeddingIds().length;
+      if (notesWithoutCount > 0) {
         console.error(
           `${symbols.warning} ${colors.warning(
-            `${notesWithout.length} notes have no embeddings. ` +
+            `${notesWithoutCount} notes have no embeddings. ` +
               "Semantic search unavailable. Run 'knowledgine upgrade --semantic' to download the model and generate embeddings.",
           )}`,
         );
       }
     } else if (semanticReadiness.embeddingsCount === 0 && semanticReadiness.totalNotes > 0) {
       // Model available but embeddings not yet generated
-      const notesWithout = repository.getNotesWithoutEmbeddings();
+      const notesWithoutCount = repository.getNotesWithoutEmbeddingIds().length;
       console.error(
         `${symbols.warning} ${colors.warning(
-          `${notesWithout.length} notes have no embeddings. ` +
+          `${notesWithoutCount} notes have no embeddings. ` +
             "Semantic search unavailable. Run 'knowledgine upgrade --semantic' to download the model and generate embeddings.",
         )}`,
       );

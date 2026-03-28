@@ -70,7 +70,9 @@ export class GitHubPlugin implements IngestPlugin {
         "all",
       ];
       if (oldestPRSeen) {
-        prArgs.push("--search", `created:<${oldestPRSeen}`);
+        // created:<= to include items with the exact same timestamp.
+        // Duplicates from boundary overlap are deduplicated by IngestEngine via sourceUri uniqueness.
+        prArgs.push("--search", `created:<=${oldestPRSeen}`);
       }
 
       const prJson = await this.execWithRetry(prArgs);
@@ -167,7 +169,9 @@ export class GitHubPlugin implements IngestPlugin {
         "all",
       ];
       if (oldestIssueSeen) {
-        issueArgs.push("--search", `created:<${oldestIssueSeen}`);
+        // created:<= to include items with the exact same timestamp.
+        // Duplicates from boundary overlap are deduplicated by IngestEngine via sourceUri uniqueness.
+        issueArgs.push("--search", `created:<=${oldestIssueSeen}`);
       }
 
       const issueJson = await this.execWithRetry(issueArgs);
@@ -217,7 +221,8 @@ export class GitHubPlugin implements IngestPlugin {
         "all",
         "--search",
         oldestPRSeen
-          ? `updated:>=${adjustedCheckpoint} created:<${oldestPRSeen}`
+          ? // created:<= to include boundary items; dedup handled by IngestEngine via sourceUri
+            `updated:>=${adjustedCheckpoint} created:<=${oldestPRSeen}`
           : `updated:>=${adjustedCheckpoint}`,
       ];
 
@@ -250,7 +255,8 @@ export class GitHubPlugin implements IngestPlugin {
         "all",
         "--search",
         oldestIssueSeen
-          ? `updated:>=${adjustedCheckpoint} created:<${oldestIssueSeen}`
+          ? // created:<= to include boundary items; dedup handled by IngestEngine via sourceUri
+            `updated:>=${adjustedCheckpoint} created:<=${oldestIssueSeen}`
           : `updated:>=${adjustedCheckpoint}`,
       ];
 

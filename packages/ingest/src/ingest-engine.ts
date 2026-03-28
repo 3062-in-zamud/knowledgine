@@ -38,7 +38,12 @@ export class IngestEngine {
     const allNoteIds: number[] = [];
 
     if (options?.pluginConfig) {
-      await plugin.initialize(options.pluginConfig);
+      const initResult = await plugin.initialize(options.pluginConfig);
+      if (initResult && initResult.ok === false) {
+        throw new Error(
+          `Plugin initialization failed for "${pluginId}": ${initResult.error ?? "unknown error"}`,
+        );
+      }
     }
 
     const cursor = options?.full ? undefined : this.cursorStore.getCursor(pluginId, sourcePath);

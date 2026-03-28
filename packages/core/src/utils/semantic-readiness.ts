@@ -18,7 +18,7 @@ export function checkSemanticReadiness(
 ): SemanticReadiness {
   const stats = repository.getStats();
   const totalNotes = stats.totalNotes;
-  const notesWithoutEmbeddings = repository.getNotesWithoutEmbeddings().length;
+  const notesWithoutEmbeddings = repository.getNotesWithoutEmbeddingIds().length;
   const embeddingsCount = totalNotes - notesWithoutEmbeddings;
   const modelAvailable = modelManager.isModelAvailable();
   const configEnabled = config.embedding.enabled;
