@@ -111,6 +111,7 @@ export interface SearchInput {
 export interface FindRelatedInput {
   noteId?: number;
   filePath?: string;
+  entityName?: string;
   limit?: number;
   maxHops?: number;
 }
@@ -193,8 +194,20 @@ export class KnowledgeService {
       resolvedNoteId = note.id;
     }
 
+    if (!resolvedNoteId && input.entityName && this.options.graphRepository) {
+      const entities = this.options.graphRepository.searchEntities(input.entityName, 1);
+      if (entities.length === 0) {
+        throw new Error(`No entity found matching: ${input.entityName}`);
+      }
+      const linkedNotes = this.options.graphRepository.getLinkedNotes(entities[0].id!);
+      if (linkedNotes.length === 0) {
+        throw new Error(`Entity "${entities[0].name}" has no linked notes`);
+      }
+      resolvedNoteId = linkedNotes[0].noteId;
+    }
+
     if (!resolvedNoteId) {
-      throw new Error("Either noteId or filePath is required");
+      throw new Error("Either noteId, filePath, or entityName is required");
     }
 
     const relatedNotes = this.linkGenerator.findRelatedNotes(resolvedNoteId, limit);
