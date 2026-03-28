@@ -131,24 +131,27 @@ export class LocalLinkGenerator {
     const relatedNotes: RelatedNote[] = [];
     const DAY_MS = 1000 * 60 * 60 * 24;
 
-    // 全ノートの日数差を計算
     const allDaysDiffs = results.map((note) => {
       const noteDate = new Date(note.created_at);
       return Math.abs((currentDate.getTime() - noteDate.getTime()) / DAY_MS);
     });
 
-    // 中央値をハーフライフとして使用（全て同日の場合は 1 でフォールバック）
     const sorted = [...allDaysDiffs].sort((a, b) => a - b);
     const medianDiff = sorted[Math.floor(sorted.length / 2)] || 1;
     const lambda = Math.LN2 / Math.max(medianDiff, 0.1);
 
+    // timestamp分散を計算し、低分散時はtime-proximityの重みを自動低減
+    const mean = allDaysDiffs.reduce((a, b) => a + b, 0) / allDaysDiffs.length;
+    const variance = allDaysDiffs.reduce((a, b) => a + (b - mean) ** 2, 0) / allDaysDiffs.length;
+    // 分散が0.01未満（≒全同一timestamp）なら dampening → 0.1、分散が大きくなるにつれ1.0に近づく
+    const dampening = Math.min(1.0, Math.sqrt(variance) / 1.0);
+    const effectiveDampening = Math.max(dampening, 0.1);
+
     for (let i = 0; i < results.length; i++) {
       const note = results[i];
       const daysDiff = allDaysDiffs[i];
-      // 指数減衰: base 0.2, scale 0.8
-      // 全て同日（daysDiff=0）のとき lambda は大きくなるが exp(0)=1 なので similarity = 0.8 * 1 + 0.2 = 1.0
-      // medianDiff=0 のとき lambda=Math.LN2/0.1 と大きくなり、daysDiff>0 のノートは急速に減衰する
-      const similarity = Math.exp(-lambda * daysDiff) * 0.8 + 0.2;
+      const rawSimilarity = Math.exp(-lambda * daysDiff) * 0.8 + 0.2;
+      const similarity = rawSimilarity * effectiveDampening;
 
       relatedNotes.push({
         id: note.id,
@@ -188,22 +191,34 @@ export class LocalLinkGenerator {
   }
 
   private deduplicateAndRank(relatedNotes: RelatedNote[], excludeNoteId: number): RelatedNote[] {
-    const noteMap = new Map<number, RelatedNote>();
+    const noteScores = new Map<number, { scores: number[]; note: RelatedNote }>();
 
     for (const note of relatedNotes) {
       if (note.id === excludeNoteId) continue;
 
-      if (noteMap.has(note.id)) {
-        const existing = noteMap.get(note.id)!;
-        // 確率的結合: 1 - (1-a)(1-b) — 自然に [0, 1] に収まる
-        existing.similarity = 1 - (1 - existing.similarity) * (1 - note.similarity);
-        existing.reason += `, ${note.reason}`;
+      if (noteScores.has(note.id)) {
+        const entry = noteScores.get(note.id)!;
+        entry.scores.push(note.similarity);
+        entry.note.reason += `, ${note.reason}`;
       } else {
-        noteMap.set(note.id, { ...note });
+        noteScores.set(note.id, { scores: [note.similarity], note: { ...note } });
       }
     }
 
-    return Array.from(noteMap.values()).sort((a, b) => b.similarity - a.similarity);
+    // max + diminishing boost: 最大スコアをベースに、追加シグナルは (1-max) の一部をブースト
+    const BOOST_FACTOR = 0.15;
+    for (const entry of noteScores.values()) {
+      const sorted = entry.scores.sort((a, b) => b - a);
+      let combined = sorted[0];
+      for (let i = 1; i < sorted.length; i++) {
+        combined += (1 - combined) * sorted[i] * BOOST_FACTOR;
+      }
+      entry.note.similarity = Math.min(combined, 0.99);
+    }
+
+    return Array.from(noteScores.values())
+      .map((e) => e.note)
+      .sort((a, b) => b.similarity - a.similarity);
   }
 
   private parseTags(frontmatterJson: string | null): string[] {
