@@ -343,28 +343,31 @@ export async function initCommand(options: InitOptions): Promise<void> {
       const noteIds = repository.getNotesWithoutEmbeddingIds();
 
       if (noteIds.length > 0) {
-        const EMBED_BATCH = 100;
+        const BATCH_SIZE = 20;
         const embProgress = createProgress(noteIds.length, "  Embeddings");
         let generated = 0;
         let failed = 0;
 
-        for (let i = 0; i < noteIds.length; i += EMBED_BATCH) {
-          const batchIds = noteIds.slice(i, i + EMBED_BATCH);
-          for (const id of batchIds) {
-            try {
-              const note = repository.getNoteById(id);
-              if (!note) {
-                failed++;
-                continue;
-              }
-              const embedding = await embeddingProvider.embed(note.content);
-              repository.saveEmbedding(id, embedding, config.embedding.modelName);
-              generated++;
-              embProgress.update(generated);
-            } catch {
-              failed++;
-            }
+        for (let i = 0; i < noteIds.length; i += BATCH_SIZE) {
+          const batchIds = noteIds.slice(i, i + BATCH_SIZE);
+          const notes = repository.getNotesByIds(batchIds);
+          try {
+            const embeddings = await embeddingProvider.embedBatch(notes.map((n) => n.content));
+            const result = repository.saveEmbeddingBatch(
+              notes.map((n, j) => ({
+                noteId: n.id,
+                embedding: embeddings[j],
+                modelName: config.embedding.modelName,
+              })),
+            );
+            generated += result.saved;
+            failed += result.failed;
+          } catch {
+            failed += notes.length;
           }
+          embProgress.update(
+            generated + failed > noteIds.length ? noteIds.length : generated + failed,
+          );
         }
 
         embProgress.finish();

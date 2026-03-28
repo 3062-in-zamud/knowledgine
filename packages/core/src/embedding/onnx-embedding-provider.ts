@@ -11,6 +11,7 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
   private tokenizer: WordPieceTokenizer | null = null;
   private modelName: string;
   private modelManager: ModelManager;
+  private ort: typeof import("onnxruntime-node") | null = null;
 
   constructor(modelName: string = DEFAULT_MODEL_NAME, modelManager?: ModelManager) {
     this.modelName = modelName;
@@ -27,8 +28,10 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
     }
 
     try {
-      const ort = await import("onnxruntime-node");
-      this.session = await ort.InferenceSession.create(
+      if (!this.ort) {
+        this.ort = await import("onnxruntime-node");
+      }
+      this.session = await this.ort.InferenceSession.create(
         this.modelManager.getModelPath(this.modelName),
         { executionProviders: ["cpu"] },
       );
@@ -62,7 +65,10 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
     const tokenizer = this.getTokenizer();
 
     try {
-      const ort = await import("onnxruntime-node");
+      if (!this.ort) {
+        this.ort = await import("onnxruntime-node");
+      }
+      const ort = this.ort;
       const results: Float32Array[] = [];
 
       for (const text of texts) {
