@@ -35,6 +35,10 @@ export class IngestEngine {
     },
   ): Promise<IngestSummary> {
     const start = Date.now();
+    const quiet = options?.quiet === true;
+    const log = (msg: string): void => {
+      if (!quiet) process.stderr.write(msg);
+    };
     const plugin = this.registry.getOrThrow(pluginId);
     let processed = 0;
     let errors = 0;
@@ -90,10 +94,10 @@ export class IngestEngine {
 
       if (!heapWarned && heapRatio > 0.8) {
         heapWarned = true;
-        process.stderr.write(
+        log(
           `  ⚠ High heap usage (${(heapRatio * 100).toFixed(0)}%). ` +
             `Reducing batch size to ${currentBatchSize}. ` +
-            `Consider: NODE_OPTIONS='--max-old-space-size=4096' knowledgine init\n`,
+            `Consider: NODE_OPTIONS='--max-old-space-size=4096'\n`,
         );
       }
 
