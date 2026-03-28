@@ -505,9 +505,7 @@ export async function setupCommand(
   // Non-interactive: MCP setup (default)
   const rawScope = options.scope ?? "global";
   if (rawScope !== "global" && rawScope !== "project") {
-    console.error(
-      `${symbols.error} ${colors.error(`Invalid scope "${rawScope}".`)}`,
-    );
+    console.error(`${symbols.error} ${colors.error(`Invalid scope "${rawScope}".`)}`);
     console.error(
       `${symbols.arrow} ${colors.hint('Valid values for --scope are "global" (default) or "project".')}`,
     );
