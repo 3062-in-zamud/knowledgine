@@ -169,15 +169,27 @@ describe("init command – rc.json generation", () => {
     mkdirSync(subDir);
     writeFileSync(join(subDir, "note.md"), "# Test\n\nContent");
 
-    await initCommand({ path: subDir, saveConfig: true, semantic: false });
+    // chdir to testDir so that any rc file is written inside the temp dir
+    const originalCwd = process.cwd();
+    process.chdir(testDir);
+    try {
+      await initCommand({ path: subDir, saveConfig: true, semantic: false });
 
-    // The rc file in cwd would get defaultPath written (cwd != subDir),
-    // but we verify via the subDir rc that defaultPath is NOT written to rootPath
-    const subRcPath = join(subDir, ".knowledginerc.json");
-    // subDir rc should NOT have defaultPath (it would be written to cwd, not rootPath)
-    if (existsSync(subRcPath)) {
-      const rc = JSON.parse(readFileSync(subRcPath, "utf-8"));
-      expect(rc.defaultPath).toBeUndefined();
+      // defaultPath should be written to cwd's rc (testDir) since
+      // options.path was explicitly provided and subDir != testDir (cwd)
+      const cwdRcPath = join(testDir, ".knowledginerc.json");
+      expect(existsSync(cwdRcPath)).toBe(true);
+      const rc = JSON.parse(readFileSync(cwdRcPath, "utf-8"));
+      expect(rc.defaultPath).toBe(subDir);
+
+      // subDir rc should NOT have defaultPath
+      const subRcPath = join(subDir, ".knowledginerc.json");
+      if (existsSync(subRcPath)) {
+        const subRc = JSON.parse(readFileSync(subRcPath, "utf-8"));
+        expect(subRc.defaultPath).toBeUndefined();
+      }
+    } finally {
+      process.chdir(originalCwd);
     }
   });
 });
