@@ -1,11 +1,12 @@
 import type Database from "better-sqlite3";
 import type { KnowledgeRepository } from "@knowledgine/core";
-import type { IngestSummary, NormalizedEvent } from "./types.js";
+import type { IngestSummary, NormalizedEvent, SkipReason } from "./types.js";
 import type { PluginRegistry } from "./plugin-registry.js";
 import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
+import { getHeapUsageRatio, getAdaptiveBatchSize } from "./heap-monitor.js";
 
-const BATCH_SIZE = 100;
+const DEFAULT_BATCH_SIZE = 50;
 
 /** Plugin IDs that represent file-based sources (eligible for stale cleanup) */
 const FILE_BASED_PLUGINS = new Set(["markdown", "obsidian"]);
@@ -26,9 +27,18 @@ export class IngestEngine {
   async ingest(
     pluginId: string,
     sourcePath: string,
-    options?: { full?: boolean; pluginConfig?: Record<string, unknown> },
+    options?: {
+      full?: boolean;
+      pluginConfig?: Record<string, unknown>;
+      verbose?: boolean;
+      quiet?: boolean;
+    },
   ): Promise<IngestSummary> {
     const start = Date.now();
+    const quiet = options?.quiet === true;
+    const log = (msg: string): void => {
+      if (!quiet) process.stderr.write(msg);
+    };
     const plugin = this.registry.getOrThrow(pluginId);
     let processed = 0;
     let errors = 0;
@@ -53,22 +63,51 @@ export class IngestEngine {
 
     const processedPaths = new Set<string>();
     let batch: NormalizedEvent[] = [];
+    let heapWarned = false;
+    let totalEventsFromGenerator = 0;
     for await (const event of generator) {
+      totalEventsFromGenerator++;
       if (!event.content || event.content.trim() === "") {
         skipped++;
+        if (options?.verbose) {
+          process.stderr.write(`  [skip] empty content: ${event.sourceUri}\n`);
+        }
         continue;
       }
       if (event.metadata.skippedReason === "large_diff") {
         skippedLargeDiff++;
+        if (options?.verbose) {
+          process.stderr.write(
+            `  [skip] large diff (metadata only): ${event.sourceUri} — ${event.title}\n`,
+          );
+        }
       }
       batch.push(event);
       processedPaths.add(event.sourceUri);
-      if (batch.length >= BATCH_SIZE) {
+
+      // Sample heap usage at batch boundaries to avoid per-event overhead
+      const shouldSample = batch.length % DEFAULT_BATCH_SIZE === 0;
+      const heapRatio = shouldSample ? getHeapUsageRatio() : 0;
+      const currentBatchSize = shouldSample
+        ? getAdaptiveBatchSize(DEFAULT_BATCH_SIZE, heapRatio)
+        : DEFAULT_BATCH_SIZE;
+
+      if (!heapWarned && heapRatio > 0.8) {
+        heapWarned = true;
+        log(
+          `  ⚠ High heap usage (${(heapRatio * 100).toFixed(0)}%). ` +
+            `Reducing batch size to ${currentBatchSize}. ` +
+            `Consider: NODE_OPTIONS='--max-old-space-size=4096'\n`,
+        );
+      }
+
+      if (batch.length >= currentBatchSize) {
         const result = this.processBatch(batch);
         processed += result.processed;
         errors += result.errors;
         allNoteIds.push(...result.noteIds);
         batch = [];
+        global.gc?.();
       }
     }
 
@@ -92,6 +131,17 @@ export class IngestEngine {
       lastIngestAt: new Date(),
     });
 
+    let skipReason: SkipReason | undefined;
+    if (processed === 0) {
+      if (totalEventsFromGenerator === 0 && cursor) {
+        skipReason = "already_indexed";
+      } else if (totalEventsFromGenerator === 0) {
+        skipReason = "no_source_data";
+      } else if (skipped > 0 || errors > 0) {
+        skipReason = "all_filtered";
+      }
+    }
+
     return {
       pluginId,
       processed,
@@ -99,6 +149,7 @@ export class IngestEngine {
       deleted,
       skipped,
       ...(skippedLargeDiff > 0 ? { skippedLargeDiff } : {}),
+      ...(skipReason ? { skipReason } : {}),
       elapsedMs: Date.now() - start,
       noteIds: allNoteIds,
     };

@@ -30,6 +30,7 @@ export interface InitOptions {
   skipEmbeddings?: boolean;
   demo?: boolean;
   force?: boolean;
+  yes?: boolean;
   saveConfig?: boolean;
 }
 
@@ -127,12 +128,15 @@ export async function initCommand(options: InitOptions): Promise<void> {
   }
 
   // Determine if semantic search should be enabled
-  const enableSemantic = options.semantic === true;
+  // --no-semantic explicitly disables; --semantic explicitly enables;
+  // default: auto-enable if model is available (prompt for large repos)
+  const semanticExplicitlyDisabled = options.semantic === false;
+  let enableSemantic = options.semantic === true;
 
   // ---------------------------------------------------------------------------
   // Step 1: Create .knowledgine directory
   // ---------------------------------------------------------------------------
-  const totalSteps = enableSemantic ? 5 : 3;
+  const totalSteps = 5; // Always show 5 steps; skip semantic steps if not needed
   const stepProgress = createStepProgress(totalSteps, "Initializing knowledgine...");
 
   const knowledgineDir = resolve(rootPath, ".knowledgine");
@@ -237,10 +241,63 @@ export async function initCommand(options: InitOptions): Promise<void> {
     await mdPlugin.initialize();
   }
   const engine = new IngestEngine(registry, db, repository);
-  const ingestSummary = await engine.ingest("markdown", rootPath, { full: true });
+  let ingestSummary;
+  try {
+    ingestSummary = await engine.ingest("markdown", rootPath, { full: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (
+      message.includes("heap") ||
+      message.includes("out of memory") ||
+      message.includes("allocation failed")
+    ) {
+      stepProgress.failStep("Indexing markdown files", "Out of memory");
+      console.error("");
+      console.error(
+        colors.error(
+          "Error: Ran out of memory while indexing. The repository may be too large for the default heap.",
+        ),
+      );
+      console.error("");
+      console.error(`${symbols.warning} ${colors.warning("Try increasing the Node.js heap:")}`);
+      console.error(
+        `  NODE_OPTIONS='--max-old-space-size=4096' knowledgine init${options.path ? ` --path ${options.path}` : ""}`,
+      );
+      console.error("");
+      console.error(
+        `${symbols.info} ${colors.info("For very large repositories (10,000+ files), use 8GB or more:")}`,
+      );
+      console.error(
+        `  NODE_OPTIONS='--max-old-space-size=8192' knowledgine init${options.path ? ` --path ${options.path}` : ""}`,
+      );
+      db.close();
+      process.exit(1);
+    }
+    throw err;
+  }
 
   if (ingestSummary.processed === 0) {
     stepProgress.warn("No markdown files found in the directory.");
+
+    // Suggest ingest sources if this is a git repository
+    try {
+      const { execFileSync } = await import("child_process");
+      execFileSync("git", ["rev-parse", "--git-dir"], { cwd: rootPath, stdio: "ignore" });
+      // It's a git repo - suggest ingest sources
+      console.error("");
+      console.error(
+        `${symbols.info} ${colors.info("This is a git repository. Enrich your knowledge base:")}`,
+      );
+      console.error(
+        `  ${symbols.arrow} ${colors.hint(`knowledgine ingest --source git-history --path ${rootPath}`)}`,
+      );
+      console.error(
+        `  ${symbols.arrow} ${colors.hint(`knowledgine ingest --source github --repo <owner/repo> --path ${rootPath}`)}`,
+      );
+      console.error("");
+    } catch {
+      // Not a git repo - no additional hint
+    }
   }
 
   if (ingestSummary.errors > 0) {
@@ -251,6 +308,52 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
   // Entity extraction (post-ingest batch)
   const postSummary = await postIngestProcessing(repository, graphRepository);
+
+  // ---------------------------------------------------------------------------
+  // Auto-detect semantic search capability (when not explicitly set)
+  // ---------------------------------------------------------------------------
+  const SEMANTIC_AUTO_THRESHOLD = 5000;
+  if (!enableSemantic && !semanticExplicitlyDisabled && ingestSummary.processed > 0) {
+    const modelManager = new ModelManager();
+    if (modelManager.isModelAvailable()) {
+      if (ingestSummary.processed < SEMANTIC_AUTO_THRESHOLD) {
+        // Auto-enable for small repos
+        enableSemantic = true;
+        config.embedding.enabled = true;
+        try {
+          await loadSqliteVecExtension(db);
+        } catch {
+          enableSemantic = false;
+          config.embedding.enabled = false;
+        }
+      } else if (options.yes) {
+        // --yes flag: auto-accept
+        enableSemantic = true;
+        config.embedding.enabled = true;
+        try {
+          await loadSqliteVecExtension(db);
+        } catch {
+          enableSemantic = false;
+          config.embedding.enabled = false;
+        }
+      } else {
+        // Large repo: prompt user
+        const shouldEnable = await p.confirm({
+          message: `Enable semantic search? (${ingestSummary.processed} notes, estimated ~${Math.ceil(ingestSummary.processed / 150)}s)`,
+        });
+        if (shouldEnable && !p.isCancel(shouldEnable)) {
+          enableSemantic = true;
+          config.embedding.enabled = true;
+          try {
+            await loadSqliteVecExtension(db);
+          } catch {
+            enableSemantic = false;
+            config.embedding.enabled = false;
+          }
+        }
+      }
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Step 4 & 5 (semantic only): Download model + generate embeddings
@@ -375,29 +478,26 @@ export async function initCommand(options: InitOptions): Promise<void> {
     }
 
     stepProgress.completeStep("Generating embeddings");
+  } else {
+    // Skip semantic steps when not enabled
+    stepProgress.skipStep("Downloading embedding model", "semantic search not enabled");
+    stepProgress.skipStep("Generating embeddings", "semantic search not enabled");
   }
 
   stepProgress.finish();
 
   // ---------------------------------------------------------------------------
-  // Auto-configure defaultPath so users don't need --path every time
+  // Write .knowledginerc.json only when explicitly requested (--save-config)
   // ---------------------------------------------------------------------------
-  const cwd = process.cwd();
-  const resolvedRoot = resolve(rootPath);
-  // Write defaultPath to cwd's .knowledginerc.json (where resolveDefaultPath reads from)
-  // Only if rootPath differs from cwd (otherwise cwd fallback already works)
-  if (resolvedRoot !== resolve(cwd)) {
-    writeRcConfig(cwd, { defaultPath: resolvedRoot });
-  }
-  // Also write semantic flag to rootPath's .knowledginerc.json if semantic enabled
-  // (this is where loadConfig reads from)
-  if (enableSemantic && config.embedding.enabled) {
-    writeRcConfig(rootPath, { semantic: true });
-  }
-
-  // --save-config: write defaultPath to .knowledginerc.json in cwd
   if (options.saveConfig) {
-    writeRcConfig(process.cwd(), { defaultPath: rootPath });
+    const cwd = process.cwd();
+    const resolvedRoot = resolve(rootPath);
+    if (resolvedRoot !== resolve(cwd)) {
+      writeRcConfig(cwd, { defaultPath: resolvedRoot });
+    }
+    if (enableSemantic && config.embedding.enabled) {
+      writeRcConfig(rootPath, { semantic: true });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -447,22 +547,22 @@ export async function initCommand(options: InitOptions): Promise<void> {
       "Try these searches",
     );
   } else {
-    p.note(
-      [
-        `${symbols.arrow} ${colors.info("knowledgine setup")}          ${colors.dim("Configure your AI tools")}`,
-        `${symbols.arrow} ${colors.info('knowledgine search "query"')}  ${colors.dim("Search your notes")}`,
-      ].join("\n"),
-      "Next steps",
-    );
+    const nextStepLines = [
+      `${symbols.arrow} ${colors.info("knowledgine setup")}          ${colors.dim("Configure your AI tools")}`,
+      `${symbols.arrow} ${colors.info('knowledgine search "query"')}  ${colors.dim("Search your notes")}`,
+    ];
     if (options.saveConfig) {
-      p.note(
-        [
-          `${symbols.arrow} ${colors.info(`knowledgine setup --target claude-code --path ${rootPath} --write`)}`,
-          `${symbols.arrow} ${colors.info(`knowledgine start --path ${rootPath}`)}`,
-        ].join("\n"),
-        "Next steps",
+      nextStepLines.push(
+        `${symbols.arrow} ${colors.info(`knowledgine setup --target claude-code --path ${rootPath} --write`)}`,
+        `${symbols.arrow} ${colors.info(`knowledgine start --path ${rootPath}`)}`,
+      );
+    } else if (resolve(rootPath) !== resolve(process.cwd())) {
+      nextStepLines.push(
+        "",
+        `${colors.dim("Tip: Use --save-config to save the path so you don't need --path every time.")}`,
       );
     }
+    p.note(nextStepLines.join("\n"), "Next steps");
   }
 
   // Suggest adding .knowledgine/ to .gitignore

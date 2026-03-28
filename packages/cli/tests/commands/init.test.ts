@@ -111,6 +111,26 @@ describe("init command", () => {
   });
 });
 
+describe("init command – rc.json generation", () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it("should not generate .knowledginerc.json by default", async () => {
+    writeFileSync(join(testDir, "note.md"), "# Test\n\nContent");
+
+    await initCommand({ path: testDir });
+
+    expect(existsSync(join(testDir, ".knowledginerc.json"))).toBe(false);
+  });
+});
+
 describe("init command – error handling", () => {
   let testDir: string;
   let stderrSpy: ReturnType<typeof vi.spyOn>;

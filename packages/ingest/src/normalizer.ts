@@ -12,7 +12,7 @@ const SECRET_PATTERNS: RegExp[] = [
   /AKIA[0-9A-Z]{16}/g,
   // JWT Token (3-part base64url)
   /eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]+/g,
-  // Database connection strings (with credentials)
+  // Database connection strings (any URL with scheme://)
   /(?:mongodb|postgres|postgresql|mysql|redis|amqp):\/\/[^\s'")\]]+/gi,
   // Private key headers
   /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,

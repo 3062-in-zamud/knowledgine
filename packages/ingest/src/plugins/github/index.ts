@@ -37,7 +37,9 @@ export class GitHubPlugin implements IngestPlugin {
     { type: "manual" },
   ];
 
-  async initialize(_config?: PluginConfig): Promise<PluginInitResult> {
+  private itemLimit: number = Infinity;
+
+  async initialize(config?: PluginConfig): Promise<PluginInitResult> {
     const versionCheck = await checkGhVersion();
     if (!versionCheck.ok) {
       return { ok: false, error: versionCheck.error ?? "gh CLI version check failed" };
@@ -46,6 +48,14 @@ export class GitHubPlugin implements IngestPlugin {
     if (!authed) {
       return { ok: false, error: "gh CLI not authenticated. Run 'gh auth login'" };
     }
+
+    if (config && typeof config.limit === "number") {
+      if (!Number.isFinite(config.limit) || config.limit <= 0) {
+        return { ok: false, error: "Invalid limit: must be a finite positive number" };
+      }
+      this.itemLimit = config.limit;
+    }
+
     return { ok: true };
   }
 
@@ -79,9 +89,15 @@ export class GitHubPlugin implements IngestPlugin {
       const prs = parsePRList(prJson);
       if (prs.length === 0) break;
 
+      let hitLimit = false;
       for (const pr of prs) {
+        if (totalPRs >= this.itemLimit) {
+          hitLimit = true;
+          break;
+        }
         // PR 本体のイベント
         yield prToNormalizedEvent(pr, owner, repo);
+        totalPRs++;
 
         // PR のコメントとレビューを取得
         try {
@@ -141,14 +157,21 @@ export class GitHubPlugin implements IngestPlugin {
         }
       }
 
-      totalPRs += prs.length;
       process.stderr.write(`  Fetching PRs... (${totalPRs} fetched)\n`);
 
+      if (hitLimit) break;
       // 取得件数が PAGE_SIZE 未満なら最終ページ
       if (prs.length < PAGE_SIZE) break;
 
-      // カーソルを最古の createdAt に更新
-      oldestPRSeen = prs[prs.length - 1].createdAt;
+      // カーソルを最古の createdAt に更新（無限ループ防止）
+      const newCursor = prs[prs.length - 1].createdAt;
+      if (newCursor === oldestPRSeen) {
+        process.stderr.write(
+          `  ⚠ Pagination stalled: ${PAGE_SIZE}+ PRs share timestamp ${newCursor}. Breaking.\n`,
+        );
+        break;
+      }
+      oldestPRSeen = newCursor;
     }
 
     // Issues with date-based cursor pagination
@@ -178,18 +201,31 @@ export class GitHubPlugin implements IngestPlugin {
       const issues = parseIssueList(issueJson);
       if (issues.length === 0) break;
 
+      let hitIssueLimit = false;
       for (const issue of issues) {
+        if (totalIssues >= this.itemLimit) {
+          hitIssueLimit = true;
+          break;
+        }
         yield issueToNormalizedEvent(issue, owner, repo);
+        totalIssues++;
       }
 
-      totalIssues += issues.length;
       process.stderr.write(`  Fetching issues... (${totalIssues} fetched)\n`);
 
+      if (hitIssueLimit) break;
       // 取得件数が PAGE_SIZE 未満なら最終ページ
       if (issues.length < PAGE_SIZE) break;
 
-      // カーソルを最古の createdAt に更新
-      oldestIssueSeen = issues[issues.length - 1].createdAt;
+      // カーソルを最古の createdAt に更新（無限ループ防止）
+      const newIssueCursor = issues[issues.length - 1].createdAt;
+      if (newIssueCursor === oldestIssueSeen) {
+        process.stderr.write(
+          `  ⚠ Pagination stalled: ${PAGE_SIZE}+ issues share timestamp ${newIssueCursor}. Breaking.\n`,
+        );
+        break;
+      }
+      oldestIssueSeen = newIssueCursor;
     }
   }
 

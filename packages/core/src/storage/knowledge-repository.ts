@@ -366,6 +366,7 @@ export class KnowledgeRepository {
     totalLinks: number;
     totalPairs: number;
     patternsByType: Record<string, number>;
+    notesBySource: Record<string, number>;
   } {
     const totalNotes = (
       this.db.prepare("SELECT COUNT(*) as count FROM knowledge_notes").get() as { count: number }
@@ -393,7 +394,18 @@ export class KnowledgeRepository {
       patternsByType[row.pattern_type] = row.count;
     }
 
-    return { totalNotes, totalPatterns, totalLinks, totalPairs, patternsByType };
+    // Source breakdown (source_type may be NULL for pre-migration notes)
+    const sourceRows = this.db
+      .prepare(
+        "SELECT COALESCE(source_type, 'markdown') as source, COUNT(*) as count FROM knowledge_notes GROUP BY COALESCE(source_type, 'markdown')",
+      )
+      .all() as Array<{ source: string; count: number }>;
+    const notesBySource: Record<string, number> = {};
+    for (const row of sourceRows) {
+      notesBySource[row.source] = row.count;
+    }
+
+    return { totalNotes, totalPatterns, totalLinks, totalPairs, patternsByType, notesBySource };
   }
 
   /**
@@ -491,12 +503,17 @@ export class KnowledgeRepository {
     if (dateFrom) dateParams.push(dateFrom);
     if (dateTo) dateParams.push(dateTo);
 
+    // CJK文字を含むクエリはtrigramテーブルを優先使用（trigramは最低3文字必要）
+    const hasCjk = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(query);
+    const useTrigram = hasCjk && query.length >= 3;
+    const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
+
     try {
       const stmt = this.db.prepare(`
-        SELECT n.*, bm25(knowledge_notes_fts, 10.0, 1.0) AS rank
+        SELECT n.*, bm25(${ftsTable}, 10.0, 1.0) AS rank
         FROM knowledge_notes n
-        JOIN knowledge_notes_fts fts ON n.id = fts.rowid
-        WHERE knowledge_notes_fts MATCH ?
+        JOIN ${ftsTable} fts ON n.id = fts.rowid
+        WHERE ${ftsTable} MATCH ?
         ${deprecatedFilter}
         ${dateFromFilter}
         ${dateToFilter}
@@ -504,21 +521,42 @@ export class KnowledgeRepository {
         LIMIT ?
       `);
       const rows = stmt.all(query, ...dateParams, limit) as Array<KnowledgeNote & { rank: number }>;
+
+      // CJKクエリでunicode61が0件の場合はLIKEフォールバック（短いCJKトークンの救済）
+      if (rows.length === 0 && hasCjk) {
+        return this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
+      }
+
       return rows.map(({ rank, ...note }) => ({ note: note as KnowledgeNote, rank }));
     } catch {
-      // FTS5失敗時はLIKEフォールバック（不正なクエリ構文への耐性）
-      const deprecatedClause = includeDeprecated ? "" : "AND n.deprecated = 0";
-      const fallbackStmt = this.db.prepare(
-        `SELECT n.* FROM knowledge_notes n WHERE (n.title LIKE ? OR n.content LIKE ?) ${deprecatedClause} ${dateFromFilter} ${dateToFilter} LIMIT ?`,
-      );
-      const fallbackRows = fallbackStmt.all(
-        `%${query}%`,
-        `%${query}%`,
-        ...dateParams,
-        limit,
-      ) as Array<KnowledgeNote & { rank: number }>;
-      return fallbackRows.map((row) => ({ note: row as KnowledgeNote, rank: 0 }));
+      return this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
     }
+  }
+
+  private searchNotesWithLike(
+    query: string,
+    limit: number,
+    includeDeprecated: boolean,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Array<{ note: KnowledgeNote; rank: number }> {
+    const deprecatedClause = includeDeprecated ? "" : "AND n.deprecated = 0";
+    const dateFromFilter = dateFrom ? "AND n.created_at >= ?" : "";
+    const dateToFilter = dateTo ? "AND n.created_at <= ?" : "";
+    const dateParams: string[] = [];
+    if (dateFrom) dateParams.push(dateFrom);
+    if (dateTo) dateParams.push(dateTo);
+
+    const fallbackStmt = this.db.prepare(
+      `SELECT n.* FROM knowledge_notes n WHERE (n.title LIKE ? OR n.content LIKE ?) ${deprecatedClause} ${dateFromFilter} ${dateToFilter} LIMIT ?`,
+    );
+    const fallbackRows = fallbackStmt.all(
+      `%${query}%`,
+      `%${query}%`,
+      ...dateParams,
+      limit,
+    ) as Array<KnowledgeNote & { rank: number }>;
+    return fallbackRows.map((row) => ({ note: row as KnowledgeNote, rank: 0 }));
   }
 
   /**

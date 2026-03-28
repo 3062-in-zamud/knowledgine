@@ -277,6 +277,38 @@ describe("QueryOrchestrator", () => {
     });
   });
 
+  describe("CHANGELOG discount in orchestrator path (KNOW-354)", () => {
+    it("should rank CHANGELOG lower than relevant notes", async () => {
+      const now = new Date().toISOString();
+      ctx.repository.saveNote({
+        filePath: "CHANGELOG.md",
+        title: "CHANGELOG",
+        content:
+          "authentication feature added. authentication improvement. authentication fix. " +
+          "authentication update. authentication refactor.",
+        createdAt: now,
+      });
+      ctx.repository.saveNote({
+        filePath: "auth-impl.md",
+        title: "Authentication Implementation",
+        content: "How to implement authentication",
+        createdAt: now,
+      });
+
+      const orchestrator = new QueryOrchestrator(ctx.repository, mockGraphRepo);
+      const results = await orchestrator.query({ query: "authentication" });
+
+      expect(results.length).toBeGreaterThanOrEqual(2);
+
+      const changelogIdx = results.findIndex((r) => r.note.file_path === "CHANGELOG.md");
+      const authIdx = results.findIndex((r) => r.note.file_path === "auth-impl.md");
+
+      if (changelogIdx >= 0 && authIdx >= 0) {
+        expect(authIdx).toBeLessThan(changelogIdx);
+      }
+    });
+  });
+
   describe("設定", () => {
     it("maxResultsで返却件数を制限できる", async () => {
       const orchestrator = new QueryOrchestrator(

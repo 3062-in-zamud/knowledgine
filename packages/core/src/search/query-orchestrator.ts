@@ -1,3 +1,4 @@
+import { basename } from "path";
 import type { KnowledgeNote, KnowledgeRepository } from "../storage/knowledge-repository.js";
 import type { GraphRepository } from "../graph/graph-repository.js";
 import type { EmbeddingProvider } from "../embedding/embedding-provider.js";
@@ -102,13 +103,36 @@ export class QueryOrchestrator {
       return [];
     }
 
-    const rawRanks = rows.map((r) => Math.abs(r.rank));
-    const minRank = Math.min(...rawRanks);
-    const maxRank = Math.max(...rawRanks);
+    // CHANGELOG discount + newness bonus (knowledge-searcher.ts と同一ロジック)
+    const CHANGELOG_PATTERN = /^(CHANGELOG|CHANGES|HISTORY)\.(md|txt|rst)$/i;
+    const CHANGELOG_DISCOUNT = 0.3;
+
+    const adjustedRanks = rows.map(({ note, rank }) => {
+      let adjusted = rank;
+
+      const validFrom = note.valid_from ?? note.created_at;
+      if (validFrom) {
+        const yearsSinceNow =
+          (Date.now() - new Date(validFrom).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+        if (Number.isFinite(yearsSinceNow)) {
+          const boost = 1 + Math.min(0.3, Math.max(0, 0.3 - yearsSinceNow * 0.06));
+          adjusted = adjusted * boost;
+        }
+      }
+
+      if (CHANGELOG_PATTERN.test(basename(note.file_path))) {
+        adjusted = adjusted * CHANGELOG_DISCOUNT;
+      }
+
+      return adjusted;
+    });
+
+    const minRank = Math.min(...adjustedRanks);
+    const maxRank = Math.max(...adjustedRanks);
     const range = maxRank - minRank;
 
-    return rows.map(({ note, rank }) => {
-      const normalized = range > 0 ? (Math.abs(rank) - minRank) / range : 1.0;
+    return rows.map(({ note }, i) => {
+      const normalized = range > 0 ? (adjustedRanks[i] - minRank) / range : 0;
       const score = 1 - normalized;
       return {
         note,

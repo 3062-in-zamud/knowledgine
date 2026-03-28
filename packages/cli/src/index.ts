@@ -55,12 +55,14 @@ program
   .description("Scan and index markdown files (FTS5 full-text search by default)")
   .option("--path <dir>", "Root directory to scan")
   .option("--semantic", "Enable semantic search (download model + generate embeddings)")
+  .option("--no-semantic", "Skip semantic search setup entirely")
   .option(
     "--skip-embeddings",
     "[deprecated] Use default behavior instead (embeddings are now opt-in)",
   )
   .option("--demo", "Initialize with sample demo notes")
   .option("--force", "Skip confirmation prompts", false)
+  .option("-y, --yes", "Automatically answer yes to all prompts")
   .option("--save-config", "Save defaultPath to .knowledginerc.json in current directory")
   .addHelpText(
     "after",
@@ -143,6 +145,9 @@ program
   .option("--limit <n>", "Limit number of items (e.g., commits for git-history)", parseInt)
   .option("--since <date>", "Filter by date (e.g., 2025-01-01, for git-history)")
   .option("--unlimited", "Disable default limits (git-history)")
+  .option("--force", "Force full re-ingest (alias for --full)")
+  .option("--verbose", "Show details of skipped items")
+  .option("--quiet", "Suppress progress output (for CI)")
   .addHelpText(
     "after",
     `
