@@ -18,7 +18,8 @@ const SECRET_PATTERNS: RegExp[] = [
   /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
   // Generic secrets in assignment context (KEY="value" or KEY: value)
   // matches patterns like SECRET_KEY="value", TOKEN="value", PASSWORD: "value"
-  /(?:SECRET|TOKEN|PASSWORD|CREDENTIAL|API_KEY|APIKEY|AUTH)(?:[\w]*\s*)?[=:]\s*['"][^'"]{8,}['"]/gi,
+  // Uses bounded quantifiers to prevent ReDoS
+  /(?:SECRET|TOKEN|PASSWORD|CREDENTIAL|API_KEY|APIKEY|AUTH)[\w]{0,30}\s{0,3}[=:]\s{0,3}['"][^'"]{8,128}['"]/gi,
   // GitHub tokens: ghp_ (PAT), gho_ (OAuth), ghu_ (user-to-server), ghs_ (server), ghr_ (refresh) — already covered above by gh[pousr]_
   // Slack tokens (xoxp-, xoxs-, xoxa-, xoxr-)
   /xox[poras]-[A-Za-z0-9-]+/g,
