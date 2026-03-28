@@ -69,7 +69,7 @@ describe("formatToolResult", () => {
     const result = formatToolResult(data);
     expect(result.content).toHaveLength(1);
     expect(result.content[0].type).toBe("text");
-    expect(result.content[0].text).toBe(JSON.stringify(data, null, 2));
+    expect(result.content[0].text).toBe(JSON.stringify(data));
   });
 
   it("returns correct structure with empty object", () => {
@@ -82,7 +82,7 @@ describe("formatToolResult", () => {
   it("returns correct structure with nested data", () => {
     const data = { nested: { deep: { value: [1, 2, 3] } } };
     const result = formatToolResult(data);
-    expect(result.content[0].text).toBe(JSON.stringify(data, null, 2));
+    expect(result.content[0].text).toBe(JSON.stringify(data));
   });
 });
 

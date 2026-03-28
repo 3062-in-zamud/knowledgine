@@ -23,6 +23,12 @@ export interface KnowledgeNote {
   code_location_json: string | null;
 }
 
+export type KnowledgeNoteSummary = Omit<KnowledgeNote, "content" | "frontmatter_json">;
+
+const SUMMARY_COLUMNS = `id, file_path, title, created_at, updated_at, content_hash,
+  version, supersedes, valid_from, deprecated, deprecation_reason,
+  extracted_at, code_location_json`;
+
 export interface ExtractedPatternRow {
   id: number;
   note_id: number;
@@ -35,7 +41,22 @@ export interface ExtractedPatternRow {
 }
 
 export class KnowledgeRepository {
+  private _stmtCache = new Map<string, Database.Statement>();
+
   constructor(private db: Database.Database) {}
+
+  private stmt(sql: string): Database.Statement {
+    let s = this._stmtCache.get(sql);
+    if (!s) {
+      s = this.db.prepare(sql);
+      this._stmtCache.set(sql, s);
+    }
+    return s;
+  }
+
+  clearStatementCache(): void {
+    this._stmtCache.clear();
+  }
 
   private computeHash(content: string): string {
     return createHash("sha256").update(content).digest("hex");
@@ -85,13 +106,14 @@ export class KnowledgeRepository {
           return existing.id;
         }
 
-        const stmt = this.db.prepare(`
+        this.stmt(
+          `
           UPDATE knowledge_notes
           SET title = ?, content = ?, frontmatter_json = ?,
               updated_at = ?, content_hash = ?, code_location_json = ?
           WHERE id = ?
-        `);
-        stmt.run(
+        `,
+        ).run(
           data.title,
           data.content,
           frontmatterJson,
@@ -102,13 +124,14 @@ export class KnowledgeRepository {
         );
         return existing.id;
       } else {
-        const stmt = this.db.prepare(`
+        const info = this.stmt(
+          `
           INSERT INTO knowledge_notes (
             file_path, title, content, frontmatter_json,
             created_at, updated_at, content_hash, code_location_json
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        const info = stmt.run(
+        `,
+        ).run(
           data.filePath,
           data.title,
           data.content,
@@ -127,13 +150,15 @@ export class KnowledgeRepository {
   }
 
   getNoteById(id: number): KnowledgeNote | undefined {
-    const stmt = this.db.prepare("SELECT * FROM knowledge_notes WHERE id = ?");
-    return stmt.get(id) as KnowledgeNote | undefined;
+    return this.stmt("SELECT * FROM knowledge_notes WHERE id = ?").get(id) as
+      | KnowledgeNote
+      | undefined;
   }
 
   getNoteByPath(filePath: string): KnowledgeNote | undefined {
-    const stmt = this.db.prepare("SELECT * FROM knowledge_notes WHERE file_path = ?");
-    return stmt.get(filePath) as KnowledgeNote | undefined;
+    return this.stmt("SELECT * FROM knowledge_notes WHERE file_path = ?").get(filePath) as
+      | KnowledgeNote
+      | undefined;
   }
 
   getNoteByIdOrThrow(id: number): KnowledgeNote {
@@ -150,28 +175,27 @@ export class KnowledgeRepository {
 
   searchNotes(query: string, limit = 50): KnowledgeNote[] {
     try {
-      const stmt = this.db.prepare(`
+      return this.stmt(
+        `
         SELECT n.*
         FROM knowledge_notes n
         JOIN knowledge_notes_fts fts ON n.id = fts.rowid
         WHERE knowledge_notes_fts MATCH ?
         ORDER BY rank
         LIMIT ?
-      `);
-      return stmt.all(query, limit) as KnowledgeNote[];
+      `,
+      ).all(query, limit) as KnowledgeNote[];
     } catch {
       // FTS5失敗時はLIKEフォールバック（不正なクエリ構文への耐性）
-      const stmt = this.db.prepare(
+      return this.stmt(
         `SELECT * FROM knowledge_notes WHERE title LIKE ? OR content LIKE ? LIMIT ?`,
-      );
-      return stmt.all(`%${query}%`, `%${query}%`, limit) as KnowledgeNote[];
+      ).all(`%${query}%`, `%${query}%`, limit) as KnowledgeNote[];
     }
   }
 
   deleteNoteById(id: number): boolean {
     try {
-      const stmt = this.db.prepare("DELETE FROM knowledge_notes WHERE id = ?");
-      const info = stmt.run(id);
+      const info = this.stmt("DELETE FROM knowledge_notes WHERE id = ?").run(id);
       return info.changes > 0;
     } catch (error) {
       throw new DatabaseError("deleteNoteById", error, { id });
@@ -180,8 +204,7 @@ export class KnowledgeRepository {
 
   deleteNoteByPath(path: string): boolean {
     try {
-      const stmt = this.db.prepare("DELETE FROM knowledge_notes WHERE file_path = ?");
-      const info = stmt.run(path);
+      const info = this.stmt("DELETE FROM knowledge_notes WHERE file_path = ?").run(path);
       return info.changes > 0;
     } catch (error) {
       throw new DatabaseError("deleteNoteByPath", error, { path });
@@ -197,28 +220,29 @@ export class KnowledgeRepository {
     }
 
     try {
-      const deleteStmt = this.db.prepare("DELETE FROM extracted_patterns WHERE note_id = ?");
-      deleteStmt.run(noteId);
-
-      const insertStmt = this.db.prepare(`
-        INSERT INTO extracted_patterns (
-          note_id, pattern_type, content, confidence,
-          context, line_number, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-
       const now = new Date().toISOString();
-      for (const pattern of patterns) {
-        insertStmt.run(
-          noteId,
-          pattern.type,
-          pattern.content,
-          pattern.confidence,
-          pattern.context ?? null,
-          pattern.lineNumber ?? null,
-          now,
-        );
-      }
+      const savePatternsTransaction = this.db.transaction(() => {
+        this.stmt("DELETE FROM extracted_patterns WHERE note_id = ?").run(noteId);
+
+        const insertSql = `
+          INSERT INTO extracted_patterns (
+            note_id, pattern_type, content, confidence,
+            context, line_number, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `;
+        for (const pattern of patterns) {
+          this.stmt(insertSql).run(
+            noteId,
+            pattern.type,
+            pattern.content,
+            pattern.confidence,
+            pattern.context ?? null,
+            pattern.lineNumber ?? null,
+            now,
+          );
+        }
+      });
+      savePatternsTransaction();
     } catch (error) {
       if (error instanceof ValidationError) throw error;
       throw new DatabaseError("savePatterns", error, { noteId });
@@ -226,10 +250,9 @@ export class KnowledgeRepository {
   }
 
   getPatternsByNoteId(noteId: number): ExtractedPatternRow[] {
-    const stmt = this.db.prepare(
-      "SELECT * FROM extracted_patterns WHERE note_id = ? ORDER BY line_number",
-    );
-    return stmt.all(noteId) as ExtractedPatternRow[];
+    return this.stmt("SELECT * FROM extracted_patterns WHERE note_id = ? ORDER BY line_number").all(
+      noteId,
+    ) as ExtractedPatternRow[];
   }
 
   saveProblemSolutionPairs(
@@ -239,15 +262,15 @@ export class KnowledgeRepository {
       relevanceScore: number;
     }>,
   ): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO problem_solution_pairs (
-        problem_pattern_id, solution_pattern_id, relevance_score, created_at
-      ) VALUES (?, ?, ?, ?)
-    `);
-
     const now = new Date().toISOString();
     for (const pair of pairs) {
-      stmt.run(pair.problemPatternId, pair.solutionPatternId, pair.relevanceScore, now);
+      this.stmt(
+        `
+        INSERT INTO problem_solution_pairs (
+          problem_pattern_id, solution_pattern_id, relevance_score, created_at
+        ) VALUES (?, ?, ?, ?)
+      `,
+      ).run(pair.problemPatternId, pair.solutionPatternId, pair.relevanceScore, now);
     }
   }
 
@@ -259,15 +282,15 @@ export class KnowledgeRepository {
       similarity?: number;
     }>,
   ): void {
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO note_links (
-        source_note_id, target_note_id, link_type, similarity, created_at
-      ) VALUES (?, ?, ?, ?, ?)
-    `);
-
     const now = new Date().toISOString();
     for (const link of links) {
-      stmt.run(link.sourceNoteId, link.targetNoteId, link.linkType, link.similarity ?? null, now);
+      this.stmt(
+        `
+        INSERT OR REPLACE INTO note_links (
+          source_note_id, target_note_id, link_type, similarity, created_at
+        ) VALUES (?, ?, ?, ?, ?)
+      `,
+      ).run(link.sourceNoteId, link.targetNoteId, link.linkType, link.similarity ?? null, now);
     }
   }
 
@@ -276,12 +299,13 @@ export class KnowledgeRepository {
     linkType: string;
     similarity: number | null;
   }> {
-    const stmt = this.db.prepare(`
+    return this.stmt(
+      `
       SELECT target_note_id as targetNoteId, link_type as linkType, similarity
       FROM note_links WHERE source_note_id = ?
       ORDER BY similarity DESC
-    `);
-    return stmt.all(noteId) as Array<{
+    `,
+    ).all(noteId) as Array<{
       targetNoteId: number;
       linkType: string;
       similarity: number | null;
@@ -297,7 +321,8 @@ export class KnowledgeRepository {
     confidence: number;
   }> {
     // Join through extracted_patterns to find pairs associated with this note's patterns
-    const stmt = this.db.prepare(`
+    return this.stmt(
+      `
       SELECT psp.id,
         ep_problem.note_id as problemNoteId,
         ep_solution.note_id as solutionNoteId,
@@ -308,8 +333,8 @@ export class KnowledgeRepository {
       JOIN extracted_patterns ep_problem ON psp.problem_pattern_id = ep_problem.id
       JOIN extracted_patterns ep_solution ON psp.solution_pattern_id = ep_solution.id
       WHERE ep_problem.note_id = ? OR ep_solution.note_id = ?
-    `);
-    return stmt.all(noteId, noteId) as Array<{
+    `,
+    ).all(noteId, noteId) as Array<{
       id: number;
       problemNoteId: number;
       solutionNoteId: number;
@@ -369,25 +394,23 @@ export class KnowledgeRepository {
     notesBySource: Record<string, number>;
   } {
     const totalNotes = (
-      this.db.prepare("SELECT COUNT(*) as count FROM knowledge_notes").get() as { count: number }
+      this.stmt("SELECT COUNT(*) as count FROM knowledge_notes").get() as { count: number }
     ).count;
     const totalPatterns = (
-      this.db.prepare("SELECT COUNT(*) as count FROM extracted_patterns").get() as { count: number }
+      this.stmt("SELECT COUNT(*) as count FROM extracted_patterns").get() as { count: number }
     ).count;
     const totalLinks = (
-      this.db.prepare("SELECT COUNT(*) as count FROM note_links").get() as { count: number }
+      this.stmt("SELECT COUNT(*) as count FROM note_links").get() as { count: number }
     ).count;
     const totalPairs = (
-      this.db.prepare("SELECT COUNT(*) as count FROM problem_solution_pairs").get() as {
+      this.stmt("SELECT COUNT(*) as count FROM problem_solution_pairs").get() as {
         count: number;
       }
     ).count;
 
-    const typeRows = this.db
-      .prepare(
-        "SELECT pattern_type, COUNT(*) as count FROM extracted_patterns GROUP BY pattern_type",
-      )
-      .all() as Array<{ pattern_type: string; count: number }>;
+    const typeRows = this.stmt(
+      "SELECT pattern_type, COUNT(*) as count FROM extracted_patterns GROUP BY pattern_type",
+    ).all() as Array<{ pattern_type: string; count: number }>;
 
     const patternsByType: Record<string, number> = {};
     for (const row of typeRows) {
@@ -413,13 +436,14 @@ export class KnowledgeRepository {
    * path パラメータを含む code_location_json が NULL でないノートを返す
    */
   searchByCodeLocation(path: string): KnowledgeNote[] {
-    const stmt = this.db.prepare(`
+    return this.stmt(
+      `
       SELECT * FROM knowledge_notes
       WHERE code_location_json IS NOT NULL
         AND code_location_json LIKE ?
       ORDER BY created_at DESC
-    `);
-    return stmt.all(`%${path}%`) as KnowledgeNote[];
+    `,
+    ).all(`%${path}%`) as KnowledgeNote[];
   }
 
   /**
@@ -428,38 +452,130 @@ export class KnowledgeRepository {
   saveEmbedding(noteId: number, embedding: Float32Array, modelName: string): void {
     try {
       const now = new Date().toISOString();
-      const embBuf = Buffer.from(embedding.buffer);
+      const embBuf = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
 
-      // note_embeddings テーブルに upsert
-      const upsertStmt = this.db.prepare(`
-        INSERT INTO note_embeddings (note_id, embedding, model_name, dimensions, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(note_id) DO UPDATE SET
-          embedding = excluded.embedding,
-          model_name = excluded.model_name,
-          dimensions = excluded.dimensions,
-          updated_at = excluded.updated_at
-      `);
-      upsertStmt.run(noteId, embBuf, modelName, embedding.length, now, now);
+      const saveEmbeddingTransaction = this.db.transaction(() => {
+        // note_embeddings テーブルに upsert
+        this.stmt(
+          `
+          INSERT INTO note_embeddings (note_id, embedding, model_name, dimensions, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(note_id) DO UPDATE SET
+            embedding = excluded.embedding,
+            model_name = excluded.model_name,
+            dimensions = excluded.dimensions,
+            updated_at = excluded.updated_at
+        `,
+        ).run(noteId, embBuf, modelName, embedding.length, now, now);
 
-      // note_embeddings_vec (vec0) が存在する場合は手動で同期
-      // vec0 は ON CONFLICT をサポートしないため DELETE + INSERT を使う
-      try {
-        this.db
-          .prepare("DELETE FROM note_embeddings_vec WHERE note_id = CAST(? AS INTEGER)")
-          .run(noteId);
-        this.db
-          .prepare(
+        // note_embeddings_vec (vec0) が存在する場合は手動で同期
+        // vec0 は ON CONFLICT をサポートしないため DELETE + INSERT を使う
+        try {
+          this.stmt("DELETE FROM note_embeddings_vec WHERE note_id = CAST(? AS INTEGER)").run(
+            noteId,
+          );
+          this.stmt(
             "INSERT INTO note_embeddings_vec(note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
-          )
-          .run(noteId, embBuf);
-      } catch {
-        // note_embeddings_vec が存在しない場合は無視（graceful degradation）
-      }
+          ).run(noteId, embBuf);
+        } catch {
+          // note_embeddings_vec が存在しない場合は無視（graceful degradation）
+        }
+      });
+      saveEmbeddingTransaction();
     } catch (error) {
       if (error instanceof DatabaseError) throw error;
       throw new DatabaseError("saveEmbedding", error, { noteId });
     }
+  }
+
+  /**
+   * 複数ノートの埋め込みベクトルをバッチ保存する
+   * 100件単位のチャンクトランザクションで処理し、チャンク失敗時は1件ずつフォールバック
+   */
+  saveEmbeddingBatch(
+    items: Array<{ noteId: number; embedding: Float32Array; modelName: string }>,
+  ): { saved: number; failed: number } {
+    if (items.length === 0) return { saved: 0, failed: 0 };
+
+    // vec0 利用可否を事前に1回だけチェック
+    let vec0Available = true;
+    try {
+      this.db.prepare("SELECT COUNT(*) FROM note_embeddings_vec").get();
+    } catch {
+      vec0Available = false;
+    }
+
+    const CHUNK_SIZE = 100;
+    let saved = 0;
+    let failed = 0;
+    const now = new Date().toISOString();
+
+    const upsertStmt = this.stmt(`
+      INSERT INTO note_embeddings (note_id, embedding, model_name, dimensions, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(note_id) DO UPDATE SET
+        embedding = excluded.embedding,
+        model_name = excluded.model_name,
+        dimensions = excluded.dimensions,
+        updated_at = excluded.updated_at
+    `);
+    const vecDeleteStmt = vec0Available
+      ? this.stmt("DELETE FROM note_embeddings_vec WHERE note_id = CAST(? AS INTEGER)")
+      : null;
+    const vecInsertStmt = vec0Available
+      ? this.stmt(
+          "INSERT INTO note_embeddings_vec(note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
+        )
+      : null;
+
+    const saveOne = (item: {
+      noteId: number;
+      embedding: Float32Array;
+      modelName: string;
+    }): void => {
+      const embBuf = Buffer.from(
+        item.embedding.buffer,
+        item.embedding.byteOffset,
+        item.embedding.byteLength,
+      );
+      upsertStmt.run(item.noteId, embBuf, item.modelName, item.embedding.length, now, now);
+      if (vec0Available && vecDeleteStmt && vecInsertStmt) {
+        try {
+          vecDeleteStmt.run(item.noteId);
+          vecInsertStmt.run(item.noteId, embBuf);
+        } catch {
+          // vec0 操作失敗は無視（graceful degradation）
+        }
+      }
+    };
+
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      const chunk = items.slice(i, i + CHUNK_SIZE);
+      try {
+        const chunkTransaction = this.db.transaction(() => {
+          for (const item of chunk) {
+            saveOne(item);
+          }
+        });
+        chunkTransaction();
+        saved += chunk.length;
+      } catch {
+        // チャンク失敗時は1件ずつフォールバック
+        for (const item of chunk) {
+          try {
+            const singleTransaction = this.db.transaction(() => {
+              saveOne(item);
+            });
+            singleTransaction();
+            saved++;
+          } catch {
+            failed++;
+          }
+        }
+      }
+    }
+
+    return { saved, failed };
   }
 
   /**
@@ -471,15 +587,16 @@ export class KnowledgeRepository {
     limit: number = 10,
   ): Array<{ note_id: number; distance: number }> {
     try {
-      const buf = Buffer.from(embedding.buffer);
-      const stmt = this.db.prepare(`
+      const buf = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
+      return this.stmt(
+        `
         SELECT note_id, distance
         FROM note_embeddings_vec
         WHERE embedding MATCH ?
         ORDER BY distance
         LIMIT ?
-      `);
-      return stmt.all(buf, limit) as Array<{ note_id: number; distance: number }>;
+      `,
+      ).all(buf, limit) as Array<{ note_id: number; distance: number }>;
     } catch {
       // vec0テーブルが存在しない場合（sqlite-vec未ロード）は空を返す
       return [];
@@ -509,7 +626,8 @@ export class KnowledgeRepository {
     const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
 
     try {
-      const stmt = this.db.prepare(`
+      const rows = this.stmt(
+        `
         SELECT n.*, bm25(${ftsTable}, 10.0, 1.0) AS rank
         FROM knowledge_notes n
         JOIN ${ftsTable} fts ON n.id = fts.rowid
@@ -519,8 +637,8 @@ export class KnowledgeRepository {
         ${dateToFilter}
         ORDER BY rank
         LIMIT ?
-      `);
-      const rows = stmt.all(query, ...dateParams, limit) as Array<KnowledgeNote & { rank: number }>;
+      `,
+      ).all(query, ...dateParams, limit) as Array<KnowledgeNote & { rank: number }>;
 
       // CJKクエリでunicode61が0件の場合はLIKEフォールバック（短いCJKトークンの救済）
       if (rows.length === 0 && hasCjk) {
@@ -547,15 +665,11 @@ export class KnowledgeRepository {
     if (dateFrom) dateParams.push(dateFrom);
     if (dateTo) dateParams.push(dateTo);
 
-    const fallbackStmt = this.db.prepare(
+    const fallbackRows = this.stmt(
       `SELECT n.* FROM knowledge_notes n WHERE (n.title LIKE ? OR n.content LIKE ?) ${deprecatedClause} ${dateFromFilter} ${dateToFilter} LIMIT ?`,
-    );
-    const fallbackRows = fallbackStmt.all(
-      `%${query}%`,
-      `%${query}%`,
-      ...dateParams,
-      limit,
-    ) as Array<KnowledgeNote & { rank: number }>;
+    ).all(`%${query}%`, `%${query}%`, ...dateParams, limit) as Array<
+      KnowledgeNote & { rank: number }
+    >;
     return fallbackRows.map((row) => ({ note: row as KnowledgeNote, rank: 0 }));
   }
 
@@ -563,11 +677,12 @@ export class KnowledgeRepository {
    * 埋め込みがまだ生成されていないノートを取得する
    */
   getNotesWithoutEmbeddings(): KnowledgeNote[] {
-    const stmt = this.db.prepare(`
+    return this.stmt(
+      `
       SELECT n.* FROM knowledge_notes n
       WHERE NOT EXISTS (SELECT 1 FROM note_embeddings e WHERE e.note_id = n.id)
-    `);
-    return stmt.all() as KnowledgeNote[];
+    `,
+    ).all() as KnowledgeNote[];
   }
 
   /**
@@ -575,48 +690,47 @@ export class KnowledgeRepository {
    */
   getNotesWithStaleEmbeddings(): KnowledgeNote[] {
     // note_embeddingsのupdated_atとknowledge_notesのupdated_atを比較
-    const stmt = this.db.prepare(`
+    return this.stmt(
+      `
       SELECT n.* FROM knowledge_notes n
       JOIN note_embeddings e ON e.note_id = n.id
       WHERE n.updated_at IS NOT NULL AND n.updated_at > e.created_at
-    `);
-    return stmt.all() as KnowledgeNote[];
+    `,
+    ).all() as KnowledgeNote[];
   }
 
   /**
    * 指定プレフィックスで始まる file_path を持つノートを取得する
    */
   getNotesWithPrefix(prefix: string, limit: number = 100): KnowledgeNote[] {
-    const stmt = this.db.prepare(
+    return this.stmt(
       "SELECT * FROM knowledge_notes WHERE file_path LIKE ? ORDER BY created_at DESC LIMIT ?",
-    );
-    return stmt.all(`${prefix}%`, limit) as KnowledgeNote[];
+    ).all(`${prefix}%`, limit) as KnowledgeNote[];
   }
 
   /**
    * 全ノートを取得する
    */
   getAllNotes(): KnowledgeNote[] {
-    const stmt = this.db.prepare("SELECT * FROM knowledge_notes");
-    return stmt.all() as KnowledgeNote[];
+    return this.stmt("SELECT * FROM knowledge_notes").all() as KnowledgeNote[];
   }
 
   /**
    * 全ノートの ID のみを取得する（content をロードしないため OOM 対策）
    */
   getAllNoteIds(): number[] {
-    const stmt = this.db.prepare("SELECT id FROM knowledge_notes");
-    return stmt.pluck().all() as number[];
+    return this.stmt("SELECT id FROM knowledge_notes").pluck().all() as number[];
   }
 
   /**
    * 埋め込みがまだ生成されていないノートの ID のみを取得する（OOM 対策）
    */
   getNotesWithoutEmbeddingIds(): number[] {
-    const stmt = this.db.prepare(
+    return this.stmt(
       "SELECT n.id FROM knowledge_notes n WHERE NOT EXISTS (SELECT 1 FROM note_embeddings e WHERE e.note_id = n.id)",
-    );
-    return stmt.pluck().all() as number[];
+    )
+      .pluck()
+      .all() as number[];
   }
 
   /**
@@ -624,8 +738,9 @@ export class KnowledgeRepository {
    * frontmatter_json 内の source_plugin フィールドで絞り込む
    */
   getNotesBySourcePlugin(pluginId: string): KnowledgeNote[] {
-    const stmt = this.db.prepare(`SELECT * FROM knowledge_notes WHERE frontmatter_json LIKE ?`);
-    return stmt.all(`%"source_plugin":"${pluginId}"%`) as KnowledgeNote[];
+    return this.stmt(`SELECT * FROM knowledge_notes WHERE frontmatter_json LIKE ?`).all(
+      `%"source_plugin":"${pluginId}"%`,
+    ) as KnowledgeNote[];
   }
 
   /**
@@ -634,8 +749,9 @@ export class KnowledgeRepository {
   deleteNotesByIds(ids: number[]): number {
     if (ids.length === 0) return 0;
     const placeholders = ids.map(() => "?").join(",");
-    const stmt = this.db.prepare(`DELETE FROM knowledge_notes WHERE id IN (${placeholders})`);
-    const info = stmt.run(...ids);
+    const info = this.db
+      .prepare(`DELETE FROM knowledge_notes WHERE id IN (${placeholders})`)
+      .run(...ids);
     return info.changes;
   }
 
@@ -644,7 +760,7 @@ export class KnowledgeRepository {
    */
   updateExtractedAt(noteId: number): void {
     const now = new Date().toISOString();
-    this.db.prepare("UPDATE knowledge_notes SET extracted_at = ? WHERE id = ?").run(now, noteId);
+    this.stmt("UPDATE knowledge_notes SET extracted_at = ? WHERE id = ?").run(now, noteId);
   }
 
   /**
@@ -652,10 +768,9 @@ export class KnowledgeRepository {
    * file_path が sourceUri として使われている（normalizer.ts の仕様）
    */
   getNotesBySourceUriPrefix(prefix: string): KnowledgeNote[] {
-    const stmt = this.db.prepare(
+    return this.stmt(
       "SELECT * FROM knowledge_notes WHERE file_path LIKE ? ORDER BY created_at ASC",
-    );
-    return stmt.all(`${prefix}%`) as KnowledgeNote[];
+    ).all(`${prefix}%`) as KnowledgeNote[];
   }
 
   /**
@@ -668,18 +783,16 @@ export class KnowledgeRepository {
     linkType: string,
     similarity?: number,
   ): boolean {
-    const existing = this.db
-      .prepare("SELECT id FROM note_links WHERE source_note_id = ? AND target_note_id = ?")
-      .get(sourceNoteId, targetNoteId);
+    const existing = this.stmt(
+      "SELECT id FROM note_links WHERE source_note_id = ? AND target_note_id = ?",
+    ).get(sourceNoteId, targetNoteId);
 
     if (existing) return false;
 
     const now = new Date().toISOString();
-    this.db
-      .prepare(
-        "INSERT INTO note_links (source_note_id, target_note_id, link_type, similarity, created_at) VALUES (?, ?, ?, ?, ?)",
-      )
-      .run(sourceNoteId, targetNoteId, linkType, similarity ?? null, now);
+    this.stmt(
+      "INSERT INTO note_links (source_note_id, target_note_id, link_type, similarity, created_at) VALUES (?, ?, ?, ?, ?)",
+    ).run(sourceNoteId, targetNoteId, linkType, similarity ?? null, now);
 
     return true;
   }
@@ -695,14 +808,15 @@ export class KnowledgeRepository {
     similarity: number | null;
     createdAt: string;
   }> {
-    const stmt = this.db.prepare(`
+    return this.stmt(
+      `
       SELECT id, source_note_id as sourceNoteId, target_note_id as targetNoteId,
              link_type as linkType, similarity, created_at as createdAt
       FROM note_links
       WHERE source_note_id = ? OR target_note_id = ?
       ORDER BY created_at DESC
-    `);
-    return stmt.all(noteId, noteId) as Array<{
+    `,
+    ).all(noteId, noteId) as Array<{
       id: number;
       sourceNoteId: number;
       targetNoteId: number;
@@ -717,11 +831,12 @@ export class KnowledgeRepository {
    */
   saveSuggestFeedback(noteId: number, query: string, isUseful: boolean, context?: string): number {
     const now = new Date().toISOString();
-    const stmt = this.db.prepare(`
+    const info = this.stmt(
+      `
       INSERT INTO suggest_feedback (note_id, query, is_useful, context, created_at)
       VALUES (?, ?, ?, ?, ?)
-    `);
-    const info = stmt.run(noteId, query, isUseful ? 1 : 0, context ?? null, now);
+    `,
+    ).run(noteId, query, isUseful ? 1 : 0, context ?? null, now);
     return Number(info.lastInsertRowid);
   }
 
@@ -735,13 +850,14 @@ export class KnowledgeRepository {
     context: string | null;
     createdAt: string;
   }> {
-    const stmt = this.db.prepare(`
+    const rows = this.stmt(
+      `
       SELECT id, query, is_useful as isUseful, context, created_at as createdAt
       FROM suggest_feedback
       WHERE note_id = ?
       ORDER BY id DESC
-    `);
-    const rows = stmt.all(noteId) as Array<{
+    `,
+    ).all(noteId) as Array<{
       id: number;
       query: string;
       isUseful: number;
@@ -758,9 +874,10 @@ export class KnowledgeRepository {
     const note = this.getNoteById(noteId);
     if (!note) throw new KnowledgeNotFoundError(noteId, "id");
 
-    this.db
-      .prepare("UPDATE knowledge_notes SET deprecated = 1, deprecation_reason = ? WHERE id = ?")
-      .run(reason, noteId);
+    this.stmt("UPDATE knowledge_notes SET deprecated = 1, deprecation_reason = ? WHERE id = ?").run(
+      reason,
+      noteId,
+    );
   }
 
   /**
@@ -770,9 +887,9 @@ export class KnowledgeRepository {
     const note = this.getNoteById(noteId);
     if (!note) throw new KnowledgeNotFoundError(noteId, "id");
 
-    this.db
-      .prepare("UPDATE knowledge_notes SET deprecated = 0, deprecation_reason = NULL WHERE id = ?")
-      .run(noteId);
+    this.stmt(
+      "UPDATE knowledge_notes SET deprecated = 0, deprecation_reason = NULL WHERE id = ?",
+    ).run(noteId);
   }
 
   /**
@@ -799,19 +916,20 @@ export class KnowledgeRepository {
 
     const createNewVersion = this.db.transaction(() => {
       // deprecated にマーク
-      this.db
-        .prepare("UPDATE knowledge_notes SET deprecated = 1, deprecation_reason = ? WHERE id = ?")
-        .run(`Superseded by version ${newVersion}`, noteId);
+      this.stmt(
+        "UPDATE knowledge_notes SET deprecated = 1, deprecation_reason = ? WHERE id = ?",
+      ).run(`Superseded by version ${newVersion}`, noteId);
 
       // 新バージョンを INSERT
-      const stmt = this.db.prepare(`
+      const info = this.stmt(
+        `
         INSERT INTO knowledge_notes (
           file_path, title, content, frontmatter_json,
           created_at, updated_at, content_hash,
           version, supersedes, valid_from, deprecated
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-      `);
-      const info = stmt.run(
+      `,
+      ).run(
         versionedPath,
         title,
         content,
@@ -829,7 +947,50 @@ export class KnowledgeRepository {
     return createNewVersion();
   }
 
+  /**
+   * 指定IDリストのノートをサマリー形式（content, frontmatter_jsonを除く）で一括取得する
+   * SQLITE_MAX_VARIABLE_NUMBER 対策として 500件ずつチャンク処理する
+   *
+   * **注意**: 返り順は入力 ids の順序と一致しない。順序が重要な場合は
+   * 呼び出し元で id→note の Map を構築してマッピングすること。
+   */
+  getNotesSummaryByIds(ids: number[]): KnowledgeNoteSummary[] {
+    if (ids.length === 0) return [];
+    const CHUNK = 500;
+    const results: KnowledgeNoteSummary[] = [];
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(",");
+      const stmt = this.db.prepare(
+        `SELECT ${SUMMARY_COLUMNS} FROM knowledge_notes WHERE id IN (${placeholders})`,
+      );
+      results.push(...(stmt.all(...chunk) as KnowledgeNoteSummary[]));
+    }
+    return results;
+  }
+
+  /**
+   * 指定IDリストのノートを全カラムで一括取得する
+   * SQLITE_MAX_VARIABLE_NUMBER 対策として 500件ずつチャンク処理する
+   *
+   * **注意**: 返り順は入力 ids の順序と一致しない。順序が重要な場合は
+   * 呼び出し元で id→note の Map を構築してマッピングすること。
+   */
+  getNotesByIds(ids: number[]): KnowledgeNote[] {
+    if (ids.length === 0) return [];
+    const CHUNK = 500;
+    const results: KnowledgeNote[] = [];
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      const placeholders = chunk.map(() => "?").join(",");
+      const stmt = this.db.prepare(`SELECT * FROM knowledge_notes WHERE id IN (${placeholders})`);
+      results.push(...(stmt.all(...chunk) as KnowledgeNote[]));
+    }
+    return results;
+  }
+
   close(): void {
+    this._stmtCache.clear();
     this.db.close();
   }
 }

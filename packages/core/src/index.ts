@@ -61,7 +61,11 @@ export type { RcConfig } from "./config/config-loader.js";
 // Storage
 export { createDatabase, loadSqliteVecExtension } from "./storage/database.js";
 export { KnowledgeRepository } from "./storage/knowledge-repository.js";
-export type { KnowledgeNote, ExtractedPatternRow } from "./storage/knowledge-repository.js";
+export type {
+  KnowledgeNote,
+  KnowledgeNoteSummary,
+  ExtractedPatternRow,
+} from "./storage/knowledge-repository.js";
 export { Migrator } from "./storage/migrator.js";
 export type { Migration, MigrationStatus } from "./storage/migrator.js";
 export { SCHEMA_SQL } from "./storage/schema.js";

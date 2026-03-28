@@ -1,5 +1,9 @@
 import type { LLMProvider } from "../llm/types.js";
-import type { KnowledgeRepository, KnowledgeNote } from "../storage/knowledge-repository.js";
+import type {
+  KnowledgeRepository,
+  KnowledgeNote,
+  KnowledgeNoteSummary,
+} from "../storage/knowledge-repository.js";
 import type { SearchResult } from "./knowledge-searcher.js";
 
 export interface RerankOptions {
@@ -8,7 +12,7 @@ export interface RerankOptions {
 }
 
 export interface RerankedResult {
-  note: KnowledgeNote;
+  note: KnowledgeNote | KnowledgeNoteSummary;
   score: number;
   originalScore: number;
   matchReason: string[];
@@ -23,7 +27,7 @@ export interface RerankedResult {
 // --- 内部型（後方互換のため旧型もエクスポート） ---
 
 export interface RerankInput {
-  note: KnowledgeNote;
+  note: KnowledgeNote | KnowledgeNoteSummary;
   baseScore: number;
   matchReason: string[];
 }
@@ -35,7 +39,7 @@ export interface AxisScores {
 }
 
 export interface RerankResult {
-  note: KnowledgeNote;
+  note: KnowledgeNote | KnowledgeNoteSummary;
   baseScore: number;
   scores: AxisScores;
   finalScore: number;
@@ -67,7 +71,7 @@ function clamp(v: number, min = 0, max = 1): number {
  * - valid_fromの新しさボーナス: +0.1/年（基準0.5から加算）
  * - deprecated=1なら -0.5ペナルティ
  */
-function scoreTemporalAxis(note: KnowledgeNote): number {
+function scoreTemporalAxis(note: KnowledgeNote | KnowledgeNoteSummary): number {
   if (note.deprecated === 1) {
     return clamp(0.5 + DEPRECATED_PENALTY);
   }
@@ -143,12 +147,16 @@ Example output:
 
   const candidateLines = candidates
     .map((c) => {
-      const preview = c.note.content.slice(0, 200).replace(/\n/g, " ");
-      const fm = c.note.frontmatter_json ? JSON.parse(c.note.frontmatter_json) : {};
+      const note = c.note as KnowledgeNote | KnowledgeNoteSummary;
+      const content = "content" in note ? (note as KnowledgeNote).content : "";
+      const frontmatterJson =
+        "frontmatter_json" in note ? (note as KnowledgeNote).frontmatter_json : null;
+      const preview = content.slice(0, 200).replace(/\n/g, " ");
+      const fm = frontmatterJson ? JSON.parse(frontmatterJson) : {};
       const tags: string[] = Array.isArray(fm.tags) ? fm.tags : [];
       return JSON.stringify({
-        id: c.note.id,
-        title: c.note.title,
+        id: note.id,
+        title: note.title,
         content: preview,
         tags,
       });
@@ -396,7 +404,7 @@ function extractTags(frontmatterJson: string | null): string[] {
   }
 }
 
-function scoreLegacyTemporalAxis(note: KnowledgeNote): number {
+function scoreLegacyTemporalAxis(note: KnowledgeNote | KnowledgeNoteSummary): number {
   const referenceDate = note.updated_at ?? note.created_at;
   const ageMs = Date.now() - new Date(referenceDate).getTime();
   const ageDays = ageMs / (1000 * 60 * 60 * 24);
@@ -404,9 +412,14 @@ function scoreLegacyTemporalAxis(note: KnowledgeNote): number {
   return Math.exp(-lambda * Math.max(0, ageDays));
 }
 
-function scoreLegacyContextAxis(note: KnowledgeNote, queryTokens: string[]): number {
+function scoreLegacyContextAxis(
+  note: KnowledgeNote | KnowledgeNoteSummary,
+  queryTokens: string[],
+): number {
   if (queryTokens.length === 0) return 0.5;
-  const tags = extractTags(note.frontmatter_json);
+  const frontmatterJson =
+    "frontmatter_json" in note ? (note as KnowledgeNote).frontmatter_json : null;
+  const tags = extractTags(frontmatterJson);
   if (tags.length === 0) return 0.3;
   const matchCount = queryTokens.filter((token) =>
     tags.some((tag) => tag.toLowerCase().includes(token) || token.includes(tag.toLowerCase())),
@@ -414,7 +427,10 @@ function scoreLegacyContextAxis(note: KnowledgeNote, queryTokens: string[]): num
   return matchCount / queryTokens.length;
 }
 
-function scoreLegacyPSPAxis(note: KnowledgeNote, repository: KnowledgeRepository): number {
+function scoreLegacyPSPAxis(
+  note: KnowledgeNote | KnowledgeNoteSummary,
+  repository: KnowledgeRepository,
+): number {
   try {
     const patterns = repository.getPatternsByNoteId(note.id);
     if (patterns.length === 0) return 0;

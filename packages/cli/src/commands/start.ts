@@ -77,6 +77,10 @@ export async function startCommand(options: StartOptions): Promise<void> {
   const semanticReadiness = checkSemanticReadiness(effectiveConfig, modelManager, repository);
   if (semanticReadiness.ready) {
     embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
+    // ONNX セッションをウォームアップして初回 semantic 検索のレイテンシスパイクを防止
+    embeddingProvider.embed("warmup").catch(() => {
+      // ウォームアップ失敗は無視（MCP 起動を妨げない）
+    });
   } else if (semanticReadiness.configEnabled) {
     if (!semanticReadiness.modelAvailable) {
       // Config enabled but model not downloaded

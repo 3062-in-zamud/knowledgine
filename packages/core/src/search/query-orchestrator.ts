@@ -1,5 +1,9 @@
 import { basename } from "path";
-import type { KnowledgeNote, KnowledgeRepository } from "../storage/knowledge-repository.js";
+import type {
+  KnowledgeNote,
+  KnowledgeNoteSummary,
+  KnowledgeRepository,
+} from "../storage/knowledge-repository.js";
 import type { GraphRepository } from "../graph/graph-repository.js";
 import type { EmbeddingProvider } from "../embedding/embedding-provider.js";
 import type { LLMProvider } from "../llm/types.js";
@@ -12,7 +16,7 @@ import { ReasoningReranker } from "./reasoning-reranker.js";
 import { classifyQuery, getWeightsForQueryType } from "./query-classifier.js";
 
 export interface OrchestratedResult {
-  note: KnowledgeNote;
+  note: KnowledgeNote | KnowledgeNoteSummary;
   score: number;
   layerScores: Record<string, number>;
   matchReason: string[];
@@ -196,18 +200,18 @@ export class QueryOrchestrator {
         });
       }
 
-      // 関連ノートを新規候補として追加
-      for (const additionalNoteId of linkedNoteIds) {
-        if (!graphResultMap.has(additionalNoteId)) {
-          const note = this.repository.getNoteById(additionalNoteId);
-          if (note) {
-            const graphScore = 0.3; // 間接的な関連のスコア
-            graphResultMap.set(additionalNoteId, {
-              score: graphScore,
-              graphContext: entityGraphs,
-              matchReason: [`グラフ経由の関連ノート (entity: ${linkedEntities[0]?.name ?? ""})`],
-            });
-          }
+      // 関連ノートを新規候補として追加（バッチ取得）
+      const newLinkedNoteIds = [...linkedNoteIds].filter((id) => !graphResultMap.has(id));
+      if (newLinkedNoteIds.length > 0) {
+        const linkedNotes = this.repository.getNotesSummaryByIds(newLinkedNoteIds);
+        const entityName = linkedEntities[0]?.name ?? "";
+        for (const note of linkedNotes) {
+          const graphScore = 0.3; // 間接的な関連のスコア
+          graphResultMap.set(note.id, {
+            score: graphScore,
+            graphContext: entityGraphs,
+            matchReason: [`グラフ経由の関連ノート (entity: ${entityName})`],
+          });
         }
       }
     }
@@ -263,16 +267,18 @@ export class QueryOrchestrator {
       });
     }
 
-    // graphResultMapに含まれる新規ノート（vectorになかったもの）を追加
-    for (const [noteId, graphData] of graphResultMap) {
-      if (!noteMap.has(noteId)) {
-        const note = this.repository.getNoteById(noteId);
-        if (!note) continue;
+    // graphResultMapに含まれる新規ノート（vectorになかったもの）をバッチ取得して追加
+    const newGraphNoteIds = [...graphResultMap.keys()].filter((id) => !noteMap.has(id));
+    if (newGraphNoteIds.length > 0) {
+      const newGraphNotes = this.repository.getNotesSummaryByIds(newGraphNoteIds);
+      for (const note of newGraphNotes) {
+        const graphData = graphResultMap.get(note.id);
+        if (!graphData) continue;
 
         const graphScore = graphData.score;
         const finalScore = weights.graph * graphScore;
 
-        noteMap.set(noteId, {
+        noteMap.set(note.id, {
           note,
           score: finalScore,
           layerScores: {
