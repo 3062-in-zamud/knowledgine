@@ -912,6 +912,9 @@ export class KnowledgeRepository {
   /**
    * 指定IDリストのノートをサマリー形式（content, frontmatter_jsonを除く）で一括取得する
    * SQLITE_MAX_VARIABLE_NUMBER 対策として 500件ずつチャンク処理する
+   *
+   * **注意**: 返り順は入力 ids の順序と一致しない。順序が重要な場合は
+   * 呼び出し元で id→note の Map を構築してマッピングすること。
    */
   getNotesSummaryByIds(ids: number[]): KnowledgeNoteSummary[] {
     if (ids.length === 0) return [];
@@ -931,6 +934,9 @@ export class KnowledgeRepository {
   /**
    * 指定IDリストのノートを全カラムで一括取得する
    * SQLITE_MAX_VARIABLE_NUMBER 対策として 500件ずつチャンク処理する
+   *
+   * **注意**: 返り順は入力 ids の順序と一致しない。順序が重要な場合は
+   * 呼び出し元で id→note の Map を構築してマッピングすること。
    */
   getNotesByIds(ids: number[]): KnowledgeNote[] {
     if (ids.length === 0) return [];
