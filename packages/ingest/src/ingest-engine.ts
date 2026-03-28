@@ -27,7 +27,12 @@ export class IngestEngine {
   async ingest(
     pluginId: string,
     sourcePath: string,
-    options?: { full?: boolean; pluginConfig?: Record<string, unknown>; verbose?: boolean },
+    options?: {
+      full?: boolean;
+      pluginConfig?: Record<string, unknown>;
+      verbose?: boolean;
+      quiet?: boolean;
+    },
   ): Promise<IngestSummary> {
     const start = Date.now();
     const plugin = this.registry.getOrThrow(pluginId);

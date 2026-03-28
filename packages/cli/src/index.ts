@@ -146,6 +146,7 @@ program
   .option("--since <date>", "Filter by date (e.g., 2025-01-01, for git-history)")
   .option("--unlimited", "Disable default limits (git-history)")
   .option("--verbose", "Show details of skipped items")
+  .option("--quiet", "Suppress progress output (for CI)")
   .addHelpText(
     "after",
     `

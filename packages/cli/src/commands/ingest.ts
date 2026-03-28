@@ -26,6 +26,7 @@ export interface IngestOptions {
   since?: string;
   unlimited?: boolean;
   verbose?: boolean;
+  quiet?: boolean;
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
