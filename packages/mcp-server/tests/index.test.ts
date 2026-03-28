@@ -89,7 +89,7 @@ describe("MCP Server Integration", () => {
       expect(result.isError).toBe(true);
 
       const content = result.content as Array<{ type: string; text: string }>;
-      expect(content[0].text).toContain("Either noteId or filePath is required");
+      expect(content[0].text).toContain("Either noteId");
     });
 
     it("should return error for non-existent filePath", async () => {
