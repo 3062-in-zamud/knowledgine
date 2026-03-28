@@ -109,7 +109,7 @@ Provide at least one of \`noteId\` or \`filePath\`. \`noteId\` values come from
 knowledgine search "<query>"                     # keyword search
 knowledgine search "<query>" --mode semantic     # semantic search
 knowledgine search "<query>" --mode hybrid       # hybrid search
-knowledgine suggest --file src/commands/setup.ts # context-based by file path
+knowledgine suggest --file src/commands/setup.ts  # context-based by file path (suggest command)
 \`\`\`
 
 ## Step-by-Step Instructions
