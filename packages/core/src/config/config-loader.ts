@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { parse as parseYaml } from "yaml";
+import { z } from "zod";
 import { defineConfig } from "../config.js";
 import type { KnowledgineConfig } from "../config.js";
 import { writeTextFileAtomically } from "../utils/atomic-write.js";
@@ -10,10 +11,66 @@ export interface RcConfig {
   defaultPath?: string;
   plugins?: { enabled?: string[]; [pluginId: string]: unknown };
   search?: { defaultMode?: "keyword" | "semantic" | "hybrid"; defaultLimit?: number };
-  serve?: { defaultPort?: number; host?: string };
+  serve?: { defaultPort?: number; host?: string; authToken?: string };
   llm?: import("../llm/types.js").LLMConfig;
+  noise?: {
+    shortMessageThreshold?: number;
+    botAuthors?: string[];
+    noiseSubjectPatterns?: string[];
+    excludePatterns?: string[];
+  };
+  observer?: { enabled?: boolean; limit?: number };
+  projects?: Array<{ name: string; path: string }>;
   [key: string]: unknown;
 }
+
+const rcConfigSchema = z
+  .object({
+    semantic: z.boolean().optional(),
+    defaultPath: z.string().optional(),
+    plugins: z
+      .object({
+        enabled: z.array(z.string()).optional(),
+      })
+      .passthrough()
+      .optional(),
+    search: z
+      .object({
+        defaultMode: z.enum(["keyword", "semantic", "hybrid"]).optional(),
+        defaultLimit: z.number().int().positive().optional(),
+      })
+      .optional(),
+    serve: z
+      .object({
+        defaultPort: z.number().int().positive().optional(),
+        host: z.string().optional(),
+        authToken: z.string().optional(),
+      })
+      .optional(),
+    noise: z
+      .object({
+        shortMessageThreshold: z.number().int().positive().optional(),
+        botAuthors: z.array(z.string()).optional(),
+        noiseSubjectPatterns: z.array(z.string()).optional(),
+        excludePatterns: z.array(z.string()).optional(),
+      })
+      .optional(),
+    observer: z
+      .object({
+        enabled: z.boolean().optional(),
+        limit: z.number().int().positive().optional(),
+      })
+      .optional(),
+    projects: z
+      .array(
+        z.object({
+          name: z.string(),
+          path: z.string(),
+        }),
+      )
+      .optional(),
+  })
+  .passthrough();
 
 function hasErrnoCode(error: unknown, code: string): error is NodeJS.ErrnoException {
   return (
@@ -43,6 +100,17 @@ export function loadConfig(rootPath: string): KnowledgineConfig {
   });
 }
 
+function validateRcConfig(raw: unknown, filePath: string): RcConfig | null {
+  const result = rcConfigSchema.safeParse(raw);
+  if (result.success) {
+    return result.data as RcConfig;
+  }
+  console.warn(
+    `Warning: Invalid config in ${filePath}, falling back to defaults: ${result.error.message}`,
+  );
+  return null;
+}
+
 function loadRcFile(startDir: string): RcConfig | null {
   let dir = startDir;
   for (let i = 0; i < 5; i++) {
@@ -50,7 +118,8 @@ function loadRcFile(startDir: string): RcConfig | null {
     const ymlPath = resolve(dir, ".knowledginerc.yml");
     try {
       try {
-        return JSON.parse(readFileSync(jsonPath, "utf-8")) as RcConfig;
+        const raw = JSON.parse(readFileSync(jsonPath, "utf-8"));
+        return validateRcConfig(raw, jsonPath);
       } catch (error) {
         if (!hasErrnoCode(error, "ENOENT")) {
           throw error;
@@ -58,7 +127,8 @@ function loadRcFile(startDir: string): RcConfig | null {
       }
 
       try {
-        return parseYaml(readFileSync(ymlPath, "utf-8")) as RcConfig;
+        const raw = parseYaml(readFileSync(ymlPath, "utf-8"));
+        return validateRcConfig(raw, ymlPath);
       } catch (error) {
         if (!hasErrnoCode(error, "ENOENT")) {
           throw error;
