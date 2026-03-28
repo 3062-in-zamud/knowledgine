@@ -366,6 +366,7 @@ export class KnowledgeRepository {
     totalLinks: number;
     totalPairs: number;
     patternsByType: Record<string, number>;
+    notesBySource: Record<string, number>;
   } {
     const totalNotes = (
       this.db.prepare("SELECT COUNT(*) as count FROM knowledge_notes").get() as { count: number }
