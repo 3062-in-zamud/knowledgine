@@ -15,7 +15,8 @@ import {
   validateCheckpoint,
   getGitLogFormat,
 } from "./git-parser.js";
-import { classifyNoiseLevel } from "../../noise-filter.js";
+import { NoiseFilter } from "../../noise-filter.js";
+import type { NoiseFilterConfig } from "../../noise-filter.js";
 
 export class GitHistoryPlugin implements IngestPlugin {
   readonly manifest: PluginManifest = {
@@ -34,6 +35,7 @@ export class GitHistoryPlugin implements IngestPlugin {
   private limit: number = 100;
   private since?: string;
   private unlimited: boolean = false;
+  private noiseFilter: NoiseFilter = new NoiseFilter();
 
   async initialize(config?: PluginConfig): Promise<PluginInitResult> {
     try {
@@ -48,6 +50,10 @@ export class GitHistoryPlugin implements IngestPlugin {
         }
         if (typeof config.since === "string") this.since = config.since;
         if (config.unlimited === true) this.unlimited = true;
+
+        if (config.noise && typeof config.noise === "object") {
+          this.noiseFilter = new NoiseFilter(config.noise as NoiseFilterConfig);
+        }
       }
 
       return { ok: true };
@@ -104,7 +110,7 @@ export class GitHistoryPlugin implements IngestPlugin {
         event.metadata.skippedReason = "large_diff";
       }
 
-      const noiseLevel = classifyNoiseLevel(
+      const noiseLevel = this.noiseFilter.classify(
         commit.subject,
         commit.authorName,
         event.relatedPaths ?? [],
@@ -157,7 +163,7 @@ export class GitHistoryPlugin implements IngestPlugin {
         event.metadata.skippedReason = "large_diff";
       }
 
-      const noiseLevel = classifyNoiseLevel(
+      const noiseLevel = this.noiseFilter.classify(
         commit.subject,
         commit.authorName,
         event.relatedPaths ?? [],

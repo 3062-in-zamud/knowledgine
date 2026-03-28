@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **RcConfig拡張 + Zodバリデーション**: `serve.authToken`、`noise`、`observer`、`projects` フィールドをRcConfigに追加。Zodスキーマによるランタイムバリデーションを実装し、不正な設定値はデフォルトにフォールバック + 警告ログを出力
 
+#### Ingest (`@knowledgine/ingest`)
+
+- **NoiseFilter設定可能化**: `NoiseFilter` クラスを追加。`shortMessageThreshold`、`botAuthors`、`noiseSubjectPatterns`、`excludePatterns` を設定可能に。既存の関数エクスポート（`classifyNoiseLevel` 等）は後方互換を維持。
+
+#### CLI (`knowledgine`)
+
+- **`--exclude-pattern` オプション**: `knowledgine ingest` コマンドに `--exclude-pattern <patterns...>` オプションを追加。Globパターンでパスをフィルタできる（例: `**/vendor/**`）。
+
 ## [0.5.0] - 2026-03-28
 
 ### Added

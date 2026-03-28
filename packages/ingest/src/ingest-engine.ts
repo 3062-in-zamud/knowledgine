@@ -5,6 +5,7 @@ import type { PluginRegistry } from "./plugin-registry.js";
 import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
 import { getHeapUsageRatio, getAdaptiveBatchSize } from "./heap-monitor.js";
+import picomatch from "picomatch";
 
 const DEFAULT_BATCH_SIZE = 50;
 
@@ -32,6 +33,7 @@ export class IngestEngine {
       pluginConfig?: Record<string, unknown>;
       verbose?: boolean;
       quiet?: boolean;
+      excludePatterns?: string[];
     },
   ): Promise<IngestSummary> {
     const start = Date.now();
@@ -61,12 +63,31 @@ export class IngestEngine {
       ? plugin.ingestIncremental(sourcePath, cursor.checkpoint)
       : plugin.ingestAll(sourcePath);
 
+    const excludeMatcher =
+      options?.excludePatterns && options.excludePatterns.length > 0
+        ? picomatch(options.excludePatterns)
+        : null;
+
     const processedPaths = new Set<string>();
     let batch: NormalizedEvent[] = [];
     let heapWarned = false;
     let totalEventsFromGenerator = 0;
     for await (const event of generator) {
       totalEventsFromGenerator++;
+
+      if (
+        excludeMatcher &&
+        event.relatedPaths &&
+        event.relatedPaths.length > 0 &&
+        event.relatedPaths.every((p) => excludeMatcher(p))
+      ) {
+        skipped++;
+        if (options?.verbose) {
+          process.stderr.write(`  [skip] exclude-pattern match: ${event.sourceUri}\n`);
+        }
+        continue;
+      }
+
       if (!event.content || event.content.trim() === "") {
         skipped++;
         if (options?.verbose) {
