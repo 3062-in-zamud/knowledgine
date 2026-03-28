@@ -1,26 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { startCommand } from "../../src/commands/start.js";
-
-// We need to mock chokidar to test ignored patterns and EMFILE handling
-vi.mock("chokidar", () => {
-  const handlers = new Map<string, (...args: unknown[]) => void>();
-  const mockWatcher = {
-    on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-      handlers.set(event, handler);
-      return mockWatcher;
-    }),
-    close: vi.fn().mockResolvedValue(undefined),
-    _handlers: handlers,
-    _triggerError: (err: NodeJS.ErrnoException) => {
-      const handler = handlers.get("error");
-      if (handler) handler(err);
-    },
-  };
-  return {
-    watch: vi.fn(() => mockWatcher),
-    _mockWatcher: mockWatcher,
-  };
-});
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 describe("start command", () => {
   it("should export startCommand function", () => {
@@ -28,20 +9,17 @@ describe("start command", () => {
   });
 
   describe("file watcher ignored patterns", () => {
-    it("should include .git and dist in ignored patterns", async () => {
-      const chokidar = await import("chokidar");
-      const watchFn = chokidar.watch as ReturnType<typeof vi.fn>;
-
-      if (watchFn.mock.calls.length > 0) {
-        const [, options] = watchFn.mock.calls[0];
-        const ignored = options.ignored as RegExp[];
-        const ignoredStrings = ignored.map((r: RegExp) => r.source);
-        expect(ignoredStrings).toContain("node_modules");
-        expect(ignoredStrings).toContain("\\.git");
-        expect(ignoredStrings).toContain("dist");
-      }
-
-      expect(true).toBe(true);
+    it("should include .git and dist in the source code ignored array", () => {
+      // Verify the source file contains the expected ignored patterns
+      // This is a structural test since invoking startCommand requires MCP stdio setup
+      const sourceCode = readFileSync(
+        resolve(import.meta.dirname, "../../src/commands/start.ts"),
+        "utf-8",
+      );
+      expect(sourceCode).toContain("/\\.git/");
+      expect(sourceCode).toContain("/dist/");
+      expect(sourceCode).toContain("/node_modules/");
+      expect(sourceCode).toContain("/\\.knowledgine/");
     });
   });
 });
