@@ -41,6 +41,23 @@ export interface SearchCommandOptions {
 }
 
 export async function searchCommand(query: string, options: SearchCommandOptions): Promise<void> {
+  // Validate query
+  if (!query || !query.trim()) {
+    console.error("Error: Search query cannot be empty.");
+    console.error('Usage: knowledgine search "your query" [--mode keyword|semantic|hybrid]');
+    process.exitCode = 1;
+    return;
+  }
+
+  // Validate mode
+  const validModes = ["keyword", "semantic", "hybrid"];
+  if (options.mode && !validModes.includes(options.mode)) {
+    console.error(`Error: Invalid search mode "${options.mode}".`);
+    console.error(`Valid modes: ${validModes.join(", ")}`);
+    process.exitCode = 1;
+    return;
+  }
+
   const fallbackAllowed = options.fallback !== false;
   const rootPath = options.demo ? getDemoNotesPath() : resolveDefaultPath(options.path);
 
