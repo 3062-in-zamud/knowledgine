@@ -601,5 +601,8 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
   p.outro(`${colors.success("Your knowledge is now searchable!")} ${colors.dim(`(${elapsed})`)}`);
 
+  console.error("");
+  console.error(`  → Next: knowledgine ingest --all --path ${rootPath}`);
+
   db.close();
 }

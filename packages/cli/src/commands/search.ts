@@ -136,7 +136,16 @@ export async function searchCommand(query: string, options: SearchCommandOptions
     const repository = new KnowledgeRepository(db);
     const graphRepository = new GraphRepository(db);
 
-    const mode = (options.mode as "keyword" | "semantic" | "hybrid") ?? "keyword";
+    // Dynamic default mode: hybrid when embeddings available, keyword otherwise
+    let mode: "keyword" | "semantic" | "hybrid";
+    if (options.mode) {
+      mode = options.mode as "keyword" | "semantic" | "hybrid";
+    } else {
+      // Check if embeddings are available for dynamic default
+      const modelManager = new ModelManager();
+      const semanticReadiness = checkSemanticReadiness(config, modelManager, repository);
+      mode = semanticReadiness.ready ? "hybrid" : "keyword";
+    }
     const limit = options.limit ?? 20;
     const format = (options.format as OutputFormat) ?? "plain";
 

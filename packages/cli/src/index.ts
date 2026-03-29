@@ -40,13 +40,16 @@ program
   .addHelpText(
     "after",
     `
-Workflow:
-  1. knowledgine init --path ~/notes    Index your files (FTS5 full-text search)
-  2. knowledgine setup --target claude-desktop  Configure AI tool
-  3. knowledgine start --path ~/notes    Start MCP server
+Quick Start:
+  1. knowledgine init --path .          Index your files
+  2. knowledgine ingest --all --path .  Ingest from all sources
+  3. knowledgine search "query"         Search your knowledge base
 
-Optional:
-  knowledgine upgrade --semantic         Enable semantic search (downloads ~23MB model)
+MCP Integration:
+  1. knowledgine init --path .
+  2. knowledgine ingest --all --path .
+  3. knowledgine setup --target claude-code
+  4. knowledgine start --path .
 
 Run 'knowledgine <command> --help' for more information on a command.`,
   );
@@ -245,7 +248,7 @@ program
   .command("search <query>")
   .description("Search indexed notes")
   .option("--demo", "Search in demo notes")
-  .option("--mode <mode>", "Search mode: keyword, semantic, hybrid", "keyword")
+  .option("--mode <mode>", "Search mode: keyword, semantic, hybrid (default: auto-detect)")
   .option("--limit <n>", "Maximum results", "20")
   .option("--format <format>", "Output format: json, table, plain", "plain")
   .option("--related <noteId>", "Find related notes by note ID")

@@ -280,6 +280,12 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       ];
       const report = createSummaryReport("knowledgine ingest", reportEntries);
       console.error("\n" + report);
+
+      // Next-step hint after --all ingest
+      const uniqueAllNoteIds = Array.from(new Set(ingestedNoteIds));
+      if (uniqueAllNoteIds.length > 0) {
+        console.error(`  → Try: knowledgine search '<your query>' --mode hybrid`);
+      }
     } else {
       const pluginConfig: Record<string, unknown> = {};
       if (options.limit !== undefined) pluginConfig.limit = options.limit;
@@ -334,6 +340,12 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         console.error(
           `\n${symbols.info} ${colors.hint(reasons[summary.skipReason] ?? "Unknown skip reason")}`,
         );
+      }
+
+      // Next-step hint after single-source ingest
+      const uniqueSingleNoteIds = Array.from(new Set(ingestedNoteIds));
+      if (uniqueSingleNoteIds.length > 0) {
+        console.error(`  → Try: knowledgine search '<your query>' --mode hybrid`);
       }
 
       // Show default limit hint for git-history when no explicit limit was set
