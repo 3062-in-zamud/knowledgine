@@ -14,6 +14,10 @@ export interface CaptureOptions {
   authToken: string;
 }
 
+export interface AuthConfig {
+  token: string;
+}
+
 const captureSchema = z.object({
   content: z.string().min(1).max(100000),
   title: z.string().max(200).optional(),
@@ -36,16 +40,76 @@ function createAuthMiddleware(token: string): (c: Context, next: Next) => Promis
   };
 }
 
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+function createRateLimiter(
+  maxRequests: number = 100,
+  windowMs: number = 60_000,
+): (c: Context, next: Next) => Promise<Response | void> {
+  const clients = new Map<string, RateLimitEntry>();
+
+  // Purge expired entries every 60 seconds
+  const purgeInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of clients) {
+      if (now >= entry.resetAt) {
+        clients.delete(key);
+      }
+    }
+  }, 60_000);
+  // Don't block process exit
+  if (purgeInterval.unref) purgeInterval.unref();
+
+  return async (c, next) => {
+    const ip =
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+      c.req.header("x-real-ip") ??
+      "unknown";
+    const now = Date.now();
+    let entry = clients.get(ip);
+
+    if (!entry || now >= entry.resetAt) {
+      entry = { count: 0, resetAt: now + windowMs };
+      clients.set(ip, entry);
+    }
+
+    entry.count++;
+
+    if (entry.count > maxRequests) {
+      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+      c.header("Retry-After", String(retryAfter));
+      return c.json({ error: "Too many requests", retryAfter }, 429);
+    }
+
+    c.header("X-RateLimit-Limit", String(maxRequests));
+    c.header("X-RateLimit-Remaining", String(Math.max(0, maxRequests - entry.count)));
+
+    await next();
+  };
+}
+
 export function createRestApp(
   service: KnowledgeService,
   version: string,
   capture?: CaptureOptions,
   projects?: ProjectEntry[],
+  authConfig?: AuthConfig,
 ): Hono {
   const app = new Hono();
 
   // CORS: 全オリジンを許可（サーバーはデフォルトでlocalhostバインドのため）
   app.use("*", cors());
+
+  // Rate limiting (100 req/min/IP)
+  app.use("*", createRateLimiter(100, 60_000));
+
+  // Apply global auth if configured
+  if (authConfig) {
+    app.use("*", createAuthMiddleware(authConfig.token));
+  }
 
   // GET /health
   app.get("/health", (c) => {

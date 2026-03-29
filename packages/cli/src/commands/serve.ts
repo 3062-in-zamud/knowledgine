@@ -25,6 +25,7 @@ export interface ServeCommandOptions {
   port?: string;
   host?: string;
   path?: string;
+  auth?: boolean;
 }
 
 export function registerServeCommand(program: Command): void {
@@ -34,6 +35,7 @@ export function registerServeCommand(program: Command): void {
     .option("--port <n>", "Port number", "3456")
     .option("--host <host>", "Host to bind", "127.0.0.1")
     .option("--path <dir>", "Project root path")
+    .option("--auth", "Require Bearer token authentication for all endpoints")
     .action(serveAction);
 }
 
@@ -85,9 +87,31 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
       ? { db, repository, graphRepository, authToken }
       : undefined;
 
-    const app = createRestApp(service, VERSION, captureOptions, rcConfig?.projects);
     const port = parseInt(options.port ?? "3456", 10);
     const hostname = options.host ?? "127.0.0.1";
+
+    // --auth flag: require Bearer token for all endpoints
+    const useAuth = options.auth ?? false;
+    let effectiveAuthToken = authToken;
+    if (useAuth && !effectiveAuthToken) {
+      const { randomBytes } = await import("crypto");
+      effectiveAuthToken = randomBytes(32).toString("hex");
+    }
+
+    // Security warning for 0.0.0.0 without auth
+    if ((hostname === "0.0.0.0" || hostname === "::") && !effectiveAuthToken) {
+      console.error(
+        `  Warning: Server bound to ${hostname} without authentication. Consider using --auth.`,
+      );
+    }
+
+    const app = createRestApp(
+      service,
+      VERSION,
+      captureOptions,
+      rcConfig?.projects,
+      effectiveAuthToken ? { token: effectiveAuthToken } : undefined,
+    );
 
     const stats = service.getStats();
     const searchMode = embeddingProvider ? "semantic + FTS5" : "FTS5 only";
@@ -103,6 +127,12 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
         console.error(`  URL:    http://${hostname}:${port}`);
         console.error(`  Notes:  ${stats.totalNotes} indexed`);
         console.error(`  Search: ${searchMode}`);
+        if (useAuth && effectiveAuthToken && !authToken) {
+          console.error(`  Auth:   Bearer ${effectiveAuthToken}`);
+          console.error(`  Set KNOWLEDGINE_API_TOKEN env var to use a fixed token.`);
+        } else if (effectiveAuthToken) {
+          console.error(`  Auth:   enabled (token from env/config)`);
+        }
         if (captureOptions) {
           console.error(`  Capture: POST /capture enabled (auth required)`);
           if (hostname !== "127.0.0.1" && hostname !== "localhost") {
