@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdirSync, existsSync } from "fs";
+import { mkdirSync, existsSync, chmodSync } from "fs";
 import { dirname, join } from "path";
 import { DatabaseError } from "../errors.js";
 
@@ -63,6 +63,16 @@ export function createDatabase(
     db.pragma("mmap_size = 67108864"); // 64MB mmap
   }
   db.pragma("temp_store = MEMORY");
+
+  // Harden file permissions (owner-only access)
+  if (dbPath !== ":memory:" && process.platform !== "win32") {
+    try {
+      chmodSync(dbPath, 0o600);
+      chmodSync(dirname(dbPath), 0o700);
+    } catch {
+      // Permission change may fail on some filesystems — non-fatal
+    }
+  }
 
   // Load sqlite-vec if requested
   let vec0Loaded = false;
