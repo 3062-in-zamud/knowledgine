@@ -26,6 +26,7 @@ import { registerFeedbackSuggestCommand } from "./commands/feedback-suggest.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { deprecationCheckCommand } from "./commands/deprecation-check.js";
 import { undeprecateCommand } from "./commands/undeprecate.js";
+import { doctorCommand } from "./commands/doctor.js";
 import { createOutputErrorHandler } from "./lib/unknown-command-handler.js";
 
 const program = new Command();
@@ -324,6 +325,19 @@ program
   .description("Restore a deprecated note to active status")
   .option("--path <dir>", "Root directory")
   .action(undeprecateCommand);
+
+program
+  .command("doctor")
+  .description("Run comprehensive health checks on your knowledge base")
+  .option("--path <dir>", "Root directory to check")
+  .option("--fix", "Automatically fix issues where possible")
+  .addHelpText(
+    "after",
+    `
+Example:
+  knowledgine doctor --path ~/notes`,
+  )
+  .action(doctorCommand);
 
 program.showSuggestionAfterError(true);
 program.configureOutput({
