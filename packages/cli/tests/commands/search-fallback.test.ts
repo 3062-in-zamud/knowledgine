@@ -50,6 +50,11 @@ vi.mock("@knowledgine/core", async (importOriginal) => {
             matchReason: ['キーワード一致: "TypeScript"'],
             createdAt: "2024-01-01T00:00:00Z",
             fellBack: true,
+            fallbackInfo: {
+              reason: "Embedding provider not available — semantic search requires embeddings",
+              modeUsed: "keyword",
+              originalMode: "semantic",
+            },
           },
         ],
       }),
