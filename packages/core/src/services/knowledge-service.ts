@@ -30,6 +30,7 @@ export interface SearchKnowledgeResult {
     title: string;
     score: number;
     matchReason: string[];
+    snippet?: string;
     createdAt: string;
     fallbackInfo?: {
       reason: string;
@@ -180,6 +181,7 @@ export class KnowledgeService {
         title: r.note.title,
         score: r.score,
         matchReason: r.matchReason,
+        snippet: r.snippet,
         createdAt: r.note.created_at,
         ...(r.fallbackInfo ? { fallbackInfo: r.fallbackInfo } : {}),
       })),

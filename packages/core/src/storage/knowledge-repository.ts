@@ -716,6 +716,110 @@ export class KnowledgeRepository {
   }
 
   /**
+   * FTS5 rank付き + スニペット付きでノートを検索する。
+   * searchNotesWithRank の拡張版で、FTS5 snippet() によるコンテキスト抜粋を含む。
+   */
+  searchNotesWithSnippet(
+    query: string,
+    limit: number = 50,
+    includeDeprecated: boolean = false,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Array<{ note: KnowledgeNote; rank: number; snippet?: string }> {
+    const hasCjk = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(query);
+
+    // Short CJK (1-2 chars) → LIKE with JS snippet
+    if (hasCjk && query.replace(/\s/g, "").length <= 2) {
+      return this.searchNotesWithLikeSnippet(query, limit, includeDeprecated, dateFrom, dateTo);
+    }
+
+    const deprecatedFilter = includeDeprecated ? "" : "AND n.deprecated = 0";
+    const dateFromFilter = dateFrom ? "AND n.created_at >= ?" : "";
+    const dateToFilter = dateTo ? "AND n.created_at <= ?" : "";
+    const dateParams: string[] = [];
+    if (dateFrom) dateParams.push(dateFrom);
+    if (dateTo) dateParams.push(dateTo);
+
+    const useTrigram = hasCjk && query.length >= 3;
+    const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
+
+    try {
+      // Use FTS5 snippet() function with Unicode markers for highlighting
+      const rows = this.stmt(
+        `
+        SELECT n.*, bm25(${ftsTable}, 10.0, 1.0) AS rank,
+               snippet(${ftsTable}, 1, '\uFFF0', '\uFFF1', '...', 32) AS snippet
+        FROM knowledge_notes n
+        JOIN ${ftsTable} fts ON n.id = fts.rowid
+        WHERE ${ftsTable} MATCH ?
+        ${deprecatedFilter}
+        ${dateFromFilter}
+        ${dateToFilter}
+        ORDER BY rank
+        LIMIT ?
+      `,
+      ).all(query, ...dateParams, limit * 3) as Array<
+        KnowledgeNote & { rank: number; snippet: string }
+      >;
+
+      if (rows.length === 0 && hasCjk) {
+        return this.searchNotesWithLikeSnippet(query, limit, includeDeprecated, dateFrom, dateTo);
+      }
+
+      return rows.slice(0, limit).map(({ rank, snippet, ...note }) => ({
+        note: note as KnowledgeNote,
+        rank,
+        snippet: snippet || undefined,
+      }));
+    } catch {
+      return this.searchNotesWithLikeSnippet(query, limit, includeDeprecated, dateFrom, dateTo);
+    }
+  }
+
+  /**
+   * LIKE-based search with JS-generated snippets.
+   * Used when FTS5 is unavailable or for short CJK queries.
+   */
+  private searchNotesWithLikeSnippet(
+    query: string,
+    limit: number,
+    includeDeprecated: boolean,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Array<{ note: KnowledgeNote; rank: number; snippet?: string }> {
+    const results = this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
+    return results.map(({ note, rank }) => ({
+      note,
+      rank,
+      snippet: this.generateJsSnippet(note.content, query),
+    }));
+  }
+
+  /**
+   * Generate a snippet by finding query text in content and extracting surrounding context.
+   */
+  private generateJsSnippet(content: string, query: string): string | undefined {
+    const lowerContent = content.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const idx = lowerContent.indexOf(lowerQuery);
+    if (idx === -1) return undefined;
+
+    const CONTEXT_CHARS = 50;
+    const start = Math.max(0, idx - CONTEXT_CHARS);
+    const end = Math.min(content.length, idx + query.length + CONTEXT_CHARS);
+
+    let snippet = "";
+    if (start > 0) snippet += "...";
+    const before = content.slice(start, idx);
+    const match = content.slice(idx, idx + query.length);
+    const after = content.slice(idx + query.length, end);
+    snippet += before + "\uFFF0" + match + "\uFFF1" + after;
+    if (end < content.length) snippet += "...";
+
+    return snippet;
+  }
+
+  /**
    * 埋め込みがまだ生成されていないノートを取得する
    */
   getNotesWithoutEmbeddings(): KnowledgeNote[] {

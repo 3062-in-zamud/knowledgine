@@ -31,6 +31,7 @@ export interface SearchResult {
   note: KnowledgeNote | KnowledgeNoteSummary;
   score: number;
   matchReason: string[];
+  snippet?: string;
   fellBack?: boolean;
   fallbackInfo?: {
     reason: string;
@@ -137,8 +138,8 @@ export class KnowledgeSearcher {
         ((mode === "semantic" && !this.semanticSearcher) ||
           (mode === "hybrid" && !this.hybridSearcher));
 
-      // keyword mode (デフォルト) — FTS5
-      const rows = this.repository.searchNotesWithRank(
+      // keyword mode (デフォルト) — FTS5 + snippet
+      const rows = this.repository.searchNotesWithSnippet(
         query,
         limit,
         includeDeprecated,
@@ -185,7 +186,7 @@ export class KnowledgeSearcher {
       const maxRank = Math.max(...adjustedRanks);
       const range = maxRank - minRank;
 
-      results = rows.map(({ note }, i) => {
+      results = rows.map(({ note, snippet }, i) => {
         const normalized = range > 0 ? (adjustedRanks[i] - minRank) / range : 0;
         const score = 1 - normalized;
 
@@ -199,6 +200,7 @@ export class KnowledgeSearcher {
           note,
           score,
           matchReason: reasons,
+          snippet,
           fellBack,
           ...(fellBack
             ? {

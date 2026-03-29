@@ -742,4 +742,47 @@ describe("KnowledgeRepository", () => {
       expect(results).toHaveLength(2);
     });
   });
+
+  describe("searchNotesWithSnippet", () => {
+    beforeEach(() => {
+      ctx.repository.saveNote({
+        filePath: "snippet-test.md",
+        title: "Snippet Test Note",
+        content:
+          "This is a long content that contains the keyword searchable somewhere in the middle of the text for testing snippet extraction.",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+    });
+
+    it("should return results with snippet field", () => {
+      const results = ctx.repository.searchNotesWithSnippet("searchable", 10);
+      expect(Array.isArray(results)).toBe(true);
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0]).toHaveProperty("snippet");
+    });
+
+    it("should return snippet containing Unicode highlight markers", () => {
+      const results = ctx.repository.searchNotesWithSnippet("searchable", 10);
+      expect(results.length).toBeGreaterThan(0);
+      const snippet = results[0].snippet;
+      if (snippet) {
+        // FTS5 snippet or JS snippet should contain the highlight markers
+        expect(snippet.includes("\uFFF0") || snippet.includes("searchable")).toBe(true);
+      }
+    });
+
+    it("should return results with rank and note", () => {
+      const results = ctx.repository.searchNotesWithSnippet("searchable", 10);
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0]).toHaveProperty("note");
+      expect(results[0]).toHaveProperty("rank");
+      expect(results[0].note.title).toBe("Snippet Test Note");
+    });
+
+    it("should return empty array for non-matching query", () => {
+      const results = ctx.repository.searchNotesWithSnippet("zzzznonexistent", 10);
+      expect(results).toHaveLength(0);
+    });
+  });
 });

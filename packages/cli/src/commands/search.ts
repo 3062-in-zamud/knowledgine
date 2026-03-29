@@ -257,7 +257,7 @@ export async function searchCommand(query: string, options: SearchCommandOptions
 /** 後方互換のためのレガシー出力形式 */
 function formatLegacySearchResults(
   query: string,
-  results: Array<{ score: number; filePath: string; title: string }>,
+  results: Array<{ score: number; filePath: string; title: string; snippet?: string }>,
 ): void {
   if (results.length === 0) {
     console.error(`${symbols.info} ${colors.hint(`No results for "${query}".`)}`);
@@ -272,6 +272,11 @@ function formatLegacySearchResults(
     const score = r.score.toFixed(2);
     console.error(`  ${i + 1}. [${score}] ${r.filePath}`);
     console.error(`     ${r.title}`);
+    if (r.snippet) {
+      // Convert Unicode markers to * for plain text highlighting
+      const displaySnippet = r.snippet.replace(/\uFFF0/g, "*").replace(/\uFFF1/g, "*");
+      console.error(`     ${displaySnippet}`);
+    }
     console.error("");
   }
 }
