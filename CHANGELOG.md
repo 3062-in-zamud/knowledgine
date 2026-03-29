@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-03-29
+
+### Fixed
+
+#### Infrastructure
+
+- **release.yml**: 全パッケージの npm publish ステップに `--access public` を統一。新規 scoped パッケージの初回 publish 失敗を根本的に防止
+
 ## [0.6.0] - 2026-03-29
 
 ### Added

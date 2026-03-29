@@ -1,6 +1,6 @@
 {
   "name": "@knowledgine/ingest",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Plugin-based knowledge ingestion engine for knowledgine. Supports Git history, GitHub, Obsidian, and Claude Sessions.",
   "keywords": [
     "knowledgine",
