@@ -10,10 +10,13 @@ after the quality improvements from the v0.6.1 dogfooding synthesis report.
 ## Test Matrix
 
 ### Testers
+
 Same 5 testers from v0.6.1 evaluation.
 
 ### Target Repositories
+
 Same 5 OSS projects from v0.6.1:
+
 1. Small TypeScript project (~100 files)
 2. Medium Python project (~500 files)
 3. Large monorepo (~2000 files)
@@ -23,6 +26,7 @@ Same 5 OSS projects from v0.6.1:
 ## Evaluation Scenarios (10)
 
 ### Setup & Initialization
+
 1. **Init -> Ingest -> Search pipeline** (10 pts)
    - `knowledgine init --path .` completes without errors
    - `knowledgine ingest --all --path .` processes files and generates embeddings
@@ -35,6 +39,7 @@ Same 5 OSS projects from v0.6.1:
    - Fix commands suggested for any issues
 
 ### Search Quality
+
 3. **Keyword search — English** (10 pts)
    - Query: technology name in the repo (e.g., "authentication")
    - P@5 >= 80% (4 of top 5 results are relevant)
@@ -59,6 +64,7 @@ Same 5 OSS projects from v0.6.1:
    - Multi-word AND query with 0 results falls back to OR with notification
 
 ### Entity & Exploration
+
 7. **Entity extraction quality** (10 pts)
    - `knowledgine explain --entity <name>` shows entity details
    - No Markdown artifacts in entity names
@@ -70,6 +76,7 @@ Same 5 OSS projects from v0.6.1:
    - `knowledgine search --related <noteId>` returns related notes
 
 ### Infrastructure
+
 9. **REST API** (10 pts)
    - `knowledgine serve --auth` generates token and requires auth
    - Rate limiting headers present
@@ -83,42 +90,42 @@ Same 5 OSS projects from v0.6.1:
 
 ## Scoring Guide
 
-| Score Range | Rating | Description |
-|-------------|--------|-------------|
-| 90-100 | Excellent | Production-ready for daily use |
-| 80-89 | Good | Minor issues, usable with workarounds |
-| 70-79 | Fair | Notable issues affecting workflow |
-| 60-69 | Poor | Significant problems, needs improvement |
-| < 60 | Failing | Critical issues preventing basic use |
+| Score Range | Rating    | Description                             |
+| ----------- | --------- | --------------------------------------- |
+| 90-100      | Excellent | Production-ready for daily use          |
+| 80-89       | Good      | Minor issues, usable with workarounds   |
+| 70-79       | Fair      | Notable issues affecting workflow       |
+| 60-69       | Poor      | Significant problems, needs improvement |
+| < 60        | Failing   | Critical issues preventing basic use    |
 
 ## Comparison Scorecard Template
 
-| Scenario | Tester 1 | Tester 2 | Tester 3 | Tester 4 | Tester 5 | Avg |
-|----------|----------|----------|----------|----------|----------|-----|
-| 1. Init pipeline | | | | | | |
-| 2. Doctor | | | | | | |
-| 3. EN keyword | | | | | | |
-| 4. CJK keyword | | | | | | |
-| 5. Hybrid search | | | | | | |
-| 6. Compound query | | | | | | |
-| 7. Entity quality | | | | | | |
-| 8. Cross-entity | | | | | | |
-| 9. REST API | | | | | | |
-| 10. Status/Diag | | | | | | |
-| **Total** | | | | | | |
+| Scenario          | Tester 1 | Tester 2 | Tester 3 | Tester 4 | Tester 5 | Avg |
+| ----------------- | -------- | -------- | -------- | -------- | -------- | --- |
+| 1. Init pipeline  |          |          |          |          |          |     |
+| 2. Doctor         |          |          |          |          |          |     |
+| 3. EN keyword     |          |          |          |          |          |     |
+| 4. CJK keyword    |          |          |          |          |          |     |
+| 5. Hybrid search  |          |          |          |          |          |     |
+| 6. Compound query |          |          |          |          |          |     |
+| 7. Entity quality |          |          |          |          |          |     |
+| 8. Cross-entity   |          |          |          |          |          |     |
+| 9. REST API       |          |          |          |          |          |     |
+| 10. Status/Diag   |          |          |          |          |          |     |
+| **Total**         |          |          |          |          |          |     |
 
 ## v0.6.1 vs v0.6.2 Comparison
 
 Track improvements against v0.6.1 baseline (avg: 50/100):
 
-| Area | v0.6.1 Issue | v0.6.2 Fix | Expected Impact |
-|------|-------------|------------|-----------------|
-| Embeddings | Not auto-generated after ingest | KNOW-369: auto-generate | +15 pts |
-| CJK search | 0 results for Japanese | KNOW-376: LIKE fallback | +10 pts |
-| Search quality | No hybrid default | KNOW-385: dynamic default | +5 pts |
-| DB security | Permissions 644 | KNOW-382: 600 | +3 pts |
-| User flow | No guidance | KNOW-385: next-step hints | +5 pts |
-| Diagnostics | No health check | KNOW-389: doctor command | +5 pts |
+| Area           | v0.6.1 Issue                    | v0.6.2 Fix                | Expected Impact |
+| -------------- | ------------------------------- | ------------------------- | --------------- |
+| Embeddings     | Not auto-generated after ingest | KNOW-369: auto-generate   | +15 pts         |
+| CJK search     | 0 results for Japanese          | KNOW-376: LIKE fallback   | +10 pts         |
+| Search quality | No hybrid default               | KNOW-385: dynamic default | +5 pts          |
+| DB security    | Permissions 644                 | KNOW-382: 600             | +3 pts          |
+| User flow      | No guidance                     | KNOW-385: next-step hints | +5 pts          |
+| Diagnostics    | No health check                 | KNOW-389: doctor command  | +5 pts          |
 
 ## Running the Evaluation
 

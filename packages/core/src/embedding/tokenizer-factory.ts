@@ -99,9 +99,11 @@ export class HFSentencePieceTokenizer implements Tokenizer {
     const rawVocab = config.model?.vocab;
     if (rawVocab) {
       if (Array.isArray(rawVocab)) {
-        // Array of [token, id] pairs (Unigram format)
-        for (const [token, id] of rawVocab as Array<[string, number]>) {
-          this.vocab.set(token, id);
+        // Array of [token, score] pairs (Unigram format)
+        // In Unigram, the ID is the index position, not the second element (which is log-probability)
+        for (let i = 0; i < (rawVocab as Array<[string, number]>).length; i++) {
+          const [token] = (rawVocab as Array<[string, number]>)[i];
+          this.vocab.set(token, i);
         }
       } else {
         // Record<string, number> (BPE format)

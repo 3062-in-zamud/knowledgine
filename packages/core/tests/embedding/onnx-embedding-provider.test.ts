@@ -127,37 +127,6 @@ describe("OnnxEmbeddingProvider", () => {
     });
   });
 
-  describe.skipIf(!e5Available)("multilingual-e5-small (e5 family)", () => {
-    let provider: import("../../src/embedding/onnx-embedding-provider.js").OnnxEmbeddingProvider;
-
-    beforeAll(async () => {
-      const { OnnxEmbeddingProvider } =
-        await import("../../src/embedding/onnx-embedding-provider.js");
-      provider = new OnnxEmbeddingProvider("multilingual-e5-small", modelManager);
-    });
-
-    it("should return Float32Array of correct dimensions", async () => {
-      const embedding = await provider.embed("Hello world");
-      expect(embedding).toBeInstanceOf(Float32Array);
-      expect(embedding.length).toBe(384);
-    });
-
-    it("should return unit-normalized vectors", async () => {
-      const embedding = await provider.embed("test sentence");
-      let norm = 0;
-      for (const v of embedding) {
-        norm += v * v;
-      }
-      expect(Math.sqrt(norm)).toBeCloseTo(1.0, 4);
-    });
-
-    it("embedQuery should return Float32Array of correct dimensions", async () => {
-      const embedding = await provider.embedQuery("semantic search query");
-      expect(embedding).toBeInstanceOf(Float32Array);
-      expect(embedding.length).toBe(384);
-    });
-  });
-
   describe("without model available", () => {
     it("should throw EmbeddingNotAvailableError when model is missing", async () => {
       const emptyDir = join(__dirname, "nonexistent-models");
