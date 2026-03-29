@@ -44,6 +44,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **`--observe` / `--no-observe` / `--observe-limit` オプション**: `knowledgine ingest` コマンドに Observer/Reflector エージェントのオプトイン切り替えを追加。`--observe` フラグまたは `.knowledginerc.json` の `observer.enabled: true` で有効化。LLM 未設定時はルールベースモードで動作（KNOW-323）
 - **`--skip-extraction` オプション**: `knowledgine ingest` コマンドに `--skip-extraction` オプションを追加。ingest後のentity抽出をスキップできる（KNOW-324）
 
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **`POST /capture` エンドポイント**: Bearer token認証付きのRESTエンドポイントを追加。AIツール（Cline, Windsurf, Cursor等）からのプッシュ型セッションキャプチャを実現。`KNOWLEDGINE_API_TOKEN` 環境変数または `.knowledginerc.json` の `serve.authToken` でトークン設定。timing-safe比較（`crypto.timingSafeEqual`）、Zodバリデーション、100,000文字上限を実装（KNOW-310）
+- **`CaptureOptions` 型エクスポート**: `createRestApp` の第3引数として `CaptureOptions` を追加。`authToken` 未設定時はエンドポイントが無効になり後方互換を維持
+
+#### CLI (`knowledgine`)
+
+- **`knowledgine serve` — capture機能統合**: `KNOWLEDGINE_API_TOKEN` 環境変数または `rcConfig.serve.authToken` を読み込み、設定時は `POST /capture` を自動的に有効化（KNOW-310）
+
 ### Removed
 
 #### CLI (`knowledgine`)

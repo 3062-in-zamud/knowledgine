@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { KnowledgeService } from "@knowledgine/core";
+import type { KnowledgeService, KnowledgeRepository, GraphRepository } from "@knowledgine/core";
+import type Database from "better-sqlite3";
 import { createRestApp } from "../src/rest-server.js";
 
 const mockStatsResult = {
@@ -83,6 +84,32 @@ const mockService = {
   getEntityGraph: vi.fn().mockReturnValue(mockEntityGraph),
   findRelated: vi.fn().mockResolvedValue(mockFindRelatedResult),
 };
+
+const mockCaptureResult = { id: 42, noteId: 10 };
+const mockWriteEvent = vi.fn().mockReturnValue(mockCaptureResult);
+const mockProcess = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@knowledgine/ingest", () => ({
+  EventWriter: vi.fn().mockImplementation(() => ({
+    writeEvent: mockWriteEvent,
+  })),
+  sanitizeContent: vi.fn().mockImplementation((c: string) => c),
+}));
+
+vi.mock("@knowledgine/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@knowledgine/core")>();
+  return {
+    ...actual,
+    IncrementalExtractor: vi.fn().mockImplementation(() => ({
+      process: mockProcess,
+    })),
+    GraphRepository: vi.fn().mockImplementation(() => ({})),
+  };
+});
+
+const mockDb = {} as Database.Database;
+const mockRepository = {} as KnowledgeRepository;
+const mockGraphRepository = {} as GraphRepository;
 
 describe("REST API Server", () => {
   let app: ReturnType<typeof createRestApp>;
@@ -242,6 +269,82 @@ describe("REST API Server", () => {
         noteId: 1,
         limit: 10,
       });
+    });
+  });
+
+  describe("POST /capture endpoint", () => {
+    const AUTH_TOKEN = "test-secret-token";
+
+    beforeEach(() => {
+      app = createRestApp(mockService as unknown as KnowledgeService, "0.2.1", {
+        db: mockDb,
+        repository: mockRepository,
+        graphRepository: mockGraphRepository,
+        authToken: AUTH_TOKEN,
+      });
+    });
+
+    it("returns 401 without auth token", async () => {
+      const res = await app.request("/capture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "test content" }),
+      });
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body.error).toBe("Authorization required");
+    });
+
+    it("returns 401 with wrong token", async () => {
+      const res = await app.request("/capture", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer wrong-token",
+        },
+        body: JSON.stringify({ content: "test content" }),
+      });
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body.error).toBe("Invalid token");
+    });
+
+    it("creates note with valid token", async () => {
+      const res = await app.request("/capture", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${AUTH_TOKEN}`,
+        },
+        body: JSON.stringify({ content: "test content", title: "Test Title", tags: ["tag1"] }),
+      });
+      expect(res.status).toBe(201);
+      const body = await res.json();
+      expect(body.id).toBe(42);
+      expect(body.title).toBe("Test Title");
+      expect(body.tags).toEqual(["tag1"]);
+    });
+
+    it("returns 400 for empty content", async () => {
+      const res = await app.request("/capture", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${AUTH_TOKEN}`,
+        },
+        body: JSON.stringify({ content: "" }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it("GET /health works without auth", async () => {
+      const res = await app.request("/health");
+      expect(res.status).toBe(200);
+    });
+
+    it("GET /search works without auth", async () => {
+      const res = await app.request("/search?q=test");
+      expect(res.status).toBe(200);
     });
   });
 });
