@@ -8,6 +8,7 @@ export interface SemanticReadiness {
   configEnabled: boolean;
   embeddingsCount: number;
   totalNotes: number;
+  embeddingCoverage: number;
   label: string;
 }
 
@@ -22,16 +23,33 @@ export function checkSemanticReadiness(
   const embeddingsCount = totalNotes - notesWithoutEmbeddings;
   const modelAvailable = modelManager.isModelAvailable();
   const configEnabled = config.embedding.enabled;
+
+  const embeddingCoverage = totalNotes > 0 ? Math.round((embeddingsCount / totalNotes) * 100) : 0;
+
+  // Semantic ready only when embeddings actually exist (not just model available)
   const ready = configEnabled && modelAvailable && embeddingsCount > 0;
 
   let label: string;
   if (totalNotes === 0) {
     label = "Not initialized";
-  } else if (ready) {
-    label = "Ready (semantic + FTS5)";
+  } else if (!modelAvailable) {
+    label = "FTS5 only — run 'upgrade --semantic' to enable";
+  } else if (embeddingsCount === 0) {
+    label = "FTS5 only — run 'ingest --all' to generate embeddings";
+  } else if (embeddingsCount < totalNotes) {
+    label = `Ready (semantic: ${embeddingCoverage}% coverage + FTS5)`;
   } else {
-    label = "Ready (FTS5 only)";
+    // embeddingsCount === totalNotes && totalNotes > 0
+    label = "Ready (semantic + FTS5)";
   }
 
-  return { ready, modelAvailable, configEnabled, embeddingsCount, totalNotes, label };
+  return {
+    ready,
+    modelAvailable,
+    configEnabled,
+    embeddingsCount,
+    totalNotes,
+    embeddingCoverage,
+    label,
+  };
 }
