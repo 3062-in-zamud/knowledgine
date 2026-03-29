@@ -12,6 +12,7 @@ export interface DeprecationCheckOptions {
   path?: string;
   apply?: boolean;
   threshold?: string;
+  excludeTranslations?: boolean;
 }
 
 interface SimilarityCandidate {
@@ -24,13 +25,27 @@ interface SimilarityCandidate {
  * 簡易テキスト類似度（Jaccard係数）でdeprecation候補を検出する
  */
 function jaccardSimilarity(a: string, b: string): number {
-  const tokenize = (text: string) =>
-    new Set(
-      text
-        .toLowerCase()
-        .split(/\W+/)
-        .filter((t) => t.length > 2),
-    );
+  const tokenize = (text: string): Set<string> => {
+    const lower = text.toLowerCase();
+    const tokens = new Set<string>();
+
+    // Word-level tokens for Latin/Cyrillic text
+    for (const token of lower.split(/\W+/)) {
+      if (token.length > 2) tokens.add(token);
+    }
+
+    // Bigram tokens for CJK characters
+    const cjkRe = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/g;
+    const cjkChars = lower.match(cjkRe);
+    if (cjkChars && cjkChars.length >= 2) {
+      for (let i = 0; i < cjkChars.length - 1; i++) {
+        tokens.add(cjkChars[i] + cjkChars[i + 1]);
+      }
+    }
+
+    return tokens;
+  };
+
   const setA = tokenize(a);
   const setB = tokenize(b);
   if (setA.size === 0 || setB.size === 0) return 0;
@@ -56,7 +71,14 @@ export async function deprecationCheckCommand(options: DeprecationCheckOptions):
   const repository = new KnowledgeRepository(db);
 
   try {
-    const allNotes = repository.getAllNotes().filter((n) => !n.deprecated);
+    let allNotes = repository.getAllNotes().filter((n) => !n.deprecated);
+
+    if (options.excludeTranslations) {
+      const translationPattern =
+        /\.(po|pot|mo|xlf|xliff)$|[\\/](locales?|i18n|translations?)[\\/]|\.i18n\./i;
+      allNotes = allNotes.filter((n) => !translationPattern.test(n.file_path));
+    }
+
     const candidates: SimilarityCandidate[] = [];
 
     // O(n²) comparison — intended for small knowledge bases

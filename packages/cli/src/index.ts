@@ -330,6 +330,7 @@ program
   .option("--path <dir>", "Root directory")
   .option("--apply", "Apply deprecation (default: dry-run)")
   .option("--threshold <n>", "Similarity threshold (0-1, default: 0.8)", "0.8")
+  .option("--exclude-translations", "Exclude translation files (.po, .xlf) from comparison")
   .action(deprecationCheckCommand);
 
 program
