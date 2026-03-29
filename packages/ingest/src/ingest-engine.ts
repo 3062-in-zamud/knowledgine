@@ -85,6 +85,7 @@ export class IngestEngine {
         event.relatedPaths.every((p) => excludeMatcher(p))
       ) {
         skipped++;
+        event.metadata.skippedReason = "exclude-pattern";
         if (options?.verbose) {
           process.stderr.write(`  [skip] exclude-pattern match: ${event.sourceUri}\n`);
         }

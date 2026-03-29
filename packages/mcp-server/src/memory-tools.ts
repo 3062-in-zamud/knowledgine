@@ -187,8 +187,12 @@ export function registerMemoryTools(server: McpServer, provider: MemoryProvider)
       inputSchema: {},
     },
     async () => {
-      const caps = provider.capabilities();
-      return { content: [{ type: "text" as const, text: JSON.stringify(caps, null, 2) }] };
+      try {
+        const caps = provider.capabilities();
+        return { content: [{ type: "text" as const, text: JSON.stringify(caps, null, 2) }] };
+      } catch (error) {
+        return handleMemoryError(error);
+      }
     },
   );
 }

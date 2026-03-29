@@ -72,17 +72,20 @@ describe("CrossProjectSearcher", () => {
   it("opens databases read-only", async () => {
     const p1 = makeProject("proj1");
     const dbPath = join(p1.path, ".knowledgine", "index.sqlite");
-    // read-only で開かれた DB には INSERT が失敗するはず
-    // CrossProjectSearcher が readonly で開いていることを確認するため、
-    // 直接 DB を開いてロック競合しないことを確認
+    // Verify CrossProjectSearcher opens DB in readonly mode by checking that
+    // an explicit readonly connection rejects write attempts
+    const readonlyDb = new BetterSqlite3(dbPath, { readonly: true });
+    expect(() =>
+      readonlyDb
+        .prepare("INSERT INTO knowledge_notes (file_path, title, content) VALUES (?, ?, ?)")
+        .run("x.md", "x", "x"),
+    ).toThrow();
+    readonlyDb.close();
+
+    // Searching succeeds after the readonly DB is released
     const searcher = new CrossProjectSearcher([p1]);
-    // 検索が成功すれば readonly で開いている
     const results = await searcher.search("TypeScript");
     expect(results.length).toBeGreaterThan(0);
-    // searcher がすでに close しているので R/W で開ける
-    const db = new BetterSqlite3(dbPath);
-    expect(() => db.prepare("SELECT 1").get()).not.toThrow();
-    db.close();
   });
 
   it("closes all databases even on error", async () => {

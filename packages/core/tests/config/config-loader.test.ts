@@ -256,9 +256,12 @@ describe("RcConfig validation", () => {
   it("should fallback on invalid noise config (wrong type)", () => {
     const config = { semantic: true, noise: { shortMessageThreshold: "not-a-number" } };
     writeFileSync(join(testDir, ".knowledginerc.json"), JSON.stringify(config));
-    // Should not throw — falls back gracefully
+    // Should not throw — falls back gracefully with default values
     const loaded = loadConfig(testDir);
     expect(loaded.rootPath).toBe(testDir);
+    // semantic: true was valid even though noise was invalid — depends on implementation's fallback scope
+    // At minimum, rootPath must be correct
+    expect(typeof loaded.embedding.enabled).toBe("boolean");
   });
 
   it("should fallback on invalid observer config (wrong type)", () => {
@@ -281,6 +284,8 @@ describe("RcConfig validation", () => {
     const loaded = loadConfig(testDir);
     // Should not throw and should still return valid config
     expect(loaded.rootPath).toBe(testDir);
+    // semantic: true must have been applied despite unknown keys
+    expect(loaded.embedding.enabled).toBe(true);
   });
 });
 

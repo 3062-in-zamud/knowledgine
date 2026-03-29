@@ -219,8 +219,12 @@ main/examples is just a directory listing
     it("should not extract entities from shields.io badge image", () => {
       const entities = extractor.extract("![badge](https://img.shields.io/npm/v/pkg)");
       const names = entities.map((e) => e.name);
+      // Potential false-positive patterns that must not appear
       expect(names).not.toContain("shields/npm");
       expect(names).not.toContain("img/shields");
+      expect(names).not.toContain("npm/v");
+      expect(names).not.toContain("v/pkg");
+      expect(names).not.toContain("shields.io/npm");
     });
 
     it("should not extract user-attachments as org in plain text", () => {

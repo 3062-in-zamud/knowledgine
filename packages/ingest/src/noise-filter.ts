@@ -33,14 +33,31 @@ export interface NoiseFilterConfig {
 export class NoiseFilter {
   private shortMessageThreshold: number;
   private botAuthors: string[];
-  private noiseSubjectPatterns: string[] | undefined;
-  private excludePatterns: string[] | undefined;
+  private compiledExcludeMatcher: ((path: string) => boolean) | null;
+  private compiledSubjectRegexes: RegExp[];
 
   constructor(config?: NoiseFilterConfig) {
     this.shortMessageThreshold = config?.shortMessageThreshold ?? DEFAULT_SHORT_MESSAGE_THRESHOLD;
-    this.botAuthors = config?.botAuthors ?? DEFAULT_BOT_AUTHORS;
-    this.noiseSubjectPatterns = config?.noiseSubjectPatterns;
-    this.excludePatterns = config?.excludePatterns;
+    // Normalize to lowercase at construction time for case-insensitive comparison
+    this.botAuthors = (config?.botAuthors ?? DEFAULT_BOT_AUTHORS).map((a) => a.toLowerCase());
+
+    // Pre-compile exclude patterns
+    this.compiledExcludeMatcher =
+      config?.excludePatterns && config.excludePatterns.length > 0
+        ? picomatch(config.excludePatterns)
+        : null;
+
+    // Pre-compile subject regexes with error handling for invalid patterns
+    this.compiledSubjectRegexes = [];
+    if (config?.noiseSubjectPatterns && config.noiseSubjectPatterns.length > 0) {
+      for (const p of config.noiseSubjectPatterns) {
+        try {
+          this.compiledSubjectRegexes.push(new RegExp(p));
+        } catch {
+          // Skip invalid regex patterns silently
+        }
+      }
+    }
   }
 
   isI18nOnlyCommit(relatedPaths: string[]): boolean {
@@ -58,14 +75,15 @@ export class NoiseFilter {
   }
 
   classify(subject: string, author: string, changedPaths: string[]): NoiseLevel {
-    if (this.excludePatterns && this.excludePatterns.length > 0 && changedPaths.length > 0) {
-      const isMatch = picomatch(this.excludePatterns);
-      if (changedPaths.every((p) => isMatch(p))) return "noise";
+    if (this.compiledExcludeMatcher && changedPaths.length > 0) {
+      if (changedPaths.every((p) => this.compiledExcludeMatcher!(p))) return "noise";
     }
 
-    if (this.noiseSubjectPatterns && this.noiseSubjectPatterns.length > 0) {
-      const subjectRegexes = this.noiseSubjectPatterns.map((p) => new RegExp(p));
-      if (subjectRegexes.some((re) => re.test(subject))) return "noise";
+    if (
+      this.compiledSubjectRegexes.length > 0 &&
+      this.compiledSubjectRegexes.some((re) => re.test(subject))
+    ) {
+      return "noise";
     }
 
     if (this.isI18nOnlyCommit(changedPaths)) return "noise";

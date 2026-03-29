@@ -44,7 +44,7 @@ export function createRestApp(
 ): Hono {
   const app = new Hono();
 
-  // CORS: localhostのみ許可
+  // CORS: 全オリジンを許可（サーバーはデフォルトでlocalhostバインドのため）
   app.use("*", cors());
 
   // GET /health

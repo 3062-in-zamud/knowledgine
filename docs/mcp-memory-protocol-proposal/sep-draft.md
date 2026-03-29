@@ -371,17 +371,24 @@ MAY expose a supplementary `get_memory_capabilities` tool.
 When present, this tool takes no input parameters and returns a structured
 object describing all capabilities supported by the server:
 
-| Field             | Type       | Description                                          |
-| ----------------- | ---------- | ---------------------------------------------------- |
-| `versioning`      | `boolean`  | Whether immutable version chains are supported.      |
-| `semanticSearch`  | `boolean`  | Whether relevance-scored vector search is supported. |
-| `layerPromotion`  | `boolean`  | Whether automatic layer promotion is supported.      |
-| `temporalQuery`   | `boolean`  | Whether point-in-time recall (`asOf`) is supported.  |
-| `ttl`             | `boolean`  | Whether TTL-based expiration is supported.           |
-| `supportedLayers` | `string[]` | List of memory layer identifiers the server accepts. |
+| Field             | Type            | Description                                          |
+| ----------------- | --------------- | ---------------------------------------------------- |
+| `versioning`      | `boolean`       | Whether immutable version chains are supported.      |
+| `semanticSearch`  | `boolean`       | Whether relevance-scored vector search is supported. |
+| `layerPromotion`  | `boolean`       | Whether automatic layer promotion is supported.      |
+| `temporalQuery`   | `boolean`       | Whether point-in-time recall (`asOf`) is supported.  |
+| `ttl`             | `boolean`       | Whether TTL-based expiration is supported.           |
+| `supportedLayers` | `MemoryLayer[]` | List of memory layer identifiers the server accepts. |
 
 A reference TypeScript type for this response is `MemoryProviderCapabilities`
 in the `@knowledgine/mcp-memory-protocol` package.
+
+> **Note on naming conventions:** Capability identifiers in the capability
+> table above use `snake_case` (e.g., `semantic_search`, `layer_promotion`)
+> following MCP tool naming conventions. The `get_memory_capabilities` response
+> fields use `camelCase` (e.g., `semanticSearch`, `layerPromotion`) following
+> TypeScript/JSON API conventions. Implementations MUST map between these when
+> reporting capabilities.
 
 ---
 

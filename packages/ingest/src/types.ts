@@ -113,13 +113,8 @@ export interface IngestCursorData {
 
 export type SkipReason = "already_indexed" | "no_source_data" | "all_filtered";
 
-export interface ExtractionSummary {
-  processedNotes: number;
-  totalEntities: number;
-  totalRelations: number;
-  totalPatterns: number;
-  errors: number;
-}
+export type { ExtractionSummary } from "@knowledgine/core";
+import type { ExtractionSummary } from "@knowledgine/core";
 
 export interface IngestSummary {
   pluginId: string;
