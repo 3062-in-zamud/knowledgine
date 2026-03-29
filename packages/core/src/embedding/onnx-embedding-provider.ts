@@ -1,14 +1,13 @@
 import type { InferenceSession, Tensor } from "onnxruntime-node";
 import type { EmbeddingProvider } from "./embedding-provider.js";
-import { WordPieceTokenizer } from "./tokenizer.js";
-import { ModelManager, DEFAULT_MODEL_NAME } from "./model-manager.js";
+import type { Tokenizer } from "./tokenizer-factory.js";
+import { createTokenizer } from "./tokenizer-factory.js";
+import { ModelManager, DEFAULT_MODEL_NAME, MODEL_REGISTRY } from "./model-manager.js";
 import { EmbeddingNotAvailableError, EmbeddingError } from "../errors.js";
-
-const DIMENSIONS = 384;
 
 export class OnnxEmbeddingProvider implements EmbeddingProvider {
   private session: InferenceSession | null = null;
-  private tokenizer: WordPieceTokenizer | null = null;
+  private tokenizer: Tokenizer | null = null;
   private modelName: string;
   private modelManager: ModelManager;
   private ort: typeof import("onnxruntime-node") | null = null;
@@ -16,6 +15,14 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
   constructor(modelName: string = DEFAULT_MODEL_NAME, modelManager?: ModelManager) {
     this.modelName = modelName;
     this.modelManager = modelManager ?? new ModelManager();
+  }
+
+  private get modelFamily(): "bert" | "e5" {
+    return MODEL_REGISTRY[this.modelName]?.family ?? "bert";
+  }
+
+  private get dimensions(): number {
+    return MODEL_REGISTRY[this.modelName]?.dimensions ?? 384;
   }
 
   private async getSession(): Promise<InferenceSession> {
@@ -44,23 +51,43 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
     }
   }
 
-  private getTokenizer(): WordPieceTokenizer {
+  private getTokenizer(): Tokenizer {
     if (this.tokenizer) return this.tokenizer;
     if (!this.modelManager.isModelAvailable(this.modelName)) {
       throw new EmbeddingNotAvailableError(
         `Model "${this.modelName}" not found. Run 'knowledgine init' to download the model automatically.`,
       );
     }
-    this.tokenizer = new WordPieceTokenizer(this.modelManager.getTokenizerPath(this.modelName));
+    const config = MODEL_REGISTRY[this.modelName];
+    const maxLength = config?.maxLength;
+    this.tokenizer = createTokenizer(this.modelManager.getTokenizerPath(this.modelName), maxLength);
     return this.tokenizer;
   }
 
+  /**
+   * Embed a document/passage text.
+   * For E5 models, prepends "passage: " prefix.
+   */
   async embed(text: string): Promise<Float32Array> {
     const [result] = await this.embedBatch([text]);
     return result;
   }
 
+  /**
+   * Embed a query text for semantic search.
+   * For E5 models, prepends "query: " prefix.
+   * For BERT models, delegates to embed().
+   */
+  async embedQuery(text: string): Promise<Float32Array> {
+    if (this.modelFamily === "e5") {
+      return this.runInference(`query: ${text}`);
+    }
+    return this.embed(text);
+  }
+
   async embedBatch(texts: string[]): Promise<Float32Array[]> {
+    if (texts.length === 0) return [];
+
     const session = await this.getSession();
     const tokenizer = this.getTokenizer();
 
@@ -72,8 +99,11 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
       const results: Float32Array[] = [];
 
       for (const text of texts) {
-        const encoded = tokenizer.encode(text);
+        // For E5 models, prepend "passage: " prefix for documents
+        const processedText = this.modelFamily === "e5" ? `passage: ${text}` : text;
+        const encoded = tokenizer.encode(processedText);
         const seqLen = encoded.inputIds.length;
+        const dims = this.dimensions;
 
         const inputIds = new ort.Tensor("int64", BigInt64Array.from(encoded.inputIds.map(BigInt)), [
           1,
@@ -101,7 +131,7 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
         const outputKey = Object.keys(output)[0];
         const lastHiddenState = output["last_hidden_state"] ?? output[outputKey];
         const data = lastHiddenState.data as Float32Array;
-        const embedding = this.meanPool(data, encoded.attentionMask, seqLen, DIMENSIONS);
+        const embedding = this.meanPool(data, encoded.attentionMask, seqLen, dims);
         results.push(this.normalize(embedding));
       }
 
@@ -117,8 +147,62 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
     }
   }
 
+  /**
+   * Run inference on a single pre-processed text (already includes any prefix).
+   */
+  private async runInference(text: string): Promise<Float32Array> {
+    const session = await this.getSession();
+    const tokenizer = this.getTokenizer();
+
+    try {
+      if (!this.ort) {
+        this.ort = await import("onnxruntime-node");
+      }
+      const ort = this.ort;
+      const encoded = tokenizer.encode(text);
+      const seqLen = encoded.inputIds.length;
+      const dims = this.dimensions;
+
+      const inputIds = new ort.Tensor("int64", BigInt64Array.from(encoded.inputIds.map(BigInt)), [
+        1,
+        seqLen,
+      ]);
+      const attentionMask = new ort.Tensor(
+        "int64",
+        BigInt64Array.from(encoded.attentionMask.map(BigInt)),
+        [1, seqLen],
+      );
+      const tokenTypeIds = new ort.Tensor(
+        "int64",
+        BigInt64Array.from(encoded.tokenTypeIds.map(BigInt)),
+        [1, seqLen],
+      );
+
+      const feeds: Record<string, Tensor> = {
+        input_ids: inputIds,
+        attention_mask: attentionMask,
+        token_type_ids: tokenTypeIds,
+      };
+      const output = await session.run(feeds);
+
+      const outputKey = Object.keys(output)[0];
+      const lastHiddenState = output["last_hidden_state"] ?? output[outputKey];
+      const data = lastHiddenState.data as Float32Array;
+      const embedding = this.meanPool(data, encoded.attentionMask, seqLen, dims);
+      return this.normalize(embedding);
+    } catch (error) {
+      if (error instanceof EmbeddingNotAvailableError || error instanceof EmbeddingError) {
+        throw error;
+      }
+      throw new EmbeddingError(
+        "ONNX inference failed",
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+  }
+
   getDimensions(): number {
-    return DIMENSIONS;
+    return this.dimensions;
   }
 
   async close(): Promise<void> {

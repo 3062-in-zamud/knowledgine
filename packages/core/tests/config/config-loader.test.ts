@@ -26,7 +26,7 @@ describe("loadConfig", () => {
   it("should return defaults when no RC file exists", () => {
     const config = loadConfig(testDir);
     expect(config.embedding.enabled).toBe(false);
-    expect(config.embedding.modelName).toBe("all-MiniLM-L6-v2");
+    expect(config.embedding.modelName).toBe("multilingual-e5-small");
     expect(config.embedding.dimensions).toBe(384);
     expect(config.rootPath).toBe(testDir);
   });

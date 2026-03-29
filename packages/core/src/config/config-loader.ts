@@ -5,6 +5,7 @@ import { z } from "zod";
 import { defineConfig } from "../config.js";
 import type { KnowledgineConfig } from "../config.js";
 import { writeTextFileAtomically } from "../utils/atomic-write.js";
+import { DEFAULT_MODEL_NAME, MODEL_REGISTRY } from "../embedding/model-manager.js";
 
 export interface RcConfig {
   semantic?: boolean;
@@ -90,11 +91,12 @@ export function loadConfig(rootPath: string): KnowledgineConfig {
   const semanticEnabled =
     envSemantic === "true" || envSemantic === "1" || rcConfig?.semantic === true;
 
+  const modelConfig = MODEL_REGISTRY[DEFAULT_MODEL_NAME];
   return defineConfig({
     rootPath,
     embedding: {
-      modelName: "all-MiniLM-L6-v2",
-      dimensions: 384,
+      modelName: DEFAULT_MODEL_NAME,
+      dimensions: modelConfig?.dimensions ?? 384,
       enabled: semanticEnabled,
     },
   });

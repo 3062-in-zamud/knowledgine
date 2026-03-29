@@ -1026,6 +1026,49 @@ export class KnowledgeRepository {
     return results;
   }
 
+  /**
+   * 現在 note_embeddings テーブルに存在するモデル名を取得する。
+   * 混合モデル検出に使用する。
+   */
+  getExistingEmbeddingModelNames(): string[] {
+    const rows = this.stmt(
+      "SELECT DISTINCT model_name FROM note_embeddings WHERE model_name IS NOT NULL",
+    )
+      .pluck()
+      .all() as string[];
+    return rows;
+  }
+
+  /**
+   * 既存の埋め込みが指定モデル名と一致するか検証する。
+   * 異なるモデルの埋め込みが混在する場合は consistent: false を返す。
+   */
+  checkEmbeddingModelConsistency(currentModelName: string): {
+    consistent: boolean;
+    existingModels: string[];
+  } {
+    const existingModels = this.getExistingEmbeddingModelNames();
+    if (existingModels.length === 0) {
+      return { consistent: true, existingModels: [] };
+    }
+    const consistent = existingModels.every((m) => m === currentModelName);
+    return { consistent, existingModels };
+  }
+
+  /**
+   * すべての埋め込みを削除する（reindex 用）
+   */
+  deleteAllEmbeddings(): number {
+    const info = this.db.prepare("DELETE FROM note_embeddings").run();
+    // vec0 テーブルも削除（存在する場合）
+    try {
+      this.db.prepare("DELETE FROM note_embeddings_vec").run();
+    } catch {
+      // vec0 テーブルが存在しない場合は無視
+    }
+    return info.changes;
+  }
+
   close(): void {
     this._stmtCache.clear();
     this.db.close();

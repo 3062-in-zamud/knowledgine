@@ -129,12 +129,17 @@ program
   .command("upgrade")
   .description("Upgrade knowledgine capabilities")
   .option("--semantic", "Enable semantic search (download model + generate embeddings)")
+  .option(
+    "--reindex",
+    "Delete and regenerate all embeddings (use after switching embedding models)",
+  )
   .option("--path <dir>", "Root directory")
   .addHelpText(
     "after",
     `
-Example:
-  knowledgine upgrade --semantic --path ~/notes`,
+Examples:
+  knowledgine upgrade --semantic --path ~/notes
+  knowledgine upgrade --reindex`,
   )
   .action(upgradeCommand);
 

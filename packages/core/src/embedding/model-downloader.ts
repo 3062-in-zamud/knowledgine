@@ -1,6 +1,6 @@
 /**
  * Embedding model downloader.
- * Downloads all-MiniLM-L6-v2 ONNX model files from HuggingFace.
+ * Downloads ONNX model files from HuggingFace.
  *
  * Features:
  * - Atomic download (.tmp + rename)
@@ -15,6 +15,7 @@ import { mkdirSync, renameSync, unlinkSync, existsSync, statSync, createWriteStr
 import { get as httpsGet } from "https";
 import { get as httpGet } from "http";
 import { pipeline } from "stream/promises";
+import { MODEL_REGISTRY, DEFAULT_MODEL_NAME } from "./model-manager.js";
 import type { ModelManager } from "./model-manager.js";
 
 export interface DownloadProgress {
@@ -35,36 +36,31 @@ export interface ModelFile {
   dest: string;
 }
 
-const HF_BASE = "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main";
-
 /**
- * Select the best quantized ONNX model for the current platform.
- * HuggingFace removed the generic `model_quantized.onnx` and now ships
- * architecture-specific variants.
+ * Get the list of files to download for a given model.
  */
-function selectOnnxModel(): string {
-  const arch = process.arch; // "arm64" | "x64" | ...
-  if (arch === "arm64") {
-    return `${HF_BASE}/onnx/model_qint8_arm64.onnx`;
-  }
-  // x64: prefer AVX2 quantized (widely supported on modern x86_64)
-  return `${HF_BASE}/onnx/model_quint8_avx2.onnx`;
+export function getModelFiles(modelName: string): ModelFile[] {
+  const config = MODEL_REGISTRY[modelName];
+  if (!config) throw new Error(`Unknown model: ${modelName}`);
+
+  const hfBase = `https://huggingface.co/${config.hfRepo}/resolve/main`;
+
+  const files: ModelFile[] = [
+    { url: `${hfBase}/tokenizer.json`, dest: "tokenizer.json" },
+    { url: `${hfBase}/config.json`, dest: "config.json" },
+  ];
+
+  const onnxPath = typeof config.onnxPath === "function" ? config.onnxPath() : config.onnxPath;
+  files.push({ url: `${hfBase}/${onnxPath}`, dest: "model.onnx" });
+
+  return files;
 }
 
-export const MODEL_FILES: ModelFile[] = [
-  {
-    url: `${HF_BASE}/tokenizer.json`,
-    dest: "tokenizer.json",
-  },
-  {
-    url: `${HF_BASE}/config.json`,
-    dest: "config.json",
-  },
-  {
-    url: selectOnnxModel(),
-    dest: "model.onnx",
-  },
-];
+/**
+ * MODEL_FILES for the default model (backward compatibility).
+ * @deprecated Use getModelFiles(modelName) instead.
+ */
+export const MODEL_FILES: ModelFile[] = getModelFiles(DEFAULT_MODEL_NAME);
 
 function isExistingAndValid(filePath: string): boolean {
   if (!existsSync(filePath)) return false;
@@ -195,14 +191,16 @@ function downloadFile(
 export async function downloadModel(
   modelManager: ModelManager,
   options: DownloadOptions = {},
+  modelName: string = DEFAULT_MODEL_NAME,
 ): Promise<{ downloaded: string[]; skipped: string[] }> {
-  const modelDir = modelManager.getModelDir();
+  const modelDir = modelManager.getModelDir(modelName);
   mkdirSync(modelDir, { recursive: true });
 
+  const files = getModelFiles(modelName);
   const downloaded: string[] = [];
   const skipped: string[] = [];
 
-  for (const file of MODEL_FILES) {
+  for (const file of files) {
     const destPath = `${modelDir}/${file.dest}`;
 
     if (isExistingAndValid(destPath)) {
