@@ -65,7 +65,7 @@ export {
 export type { RcConfig } from "./config/config-loader.js";
 
 // Storage
-export { createDatabase, loadSqliteVecExtension } from "./storage/database.js";
+export { createDatabase, loadSqliteVecExtension, closeDatabase } from "./storage/database.js";
 export { KnowledgeRepository } from "./storage/knowledge-repository.js";
 export type {
   KnowledgeNote,

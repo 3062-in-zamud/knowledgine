@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdirSync, existsSync, chmodSync } from "fs";
+import { mkdirSync, existsSync, chmodSync, statSync, unlinkSync } from "fs";
 import { dirname, join } from "path";
 import { DatabaseError } from "../errors.js";
 
@@ -74,6 +74,23 @@ export function createDatabase(
     }
   }
 
+  // Verify DB was created successfully (not a 0-byte file)
+  if (dbPath !== ":memory:") {
+    try {
+      const stat = statSync(dbPath);
+      if (stat.size === 0) {
+        db.close();
+        unlinkSync(dbPath);
+        throw new DatabaseError("initialization - Database file is empty (0 bytes)", undefined, {
+          dbPath,
+        });
+      }
+    } catch (error) {
+      if (error instanceof DatabaseError) throw error;
+      // statSync failed — non-fatal
+    }
+  }
+
   // Load sqlite-vec if requested
   let vec0Loaded = false;
   if (options.enableVec === true) {
@@ -121,4 +138,17 @@ export async function loadSqliteVecExtension(db: Database.Database): Promise<boo
     // sqlite-vec not available — vector search will be unavailable
     return false;
   }
+}
+
+/**
+ * Safely close a database with WAL checkpoint.
+ * Ensures all WAL data is written to the main database file before closing.
+ */
+export function closeDatabase(db: Database.Database): void {
+  try {
+    db.pragma("wal_checkpoint(TRUNCATE)");
+  } catch {
+    // Checkpoint may fail if DB is read-only or corrupted — non-fatal
+  }
+  db.close();
 }
