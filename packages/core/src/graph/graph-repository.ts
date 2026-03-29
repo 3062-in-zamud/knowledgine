@@ -179,12 +179,23 @@ export class GraphRepository {
 
   /**
    * FTS5 trigram検索。3文字未満はLIKEフォールバック。
+   * includeUnknown: falseの場合、entity_type='unknown'を除外する（デフォルト）
    */
-  searchEntities(query: string, limit = 20): Array<Entity & { id: number }> {
+  searchEntities(
+    query: string,
+    limit = 20,
+    options: { includeUnknown?: boolean } = {},
+  ): Array<Entity & { id: number }> {
+    const { includeUnknown = false } = options;
+    const unknownFilter = includeUnknown ? "" : "AND e.entity_type != 'unknown'";
+    const unknownFilterLike = includeUnknown ? "" : "AND entity_type != 'unknown'";
+
     if (query.length < 3) {
       // LIKE fallback for short queries
       const rows = this.db
-        .prepare(`SELECT * FROM entities WHERE name LIKE ? OR description LIKE ? LIMIT ?`)
+        .prepare(
+          `SELECT * FROM entities WHERE (name LIKE ? OR description LIKE ?) ${unknownFilterLike} LIMIT ?`,
+        )
         .all(`%${query}%`, `%${query}%`, limit) as EntityRow[];
       return rows.map(rowToEntity);
     }
@@ -195,6 +206,7 @@ export class GraphRepository {
           SELECT e.* FROM entities e
           JOIN entities_fts fts ON e.id = fts.rowid
           WHERE entities_fts MATCH ?
+          ${unknownFilter}
           ORDER BY rank
           LIMIT ?
         `,
@@ -204,7 +216,9 @@ export class GraphRepository {
     } catch {
       // FTS失敗時はLIKEフォールバック
       const rows = this.db
-        .prepare(`SELECT * FROM entities WHERE name LIKE ? OR description LIKE ? LIMIT ?`)
+        .prepare(
+          `SELECT * FROM entities WHERE (name LIKE ? OR description LIKE ?) ${unknownFilterLike} LIMIT ?`,
+        )
         .all(`%${query}%`, `%${query}%`, limit) as EntityRow[];
       return rows.map(rowToEntity);
     }

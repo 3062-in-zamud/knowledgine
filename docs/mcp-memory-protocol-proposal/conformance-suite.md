@@ -74,37 +74,36 @@ npm >= 9
 npm install --save-dev @knowledgine/mcp-memory-protocol
 ```
 
-### Write an adapter
+### Create a test context
 
-The conformance suite communicates with your server through a simple adapter
-interface:
+The conformance suite communicates with your server through an MCP `Client`
+instance:
 
 ```typescript
-import type { ConformanceAdapter } from "@knowledgine/mcp-memory-protocol/conformance";
+import type { ConformanceTestContext } from "@knowledgine/mcp-memory-protocol";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
-const adapter: ConformanceAdapter = {
-  async callTool(name: string, input: unknown): Promise<unknown> {
-    // Call your MCP server's tools/call endpoint and return the result.
-    // For an in-process server, call the handler directly.
-    // For a remote server, use the MCP client SDK.
-    return myMcpClient.callTool(name, input);
-  },
-};
+// Connect your MCP client to the server under test
+const client = new Client({ name: "conformance", version: "1.0.0" });
+// ... connect transport ...
+
+const ctx: ConformanceTestContext = { client };
 ```
 
 ### Run
 
 ```typescript
-import { runConformanceSuite } from "@knowledgine/mcp-memory-protocol/conformance";
+import { runConformanceSuite } from "@knowledgine/mcp-memory-protocol";
 
-const results = await runConformanceSuite(adapter, {
-  // Declare which optional capabilities your server supports.
-  // Only tests for declared capabilities are run.
-  capabilities: ["versioning", "temporal_query"],
+const results = await runConformanceSuite(ctx, {
+  // Set to true to run optional versioning tests
+  includeVersioning: true,
+  // Set to true to run get_memory_capabilities tests
+  includeCapabilities: true,
 });
 
-console.log(results.summary());
-// Passed: 28/28 (required: 15/15, versioning: 8/8, temporal_query: 5/5)
+const passed = results.filter((r) => r.passed).length;
+console.log(`Passed: ${passed}/${results.length}`);
 ```
 
 ### Exit code
@@ -113,7 +112,7 @@ console.log(results.summary());
 inspect results programmatically. To fail a CI build on any test failure:
 
 ```typescript
-if (!results.passed) {
+if (results.some((r) => !r.passed)) {
   process.exit(1);
 }
 ```

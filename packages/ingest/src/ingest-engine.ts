@@ -1,10 +1,12 @@
 import type Database from "better-sqlite3";
-import type { KnowledgeRepository } from "@knowledgine/core";
-import type { IngestSummary, NormalizedEvent, SkipReason } from "./types.js";
+import type { KnowledgeRepository, GraphRepository } from "@knowledgine/core";
+import { IncrementalExtractor } from "@knowledgine/core";
+import type { IngestSummary, ExtractionSummary, NormalizedEvent, SkipReason } from "./types.js";
 import type { PluginRegistry } from "./plugin-registry.js";
 import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
 import { getHeapUsageRatio, getAdaptiveBatchSize } from "./heap-monitor.js";
+import picomatch from "picomatch";
 
 const DEFAULT_BATCH_SIZE = 50;
 
@@ -19,6 +21,7 @@ export class IngestEngine {
     private registry: PluginRegistry,
     private db: Database.Database,
     private repository: KnowledgeRepository,
+    private graphRepository?: GraphRepository,
   ) {
     this.cursorStore = new CursorStore(db);
     this.eventWriter = new EventWriter(db, repository);
@@ -32,6 +35,8 @@ export class IngestEngine {
       pluginConfig?: Record<string, unknown>;
       verbose?: boolean;
       quiet?: boolean;
+      excludePatterns?: string[];
+      postProcessExtraction?: boolean;
     },
   ): Promise<IngestSummary> {
     const start = Date.now();
@@ -61,12 +66,32 @@ export class IngestEngine {
       ? plugin.ingestIncremental(sourcePath, cursor.checkpoint)
       : plugin.ingestAll(sourcePath);
 
+    const excludeMatcher =
+      options?.excludePatterns && options.excludePatterns.length > 0
+        ? picomatch(options.excludePatterns)
+        : null;
+
     const processedPaths = new Set<string>();
     let batch: NormalizedEvent[] = [];
     let heapWarned = false;
     let totalEventsFromGenerator = 0;
     for await (const event of generator) {
       totalEventsFromGenerator++;
+
+      if (
+        excludeMatcher &&
+        event.relatedPaths &&
+        event.relatedPaths.length > 0 &&
+        event.relatedPaths.every((p) => excludeMatcher(p))
+      ) {
+        skipped++;
+        event.metadata.skippedReason = "exclude-pattern";
+        if (options?.verbose) {
+          process.stderr.write(`  [skip] exclude-pattern match: ${event.sourceUri}\n`);
+        }
+        continue;
+      }
+
       if (!event.content || event.content.trim() === "") {
         skipped++;
         if (options?.verbose) {
@@ -142,6 +167,12 @@ export class IngestEngine {
       }
     }
 
+    let extractionSummary: ExtractionSummary | undefined;
+    if (this.graphRepository && options?.postProcessExtraction !== false && allNoteIds.length > 0) {
+      const extractor = new IncrementalExtractor(this.repository, this.graphRepository);
+      extractionSummary = await extractor.process(allNoteIds);
+    }
+
     return {
       pluginId,
       processed,
@@ -152,6 +183,7 @@ export class IngestEngine {
       ...(skipReason ? { skipReason } : {}),
       elapsedMs: Date.now() - start,
       noteIds: allNoteIds,
+      ...(extractionSummary ? { extractionSummary } : {}),
     };
   }
 

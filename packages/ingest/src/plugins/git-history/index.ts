@@ -15,7 +15,8 @@ import {
   validateCheckpoint,
   getGitLogFormat,
 } from "./git-parser.js";
-import { classifyNoiseLevel } from "../../noise-filter.js";
+import { NoiseFilter } from "../../noise-filter.js";
+import type { NoiseFilterConfig } from "../../noise-filter.js";
 
 export class GitHistoryPlugin implements IngestPlugin {
   readonly manifest: PluginManifest = {
@@ -34,6 +35,7 @@ export class GitHistoryPlugin implements IngestPlugin {
   private limit: number = 100;
   private since?: string;
   private unlimited: boolean = false;
+  private noiseFilter: NoiseFilter = new NoiseFilter();
 
   async initialize(config?: PluginConfig): Promise<PluginInitResult> {
     try {
@@ -48,6 +50,27 @@ export class GitHistoryPlugin implements IngestPlugin {
         }
         if (typeof config.since === "string") this.since = config.since;
         if (config.unlimited === true) this.unlimited = true;
+
+        if (config.noise && typeof config.noise === "object" && !Array.isArray(config.noise)) {
+          const noiseConfig = config.noise as NoiseFilterConfig;
+          // Type-check array fields before passing to NoiseFilter
+          if (noiseConfig.botAuthors !== undefined && !Array.isArray(noiseConfig.botAuthors)) {
+            return { ok: false, error: "Invalid noise.botAuthors: must be an array" };
+          }
+          if (
+            noiseConfig.noiseSubjectPatterns !== undefined &&
+            !Array.isArray(noiseConfig.noiseSubjectPatterns)
+          ) {
+            return { ok: false, error: "Invalid noise.noiseSubjectPatterns: must be an array" };
+          }
+          if (
+            noiseConfig.excludePatterns !== undefined &&
+            !Array.isArray(noiseConfig.excludePatterns)
+          ) {
+            return { ok: false, error: "Invalid noise.excludePatterns: must be an array" };
+          }
+          this.noiseFilter = new NoiseFilter(noiseConfig);
+        }
       }
 
       return { ok: true };
@@ -104,7 +127,7 @@ export class GitHistoryPlugin implements IngestPlugin {
         event.metadata.skippedReason = "large_diff";
       }
 
-      const noiseLevel = classifyNoiseLevel(
+      const noiseLevel = this.noiseFilter.classify(
         commit.subject,
         commit.authorName,
         event.relatedPaths ?? [],
@@ -157,7 +180,7 @@ export class GitHistoryPlugin implements IngestPlugin {
         event.metadata.skippedReason = "large_diff";
       }
 
-      const noiseLevel = classifyNoiseLevel(
+      const noiseLevel = this.noiseFilter.classify(
         commit.subject,
         commit.authorName,
         event.relatedPaths ?? [],

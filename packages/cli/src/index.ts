@@ -98,12 +98,15 @@ program
   .option("--write", "Write configuration to file (default: dry-run)")
   .option("--rules", "Configure agent rules (instruction files)")
   .option("--skills", "Install agent skill packages (SKILL.md)")
+  .option("--lang <locale>", "Language for skills: en or ja (default: en)")
+  .option("--scope <scope>", "Configuration scope: global or project (default: global)")
   .addHelpText(
     "after",
     `
 Examples:
   knowledgine setup                                        Interactive 3-step setup
   knowledgine setup --target cursor --path ~/notes --write MCP config
+  knowledgine setup --target claude-code --scope project --write  Project MCP config
   knowledgine setup --rules --target cursor --write        Agent rules
   knowledgine setup --skills --target cursor --write       Agent skills`,
   )
@@ -148,6 +151,11 @@ program
   .option("--force", "Force full re-ingest (alias for --full)")
   .option("--verbose", "Show details of skipped items")
   .option("--quiet", "Suppress progress output (for CI)")
+  .option("--exclude-pattern <patterns...>", "Glob patterns to exclude from ingestion")
+  .option("--skip-extraction", "Skip entity extraction after ingest")
+  .option("--observe", "Run Observer/Reflector agents after ingestion")
+  .option("--no-observe", "Skip Observer/Reflector agents")
+  .option("--observe-limit <n>", "Max notes to process with Observer", parseInt)
   .addHelpText(
     "after",
     `
@@ -160,12 +168,19 @@ Examples:
   knowledgine ingest --source git-history --limit 500 --path ~/notes
   knowledgine ingest --source git-history --since 2025-01-01 --path ~/notes
   knowledgine ingest --source git-history --unlimited --path ~/notes
+  knowledgine ingest --source git-history --exclude-pattern "**/vendor/**" --path ~/notes
+  knowledgine ingest --source markdown --observe --path ~/notes
+  knowledgine ingest --source markdown --observe --observe-limit 20 --path ~/notes
 
 Source-specific options:
   --source github --repo owner/repo  Ingest GitHub PRs and issues (requires GITHUB_TOKEN env var)
   --limit <n>                        Limit number of commits (git-history, default: 100)
   --since <date>                     Filter commits by date (git-history)
-  --unlimited                        Disable default commit limit (git-history)`,
+  --unlimited                        Disable default commit limit (git-history)
+  --exclude-pattern <patterns...>    Glob patterns to exclude (e.g., "**/vendor/**")
+  --observe                          Run Observer/Reflector agents after ingestion
+  --no-observe                       Skip Observer/Reflector agents (overrides rc config)
+  --observe-limit <n>                Max notes for Observer (default: 50)`,
   )
   .action(ingestCommand);
 
@@ -232,6 +247,7 @@ program
   )
   .option("--agentic", "Include deprecated notes in search results (agentic mode)")
   .option("--include-deprecated", "Include deprecated notes in search results")
+  .option("--projects <names>", "Search across projects (comma-separated project names)")
   .action(
     (
       query: string,
@@ -246,6 +262,7 @@ program
         fallback?: boolean;
         agentic?: boolean;
         includeDeprecated?: boolean;
+        projects?: string;
       },
     ) => {
       return searchCommand(query, {
@@ -259,6 +276,7 @@ program
         fallback: opts.fallback,
         agentic: opts.agentic,
         includeDeprecated: opts.includeDeprecated,
+        projects: opts.projects,
       });
     },
   );

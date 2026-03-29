@@ -1,3 +1,5 @@
+import picomatch from "picomatch";
+
 /** Patterns that indicate i18n/l10n file paths */
 const I18N_PATH_PATTERNS = [
   /^(.*\/)?locales?\//i,
@@ -15,25 +17,96 @@ const DEPENDABOT_SUBJECT_PATTERNS = [
   /^bump\s+\S+\s+from\s+/i,
 ];
 
-/** Known bot authors */
-const BOT_AUTHORS = ["dependabot[bot]", "renovate[bot]"];
+const DEFAULT_BOT_AUTHORS = ["dependabot[bot]", "renovate[bot]"];
 
-const SHORT_MESSAGE_THRESHOLD = 10;
+const DEFAULT_SHORT_MESSAGE_THRESHOLD = 10;
+
+export type NoiseLevel = "noise" | "low-value" | "normal";
+
+export interface NoiseFilterConfig {
+  shortMessageThreshold?: number;
+  botAuthors?: string[];
+  noiseSubjectPatterns?: string[];
+  excludePatterns?: string[];
+}
+
+export class NoiseFilter {
+  private shortMessageThreshold: number;
+  private botAuthors: string[];
+  private compiledExcludeMatcher: ((path: string) => boolean) | null;
+  private compiledSubjectRegexes: RegExp[];
+
+  constructor(config?: NoiseFilterConfig) {
+    this.shortMessageThreshold = config?.shortMessageThreshold ?? DEFAULT_SHORT_MESSAGE_THRESHOLD;
+    // Normalize to lowercase at construction time for case-insensitive comparison
+    this.botAuthors = (config?.botAuthors ?? DEFAULT_BOT_AUTHORS).map((a) => a.toLowerCase());
+
+    // Pre-compile exclude patterns
+    this.compiledExcludeMatcher =
+      config?.excludePatterns && config.excludePatterns.length > 0
+        ? picomatch(config.excludePatterns)
+        : null;
+
+    // Pre-compile subject regexes with error handling for invalid patterns
+    this.compiledSubjectRegexes = [];
+    if (config?.noiseSubjectPatterns && config.noiseSubjectPatterns.length > 0) {
+      for (const p of config.noiseSubjectPatterns) {
+        try {
+          this.compiledSubjectRegexes.push(new RegExp(p));
+        } catch {
+          // Skip invalid regex patterns silently
+        }
+      }
+    }
+  }
+
+  isI18nOnlyCommit(relatedPaths: string[]): boolean {
+    if (relatedPaths.length === 0) return false;
+    return relatedPaths.every((p) => I18N_PATH_PATTERNS.some((re) => re.test(p)));
+  }
+
+  isDependabotCommit(subject: string, author?: string): boolean {
+    if (author && this.botAuthors.includes(author.toLowerCase())) return true;
+    return DEPENDABOT_SUBJECT_PATTERNS.some((re) => re.test(subject));
+  }
+
+  isShortCommitMessage(subject: string): boolean {
+    return subject.trim().length < this.shortMessageThreshold;
+  }
+
+  classify(subject: string, author: string, changedPaths: string[]): NoiseLevel {
+    if (this.compiledExcludeMatcher && changedPaths.length > 0) {
+      if (changedPaths.every((p) => this.compiledExcludeMatcher!(p))) return "noise";
+    }
+
+    if (
+      this.compiledSubjectRegexes.length > 0 &&
+      this.compiledSubjectRegexes.some((re) => re.test(subject))
+    ) {
+      return "noise";
+    }
+
+    if (this.isI18nOnlyCommit(changedPaths)) return "noise";
+    if (this.isDependabotCommit(subject, author)) return "low-value";
+    if (this.isShortCommitMessage(subject)) return "low-value";
+    return "normal";
+  }
+}
+
+const defaultFilter = new NoiseFilter();
 
 /**
  * Returns true if all changed paths are i18n/l10n files.
  */
 export function isI18nOnlyCommit(relatedPaths: string[]): boolean {
-  if (relatedPaths.length === 0) return false;
-  return relatedPaths.every((p) => I18N_PATH_PATTERNS.some((re) => re.test(p)));
+  return defaultFilter.isI18nOnlyCommit(relatedPaths);
 }
 
 /**
  * Returns true if the commit subject or author matches Dependabot/Renovate patterns.
  */
 export function isDependabotCommit(subject: string, author?: string): boolean {
-  if (author && BOT_AUTHORS.includes(author.toLowerCase())) return true;
-  return DEPENDABOT_SUBJECT_PATTERNS.some((re) => re.test(subject));
+  return defaultFilter.isDependabotCommit(subject, author);
 }
 
 /**
@@ -41,12 +114,10 @@ export function isDependabotCommit(subject: string, author?: string): boolean {
  */
 export function isShortCommitMessage(
   subject: string,
-  threshold = SHORT_MESSAGE_THRESHOLD,
+  threshold = DEFAULT_SHORT_MESSAGE_THRESHOLD,
 ): boolean {
   return subject.trim().length < threshold;
 }
-
-export type NoiseLevel = "noise" | "low-value" | "normal";
 
 /**
  * Classify a commit's noise level based on its characteristics.
@@ -59,8 +130,5 @@ export function classifyNoiseLevel(
   author: string,
   relatedPaths: string[],
 ): NoiseLevel {
-  if (isI18nOnlyCommit(relatedPaths)) return "noise";
-  if (isDependabotCommit(subject, author)) return "low-value";
-  if (isShortCommitMessage(subject)) return "low-value";
-  return "normal";
+  return defaultFilter.classify(subject, author, relatedPaths);
 }

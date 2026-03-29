@@ -1,6 +1,6 @@
 {
   "name": "@knowledgine/ingest",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Plugin-based knowledge ingestion engine for knowledgine. Supports Git history, GitHub, Obsidian, and Claude Sessions.",
   "keywords": [
     "knowledgine",
@@ -44,10 +44,12 @@
     "access": "public"
   },
   "dependencies": {
-    "@knowledgine/core": "workspace:*"
+    "@knowledgine/core": "workspace:*",
+    "picomatch": "^4.0.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.0.0",
+    "@types/picomatch": "^4.0.2",
     "better-sqlite3": "^11.0.0"
   }
 }

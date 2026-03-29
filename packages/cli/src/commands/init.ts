@@ -9,6 +9,7 @@ import {
   Migrator,
   KnowledgeRepository,
   GraphRepository,
+  IncrementalExtractor,
   ALL_MIGRATIONS,
   OnnxEmbeddingProvider,
   ModelManager,
@@ -17,7 +18,6 @@ import {
   VERSION,
 } from "@knowledgine/core";
 import { IngestEngine, PluginRegistry, MarkdownPlugin } from "@knowledgine/ingest";
-import { postIngestProcessing } from "../lib/entity-extractor.js";
 import { createProgress, createStepProgress, formatDuration } from "../lib/progress.js";
 import { copyDemoFixtures } from "../lib/demo-manager.js";
 import { getDemoNotesPath } from "./demo.js";
@@ -307,7 +307,9 @@ export async function initCommand(options: InitOptions): Promise<void> {
   stepProgress.completeStep("Indexing markdown files");
 
   // Entity extraction (post-ingest batch)
-  const postSummary = await postIngestProcessing(repository, graphRepository);
+  const extractor = new IncrementalExtractor(repository, graphRepository);
+  const allNoteIds = ingestSummary.noteIds ?? repository.getAllNoteIds();
+  const postSummary = await extractor.process(allNoteIds);
 
   // ---------------------------------------------------------------------------
   // Auto-detect semantic search capability (when not explicitly set)
@@ -495,16 +497,23 @@ export async function initCommand(options: InitOptions): Promise<void> {
   stepProgress.finish();
 
   // ---------------------------------------------------------------------------
-  // Write .knowledginerc.json only when explicitly requested (--save-config)
+  // Persist semantic: true when embeddings were generated (reflects DB state)
+  // Same pattern as upgrade --semantic (unconditional write)
+  // ---------------------------------------------------------------------------
+  if (enableSemantic && config.embedding.enabled) {
+    writeRcConfig(rootPath, { semantic: true });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Write defaultPath only when explicitly requested (--save-config + --path)
   // ---------------------------------------------------------------------------
   if (options.saveConfig) {
     const cwd = process.cwd();
     const resolvedRoot = resolve(rootPath);
-    if (resolvedRoot !== resolve(cwd)) {
+    // Only write defaultPath when --path was explicitly provided by user,
+    // preventing resolveDefaultPath inferred paths from being written back
+    if (options.path && resolvedRoot !== resolve(cwd)) {
       writeRcConfig(cwd, { defaultPath: resolvedRoot });
-    }
-    if (enableSemantic && config.embedding.enabled) {
-      writeRcConfig(rootPath, { semantic: true });
     }
   }
 

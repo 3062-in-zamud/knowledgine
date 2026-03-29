@@ -84,7 +84,8 @@ export type EntityType =
   | "concept"
   | "tool"
   | "organization"
-  | "event";
+  | "event"
+  | "unknown";
 
 export type RelationType =
   | "uses"

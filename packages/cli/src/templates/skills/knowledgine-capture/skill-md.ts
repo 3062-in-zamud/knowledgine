@@ -1,5 +1,7 @@
 export const SKILL_MD = `---
 name: knowledgine-capture
+version: "1.0.0"
+lang: en
 description: >
   Record knowledge to the local knowledge base after solving problems, making design
   decisions, or discovering reusable patterns. Invoke whenever you have just fixed a bug,
@@ -39,8 +41,8 @@ Use the \`capture_knowledge\` MCP tool:
 \`\`\`
 capture_knowledge(
   content: string,   // Full explanation: problem + solution + context
-  title: string,     // Short descriptive title (max ~80 chars)
-  tags: string[],    // 2–5 tags from the standard taxonomy
+  title?: string,    // Short descriptive title (max ~80 chars)
+  tags?: string[],   // 2–5 tags from the standard taxonomy
   source?: string    // Optional: URL, filename, or reference source
 )
 \`\`\`

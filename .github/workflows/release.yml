@@ -63,6 +63,12 @@ jobs:
           git tag -a "${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
           git push origin "${{ steps.version.outputs.version }}"
 
+      - name: Publish @knowledgine/mcp-memory-protocol
+        if: steps.tag_check.outputs.exists == 'false'
+        run: pnpm --filter @knowledgine/mcp-memory-protocol publish --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish @knowledgine/core
         if: steps.tag_check.outputs.exists == 'false'
         run: pnpm --filter @knowledgine/core publish --provenance --no-git-checks

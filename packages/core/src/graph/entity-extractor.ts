@@ -128,6 +128,8 @@ const TECH_DICTIONARY = new Map<string, EntityType>([
   ["nextjs", "technology"],
   ["nuxt", "technology"],
   // Tools
+  ["vscode", "tool"],
+  ["neovim", "tool"],
   ["webpack", "tool"],
   ["vite", "tool"],
   ["eslint", "tool"],
@@ -163,6 +165,10 @@ const NOT_PERSON_LIST = new Set([
   "builder",
   "parser",
   "compiler",
+  "linter",
+  "formatter",
+  "bundler",
+  "transpiler",
   "runtime",
   "kernel",
   "scheduler",
@@ -256,6 +262,8 @@ export class EntityExtractor {
     "issues",
     "pulls",
     "packages",
+    "user-attachments",
+    "badges",
   ]);
 
   constructor(rules?: ExtractionRules) {
@@ -529,7 +537,7 @@ export class EntityExtractor {
     const techType = TECH_DICTIONARY.get(name);
     if (techType) return { entityType: techType, sourceType: "mention" };
     if (NOT_PERSON_LIST.has(name)) return { entityType: "concept", sourceType: "mention" };
-    return { entityType: "person", sourceType: "mention" };
+    return { entityType: "unknown", sourceType: "mention" };
   }
 
   private extractOrgRepos(content: string): ExtractedEntity[] {
@@ -559,8 +567,12 @@ export class EntityExtractor {
    * URL path fragments from being matched as org/repo.
    */
   private stripUrls(content: string): string {
+    // Strip Markdown image links first to prevent URL path fragments from matching
+    // Length-bounded quantifiers prevent ReDoS on malicious input
+    let result = content.replace(/!\[[^\]]{0,1000}\]\([^)]{0,2000}\)/g, " ");
     // Match http(s):// URLs and protocol-relative //
-    return content.replace(/(?:https?:\/\/|\/\/)[^\s)>\]]+/g, " ");
+    result = result.replace(/(?:https?:\/\/|\/\/)[^\s)>\]]+/g, " ");
+    return result;
   }
 
   /**

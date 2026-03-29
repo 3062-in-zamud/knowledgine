@@ -210,7 +210,7 @@ describe("ObserverAgent", () => {
 
       const note = makeNote({
         content: "レビュアーは @bob-smith です",
-        frontmatter_json: null,
+        frontmatter_json: JSON.stringify({ author: "bob-smith" }),
       });
 
       const result = await agent.observe(note);

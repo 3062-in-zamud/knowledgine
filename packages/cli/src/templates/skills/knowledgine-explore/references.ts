@@ -62,9 +62,9 @@ the entity to all related bug fixes, design decisions, and patterns.
 
 **Exploration pattern**:
 \`\`\`
-1. search_entities(query: "SQLite") → get entity ID
-2. get_entity_graph(entityId: "<id>") → see all connections
-3. find_related(noteId: "<connected note id>") → traverse outward
+1. search_entities(query: "SQLite") → get entity ID (number)
+2. get_entity_graph(entityId: 123) → see all connections
+3. find_related(noteId: 456) → traverse outward
 \`\`\`
 `,
 
@@ -94,7 +94,7 @@ The knowledge graph has two node types:
 Returns the entity and all notes it appears in, plus related entities.
 
 \`\`\`
-get_entity_graph(entityId: "123")
+get_entity_graph(entityId: 123)
 // Returns: { entity, notes: [...], relatedEntities: [...] }
 
 get_entity_graph(entityName: "SQLite")
@@ -113,25 +113,25 @@ get_entity_graph(entityName: "SQLite")
 Returns notes related to a starting point (note or file path) via shared entities.
 
 \`\`\`
-find_related(noteId: "abc123", limit: 10, maxHops: 2)
+find_related(noteId: 456, limit: 10, maxHops: 2)
 find_related(filePath: "src/commands/setup.ts", limit: 10)
 \`\`\`
 
 **Parameters**:
-- \`noteId\` or \`filePath\`: Starting point for traversal
-- \`limit\`: Maximum notes to return
-- \`maxHops\`: How many edge-traversal steps to allow (1–3)
+- \`noteId\` (number) or \`filePath\`: Starting point for traversal
+- \`limit\`: Maximum notes to return (default 5)
+- \`maxHops\`: How many edge-traversal steps to allow (1–3, default 1)
 
 ### maxHops Guide
 
 | maxHops | Meaning | When to use |
 |---------|---------|-------------|
-| 1 | Only notes that share a direct entity with the starting note | Focused lookup |
-| 2 | Notes 2 hops away (share an entity with a 1-hop note) | Default, good balance |
+| 1 | Only notes that share a direct entity with the starting note | Default, focused lookup |
+| 2 | Notes 2 hops away (share an entity with a 1-hop note) | Broader exploration |
 | 3 | Notes 3 hops away | Open-ended exploration, large graph |
 
 **Higher maxHops returns more results but with lower average relevance.** Start at 1
-or 2 and increase only if the results are too sparse.
+and increase only if the results are too sparse.
 
 ---
 
@@ -141,11 +141,11 @@ or 2 and increase only if the results are too sparse.
 
 \`\`\`
 // Understand everything in the knowledge base about TypeScript
-1. search_entities(query: "TypeScript") → { id: "42", name: "TypeScript" }
-2. get_entity_graph(entityId: "42")
+1. search_entities(query: "TypeScript") → { id: 42, name: "TypeScript" }
+2. get_entity_graph(entityId: 42)
    → 15 notes mention TypeScript
    → related entities: ESM, tsconfig, type-safety
-3. find_related(noteId: "<top note id>", maxHops: 2)
+3. find_related(noteId: <top note id>, maxHops: 2)
    → Surface adjacent notes
 \`\`\`
 
@@ -154,7 +154,7 @@ or 2 and increase only if the results are too sparse.
 \`\`\`
 // Understand the history of the setup command
 1. search_entities(query: "setupCommand") → entity
-2. get_entity_graph(entityId: "<id>") → notes about setupCommand
+2. get_entity_graph(entityId: <id>) → notes about setupCommand
 3. Filter for design-decision and refactoring notes
 4. Read chronologically to understand evolution
 \`\`\`

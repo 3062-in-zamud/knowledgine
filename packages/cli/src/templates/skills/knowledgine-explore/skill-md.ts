@@ -1,16 +1,18 @@
 export const SKILL_MD = `---
-name: knowledgine-explain
+name: knowledgine-explore
+version: "1.0.0"
+lang: en
 description: >
   Explore entities, knowledge graph connections, and design history for unfamiliar
   components. Invoke when exploring code you did not write, tracing the history of a
   design decision, or understanding how a named entity (technology, library, project,
-  person) relates to other parts of the knowledge base.
+  component) relates to other parts of the knowledge base.
 ---
-# knowledgine-explain
+# knowledgine-explore
 
 ## Purpose
 
-Trace the knowledge graph to understand why things are the way they are. Explain uses
+Trace the knowledge graph to understand why things are the way they are. Explore uses
 entity search and graph traversal to surface the full context around a component or
 concept — not just what exists, but how it connects to other parts of the system and
 what decisions shaped it.
@@ -25,18 +27,18 @@ what decisions shaped it.
 
 ## When NOT to Use
 
-- When you just need to find a specific past solution (use knowledgine-recall instead)
+- When you just need to find a specific past solution (use knowledgine-search instead)
 - When the entity does not exist in the knowledge base yet
 - For trivial well-known concepts with no project-specific context
 
-## How to Explain (MCP Tools)
+## How to Explore (MCP Tools)
 
 ### Step 1: Search for entities
 
 \`\`\`
 search_entities(
   query: string,   // Entity name, technology, concept, or person
-  limit?: number   // Max results (default 10)
+  limit?: number   // Max results (default 20)
 )
 \`\`\`
 
@@ -44,7 +46,7 @@ search_entities(
 
 \`\`\`
 get_entity_graph(
-  entityId?: string,    // ID from search_entities result
+  entityId?: number,    // ID from search_entities result
   entityName?: string   // Or search by name directly
 )
 \`\`\`
@@ -53,14 +55,14 @@ get_entity_graph(
 
 \`\`\`
 find_related(
-  noteId?: string,    // A relevant note ID found in earlier steps
+  noteId?: number,    // A relevant note ID found in earlier steps
   filePath?: string,  // Or a relevant file path
-  limit?: number,
-  maxHops?: number    // 1–3, default 2
+  limit?: number,     // Max notes to return (default 5)
+  maxHops?: number    // 1–3, default 1
 )
 \`\`\`
 
-## How to Explain (CLI Alternative)
+## How to Explore (CLI Alternative)
 
 \`\`\`bash
 knowledgine explain "<entity name or concept>"
@@ -80,6 +82,11 @@ knowledgine explain "<entity name or concept>"
 - Use \`get_entity_graph\` to map the neighborhood before diving into individual notes
 - Increase \`maxHops\` gradually — start at 1, go to 2 or 3 if the immediate neighborhood is sparse
 - Look specifically for notes tagged \`design-decision\` — they explain the "why"
+
+## Edge Cases
+
+- **If the knowledge base is empty** — No entities will be found. Run \`knowledgine-ingest\` first to populate the knowledge base before exploring.
+- **If semantic search is unavailable** — Fall back to keyword search by using specific technology or component names as the query string.
 
 ## Reference Files
 

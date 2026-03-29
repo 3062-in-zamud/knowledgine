@@ -178,4 +178,21 @@ export function registerMemoryTools(server: McpServer, provider: MemoryProvider)
       }
     },
   );
+
+  // get_memory_capabilities
+  server.registerTool(
+    "get_memory_capabilities",
+    {
+      description: "Get memory provider capabilities",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const caps = provider.capabilities();
+        return { content: [{ type: "text" as const, text: JSON.stringify(caps, null, 2) }] };
+      } catch (error) {
+        return handleMemoryError(error);
+      }
+    },
+  );
 }

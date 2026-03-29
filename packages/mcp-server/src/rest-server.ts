@@ -1,11 +1,50 @@
-import { Hono } from "hono";
+import { Hono, type Context, type Next } from "hono";
 import { cors } from "hono/cors";
-import type { KnowledgeService } from "@knowledgine/core";
+import { timingSafeEqual } from "node:crypto";
+import { z } from "zod";
+import type { KnowledgeService, KnowledgeRepository } from "@knowledgine/core";
+import { IncrementalExtractor, CrossProjectSearcher, GraphRepository } from "@knowledgine/core";
+import type { ProjectEntry } from "@knowledgine/core";
+import type Database from "better-sqlite3";
 
-export function createRestApp(service: KnowledgeService, version: string): Hono {
+export interface CaptureOptions {
+  db: Database.Database;
+  repository: KnowledgeRepository;
+  graphRepository?: GraphRepository;
+  authToken: string;
+}
+
+const captureSchema = z.object({
+  content: z.string().min(1).max(100000),
+  title: z.string().max(200).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+  source: z.string().max(100).optional(),
+});
+
+function createAuthMiddleware(token: string): (c: Context, next: Next) => Promise<Response | void> {
+  return async (c, next) => {
+    const auth = c.req.header("Authorization");
+    if (!auth?.startsWith("Bearer ")) {
+      return c.json({ error: "Authorization required" }, 401);
+    }
+    const provided = Buffer.from(auth.slice(7));
+    const expected = Buffer.from(token);
+    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+      return c.json({ error: "Invalid token" }, 401);
+    }
+    await next();
+  };
+}
+
+export function createRestApp(
+  service: KnowledgeService,
+  version: string,
+  capture?: CaptureOptions,
+  projects?: ProjectEntry[],
+): Hono {
   const app = new Hono();
 
-  // CORS: localhostのみ許可
+  // CORS: 全オリジンを許可（サーバーはデフォルトでlocalhostバインドのため）
   app.use("*", cors());
 
   // GET /health
@@ -14,14 +53,29 @@ export function createRestApp(service: KnowledgeService, version: string): Hono 
     return c.json({ ok: true, version, notes: stats.totalNotes });
   });
 
-  // GET /search?q=...&mode=keyword&limit=20
+  // GET /search?q=...&mode=keyword&limit=20&projects=a,b
   app.get("/search", async (c) => {
     const q = c.req.query("q");
     if (!q) return c.json({ error: "q parameter is required" }, 400);
     const mode = c.req.query("mode") ?? "keyword";
     const limit = parseInt(c.req.query("limit") ?? "20", 10);
     if (isNaN(limit) || limit < 1) return c.json({ error: "Invalid limit" }, 400);
+    const projectsParam = c.req.query("projects");
     const start = Date.now();
+
+    if (projectsParam && projects) {
+      const requestedNames = new Set(
+        projectsParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+      const projectsToSearch = projects.filter((p) => requestedNames.has(p.name));
+      const searcher = new CrossProjectSearcher(projectsToSearch);
+      const results = await searcher.search(q, { limit });
+      return c.json({ results, query: q, crossProject: true, took_ms: Date.now() - start });
+    }
+
     const result = await service.search({
       query: q,
       limit,
@@ -58,6 +112,52 @@ export function createRestApp(service: KnowledgeService, version: string): Hono 
     const result = await service.findRelated({ noteId, limit }); // async
     return c.json(result);
   });
+
+  // POST /capture (requires auth + capture options)
+  if (capture) {
+    app.post("/capture", createAuthMiddleware(capture.authToken), async (c) => {
+      const raw = await c.req.json().catch(() => null);
+      const parsed = captureSchema.safeParse(raw);
+      if (!parsed.success) {
+        return c.json({ error: "Invalid request body", details: parsed.error.issues }, 400);
+      }
+      const input = parsed.data;
+
+      const { EventWriter, sanitizeContent } = await import("@knowledgine/ingest");
+      const writer = new EventWriter(capture.db, capture.repository);
+      const title = input.title || input.content.slice(0, 50).replace(/\n/g, " ").trim();
+      const sourceUri = input.source ? `capture://${input.source}` : "capture://rest";
+      const event = {
+        sourceUri,
+        eventType: "capture" as const,
+        title,
+        content: sanitizeContent(input.content),
+        timestamp: new Date(),
+        metadata: {
+          sourcePlugin: "capture",
+          sourceId: `capture-${Date.now()}`,
+          tags: input.tags,
+        },
+      };
+      const result = writer.writeEvent(event);
+
+      const extractor = new IncrementalExtractor(
+        capture.repository,
+        capture.graphRepository ?? new GraphRepository(capture.db),
+      );
+      await extractor.process([result.noteId]);
+
+      return c.json(
+        {
+          id: result.id,
+          title,
+          tags: input.tags ?? [],
+          sourceUri,
+        },
+        201,
+      );
+    });
+  }
 
   return app;
 }

@@ -84,12 +84,13 @@ foo.require('lodash');
   });
 
   describe("extract @mentions", () => {
-    it("should extract person entities from @username patterns", () => {
+    it("should extract unknown entities from @username patterns (conservative classification)", () => {
       const content = "cc @alice @bob please review";
       const result = extractor.extract(content);
-      const persons = result.filter((e) => e.entityType === "person");
-      expect(persons.some((e) => e.name === "alice")).toBe(true);
-      expect(persons.some((e) => e.name === "bob")).toBe(true);
+      // fallback is now 'unknown' — persons must be declared via frontmatter
+      const unknowns = result.filter((e) => e.entityType === "unknown");
+      expect(unknowns.some((e) => e.name === "alice")).toBe(true);
+      expect(unknowns.some((e) => e.name === "bob")).toBe(true);
     });
   });
 
@@ -215,6 +216,29 @@ main/examples is just a directory listing
       expect(names).not.toContain("main/examples");
     });
 
+    it("should not extract entities from shields.io badge image", () => {
+      const entities = extractor.extract("![badge](https://img.shields.io/npm/v/pkg)");
+      const names = entities.map((e) => e.name);
+      // Potential false-positive patterns that must not appear
+      expect(names).not.toContain("shields/npm");
+      expect(names).not.toContain("img/shields");
+      expect(names).not.toContain("npm/v");
+      expect(names).not.toContain("v/pkg");
+      expect(names).not.toContain("shields.io/npm");
+    });
+
+    it("should not extract user-attachments as org in plain text", () => {
+      const entities = extractor.extract("user-attachments/some-repo is mentioned");
+      const names = entities.map((e) => e.name);
+      expect(names).not.toContain("user-attachments/some-repo");
+    });
+
+    it("should not extract org/badges pattern", () => {
+      const entities = extractor.extract("shields/badges endpoint");
+      const names = entities.map((e) => e.name);
+      expect(names).not.toContain("shields/badges");
+    });
+
     it("should not extract entities from markdown image URLs", () => {
       const content = "![screenshot](https://github.com/user-attachments/assets/image.png)";
       const result = extractor.extract(content);
@@ -258,12 +282,12 @@ main/examples is just a directory listing
       expect(k8s!.entityType).toBe("technology");
     });
 
-    it("should still classify real usernames as person", () => {
+    it("should classify unknown @mentions as unknown, not person", () => {
       const content = "cc @alice @bob please review";
       const result = extractor.extract(content);
       const alice = result.find((e) => e.name === "alice");
       expect(alice).toBeDefined();
-      expect(alice!.entityType).toBe("person");
+      expect(alice!.entityType).toBe("unknown");
     });
 
     it("should keep tag-based technology classification for @react", () => {
@@ -280,6 +304,35 @@ main/examples is just a directory listing
       const middleware = result.find((e) => e.name === "middleware");
       if (middleware) {
         expect(middleware.entityType).not.toBe("person");
+      }
+    });
+  });
+
+  describe("KNOW-362: entity type inference improvement", () => {
+    it("should classify sandbox as concept (NOT_PERSON_LIST)", () => {
+      const entities = extractor.extract("Talked to @sandbox about the issue");
+      const sandbox = entities.find((e) => e.name === "sandbox");
+      expect(sandbox?.entityType).not.toBe("person");
+    });
+
+    it("should classify docker as technology (TECH_DICTIONARY)", () => {
+      const entities = extractor.extract("@docker is great");
+      const docker = entities.find((e) => e.name === "docker");
+      expect(docker?.entityType).toBe("technology");
+    });
+
+    it("should classify unknown mentions as unknown (not person)", () => {
+      const entities = extractor.extract("@randomname mentioned it");
+      const random = entities.find((e) => e.name === "randomname");
+      expect(random?.entityType).toBe("unknown");
+    });
+
+    it("should classify new TECH_DICTIONARY entries correctly", () => {
+      for (const name of ["vscode", "webpack", "vite", "bun", "deno", "terraform"]) {
+        const entities = extractor.extract(`@${name} is useful`);
+        const entity = entities.find((e) => e.name === name);
+        expect(entity?.entityType).not.toBe("person");
+        expect(entity?.entityType).not.toBe("unknown");
       }
     });
   });

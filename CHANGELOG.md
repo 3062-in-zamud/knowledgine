@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-29
+
+### Added
+
+#### MCP Memory Protocol (`@knowledgine/mcp-memory-protocol`)
+
+- **Error format conformance suite** (`runErrorFormatTests`): エラーレスポンスが `{ isError: true, content: [{ type: "text", text: "CODE: ..." }] }` 形式であることを検証する conformance test suite を追加（KNOW-340）
+- **Capabilities conformance suite** (`runCapabilitiesTests`): `get_memory_capabilities` ツールが有効な `MemoryProviderCapabilities` 構造を返すことを検証する conformance test suite を追加（optional, KNOW-340）
+- **`npm` 公開準備**: `prepublishOnly` スクリプトと `@modelcontextprotocol/sdk` の peerDependency を追加（KNOW-340）
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **`get_memory_capabilities` ツール**: `MemoryProvider.capabilities()` の結果を返す MCP ツールを追加（KNOW-340）
+
+### Fixed
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **`GraphRepositoryImpl` 参照エラー修正**: `rest-server.ts` で存在しない `GraphRepositoryImpl` を参照していたビルドエラーを修正。`GraphRepository` クラスを直接使用するよう変更（KNOW-340）
+
+### Documentation
+
+- **MCP Memory Protocol SEP draft 最終仕上げ**: 参照実装リンク・`get_memory_capabilities` capabilities 記述を更新（KNOW-341）
+
+- **`docs/mcp-memory-protocol-proposal/implementation-guide.md`** 新規作成: `MemoryProvider` インターフェース実装方法、Zodスキーマを使ったツール登録、エラーハンドリング、conformance suite の実行方法（KNOW-340）
+- **`docs/mcp-memory-protocol-proposal/conformance-suite.md`** コード不整合修正: `ConformanceAdapter` → 実際の `ConformanceTestContext` インターフェース、API使用例を実際のエクスポートに合わせて修正（KNOW-340）
+- **`docs/mcp-memory-protocol-proposal/reference-impl.md`** 虚偽記述修正: `temporal_query`・`semantic_search`・`ttl` を "Implemented" → "Planned" に修正。ファイル構造と型名を実際のコードに合わせて修正（KNOW-340）
+
+#### Core (`@knowledgine/core`)
+
+- **クロスプロジェクト横断検索 (`CrossProjectSearcher`)**: 複数プロジェクトの SQLite DB を read-only で横断検索する `CrossProjectSearcher` クラスを追加。スキーマバージョン 8 未満の DB は自動スキップ、DB 接続を try/finally で確実にクローズ、最大 10 プロジェクトまで同時検索をサポート（KNOW-338）
+- **RcConfig拡張 + Zodバリデーション**: `serve.authToken`、`noise`、`observer`、`projects` フィールドをRcConfigに追加。Zodスキーマによるランタイムバリデーションを実装し、不正な設定値はデフォルトにフォールバック + 警告ログを出力
+- **Migration 013 — `unknown` entityタイプ追加**: `entities` テーブルのCHECK制約に `'unknown'` を追加（SQLiteのALTER COLUMN非サポートによりテーブル再作成）（KNOW-362）
+- **entityタイプ推定の保守化**: `@mention` のフォールバック分類を `person` → `unknown` に変更。TECH_DICTIONARY に `vscode`・`neovim` を追加、NOT_PERSON_LISTに `linter`・`formatter`・`bundler`・`transpiler` を追加（KNOW-362）
+- **`searchEntities` に `includeUnknown` オプション追加**: デフォルト `false` で `entity_type='unknown'` を検索結果から除外（KNOW-362）
+- **`loadRcFile` を公開 API に追加**: `loadRcFile(startDir)` を `@knowledgine/core` からエクスポート。CLI コマンドが rc ファイルの設定値を直接参照できるように（KNOW-323）
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **`search_knowledge` に `projects` パラメータ追加**: クロスプロジェクト検索を MCP ツールから実行可能に。`projects: string[]` でプロジェクト名を指定すると `CrossProjectSearcher` を使用（KNOW-338）
+- **REST `/search` に `projects` クエリパラメータ追加**: `GET /search?q=...&projects=a,b` でカンマ区切りプロジェクト名を指定してクロスプロジェクト検索（KNOW-338）
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **NoiseFilter設定可能化**: `NoiseFilter` クラスを追加。`shortMessageThreshold`、`botAuthors`、`noiseSubjectPatterns`、`excludePatterns` を設定可能に。既存の関数エクスポート（`classifyNoiseLevel` 等）は後方互換を維持。
+- **entity抽出をIngestEngineパイプラインに統合**: `IngestEngine` のコンストラクタにオプショナルな `graphRepository` パラメータを追加。`graphRepository` が提供された場合、ingest完了後に `IncrementalExtractor` を自動実行する。`IngestSummary` に `extractionSummary` フィールドを追加。`ingest()` のオプションに `postProcessExtraction` (default: true) を追加し、抽出をスキップ可能に（KNOW-324）
+
+#### CLI (`@knowledgine/cli`)
+
+- **`--exclude-pattern` オプション**: `knowledgine ingest` コマンドに `--exclude-pattern <patterns...>` オプションを追加。Globパターンでパスをフィルタできる（例: `**/vendor/**`）。
+- **`--observe` / `--no-observe` / `--observe-limit` オプション**: `knowledgine ingest` コマンドに Observer/Reflector エージェントのオプトイン切り替えを追加。`--observe` フラグまたは `.knowledginerc.json` の `observer.enabled: true` で有効化。LLM 未設定時はルールベースモードで動作（KNOW-323）
+- **`--skip-extraction` オプション**: `knowledgine ingest` コマンドに `--skip-extraction` オプションを追加。ingest後のentity抽出をスキップできる（KNOW-324）
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **`POST /capture` エンドポイント**: Bearer token認証付きのRESTエンドポイントを追加。AIツール（Cline, Windsurf, Cursor等）からのプッシュ型セッションキャプチャを実現。`KNOWLEDGINE_API_TOKEN` 環境変数または `.knowledginerc.json` の `serve.authToken` でトークン設定。timing-safe比較（`crypto.timingSafeEqual`）、Zodバリデーション、100,000文字上限を実装（KNOW-310）
+- **`CaptureOptions` 型エクスポート**: `createRestApp` の第3引数として `CaptureOptions` を追加。`authToken` 未設定時はエンドポイントが無効になり後方互換を維持
+
+#### CLI (`@knowledgine/cli`)
+
+- **`knowledgine serve` — capture機能統合**: `KNOWLEDGINE_API_TOKEN` 環境変数または `rcConfig.serve.authToken` を読み込み、設定時は `POST /capture` を自動的に有効化（KNOW-310）
+
+### Removed
+
+#### CLI (`@knowledgine/cli`)
+
+- **`packages/cli/src/lib/entity-extractor.ts` 削除**: `postIngestProcessing` を提供していたdeprecatedファイルを削除。`init` コマンドは `IncrementalExtractor` を直接使用するよう移行（KNOW-324）
+
 ## [0.5.0] - 2026-03-28
 
 ### Added
