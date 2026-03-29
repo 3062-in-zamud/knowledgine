@@ -5,8 +5,11 @@ import { tmpdir } from "os";
 import { execFileSync } from "child_process";
 
 // Mock ObserverAgent and ReflectorAgent before importing ingestCommand
-const mockObserveBatch = vi.fn();
-const mockReflectBatch = vi.fn();
+// Use vi.hoisted() to avoid TDZ issues with vi.mock hoisting
+const { mockObserveBatch, mockReflectBatch } = vi.hoisted(() => ({
+  mockObserveBatch: vi.fn(),
+  mockReflectBatch: vi.fn(),
+}));
 
 vi.mock("@knowledgine/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@knowledgine/core")>();

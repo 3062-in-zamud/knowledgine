@@ -19,6 +19,8 @@ import { runCapabilitiesTests } from "./capabilities.test-suite.js";
 export interface ConformanceSuiteOptions {
   includeVersioning?: boolean;
   includeCapabilities?: boolean;
+  /** Include error-format tests (default: true). Set false if your test suite already covers error formats independently. */
+  includeErrorFormat?: boolean;
 }
 
 export async function runConformanceSuite(
@@ -30,7 +32,9 @@ export async function runConformanceSuite(
   results.push(...(await runRecallTests(ctx)));
   results.push(...(await runUpdateTests(ctx)));
   results.push(...(await runForgetTests(ctx)));
-  results.push(...(await runErrorFormatTests(ctx)));
+  if (options.includeErrorFormat !== false) {
+    results.push(...(await runErrorFormatTests(ctx)));
+  }
   if (options.includeVersioning) {
     results.push(...(await runVersioningTests(ctx)));
   }
