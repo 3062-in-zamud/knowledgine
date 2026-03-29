@@ -291,11 +291,12 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
     const rcConfig = loadRcFile(rootPath);
     const shouldObserve = options.observe ?? rcConfig?.observer?.enabled ?? false;
 
-    if (shouldObserve && ingestedNoteIds.length > 0) {
+    const uniqueIngestedNoteIds = Array.from(new Set(ingestedNoteIds));
+    if (shouldObserve && uniqueIngestedNoteIds.length > 0) {
       const observeLimit = options.observeLimit ?? rcConfig?.observer?.limit ?? 50;
-      const noteIdsToObserve = ingestedNoteIds.slice(0, observeLimit);
+      const noteIdsToObserve = uniqueIngestedNoteIds.slice(0, observeLimit);
 
-      let llmProvider: ReturnType<typeof createLLMProvider>;
+      let llmProvider: ReturnType<typeof createLLMProvider> | undefined = undefined;
       try {
         if (rcConfig?.llm) {
           llmProvider = createLLMProvider(rcConfig.llm);

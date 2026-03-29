@@ -65,12 +65,15 @@ export class CrossProjectSearcher {
             noteId: note.id,
             title: note.title,
             content: note.content.slice(0, 500),
-            score: rank,
+            // FTS5 rank is negative (more negative = better match); negate for ascending sort
+            score: -(rank ?? 0),
             projectName: project.name,
           });
         }
       } catch (err) {
-        console.warn(`Project ${project.name}: search failed - ${err}`);
+        console.warn(
+          `Project ${project.name}: search failed - ${err instanceof Error ? err.message : String(err)}`,
+        );
       } finally {
         db?.close();
       }

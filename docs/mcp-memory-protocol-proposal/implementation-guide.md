@@ -76,6 +76,7 @@ export class MyMemoryProvider implements MemoryProvider {
 Use the exported Zod schemas for input validation and MCP tool registration:
 
 ```typescript
+import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   MemoryStoreRequestSchema,
@@ -128,14 +129,14 @@ All errors MUST be returned as MCP tool errors in the format:
 
 Use the factory functions exported from `@knowledgine/mcp-memory-protocol`:
 
-| Factory                    | Error Code                 | When to use                          |
-| -------------------------- | -------------------------- | ------------------------------------ |
-| `invalidContent()`         | `INVALID_CONTENT`          | `content` is empty or missing        |
-| `invalidLayer(val)`        | `INVALID_LAYER`            | `layer` is not a valid enum value    |
-| `memoryNotFound(id)`       | `MEMORY_NOT_FOUND`         | ID does not exist in storage         |
-| `invalidParameter()`       | `INVALID_PARAMETER`        | Any other input validation failure   |
-| `storageError()`           | `STORAGE_ERROR`            | Underlying storage failure           |
-| `capabilityNotSupported()` | `CAPABILITY_NOT_SUPPORTED` | Client uses an unimplemented feature |
+| Factory                           | Error Code                 | When to use                          |
+| --------------------------------- | -------------------------- | ------------------------------------ |
+| `invalidContent()`                | `INVALID_CONTENT`          | `content` is empty or missing        |
+| `invalidLayer(val)`               | `INVALID_LAYER`            | `layer` is not a valid enum value    |
+| `memoryNotFound(id)`              | `MEMORY_NOT_FOUND`         | ID does not exist in storage         |
+| `invalidParameter(field, detail)` | `INVALID_PARAMETER`        | Any other input validation failure   |
+| `storageError()`                  | `STORAGE_ERROR`            | Underlying storage failure           |
+| `capabilityNotSupported()`        | `CAPABILITY_NOT_SUPPORTED` | Client uses an unimplemented feature |
 
 Catch `MemoryProtocolError` and re-format it as a tool error rather than
 letting it propagate as an unhandled exception.

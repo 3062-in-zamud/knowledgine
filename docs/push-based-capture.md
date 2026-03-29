@@ -19,12 +19,12 @@ export KNOWLEDGINE_API_TOKEN="your-secret-token"
 
 **RCファイル（フォールバック）:**
 
-```json
+```jsonc
 // .knowledginerc.json
 {
   "serve": {
-    "authToken": "your-secret-token"
-  }
+    "authToken": "your-secret-token",
+  },
 }
 ```
 
@@ -175,7 +175,7 @@ curl -s -X POST "http://127.0.0.1:3456/capture" \
 `/knowledgine-capture` スキルを使うか、セッション後にターミナルで:
 
 ```bash
-knowledgine capture --content "セッションサマリー" --tags "ai-session,claude-code"
+knowledgine capture add --content "セッションサマリー" --tags "ai-session,claude-code"
 ```
 
 ## Cline Storage Investigation Results

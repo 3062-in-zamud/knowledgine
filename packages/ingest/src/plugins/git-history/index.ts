@@ -51,8 +51,25 @@ export class GitHistoryPlugin implements IngestPlugin {
         if (typeof config.since === "string") this.since = config.since;
         if (config.unlimited === true) this.unlimited = true;
 
-        if (config.noise && typeof config.noise === "object") {
-          this.noiseFilter = new NoiseFilter(config.noise as NoiseFilterConfig);
+        if (config.noise && typeof config.noise === "object" && !Array.isArray(config.noise)) {
+          const noiseConfig = config.noise as NoiseFilterConfig;
+          // Type-check array fields before passing to NoiseFilter
+          if (noiseConfig.botAuthors !== undefined && !Array.isArray(noiseConfig.botAuthors)) {
+            return { ok: false, error: "Invalid noise.botAuthors: must be an array" };
+          }
+          if (
+            noiseConfig.noiseSubjectPatterns !== undefined &&
+            !Array.isArray(noiseConfig.noiseSubjectPatterns)
+          ) {
+            return { ok: false, error: "Invalid noise.noiseSubjectPatterns: must be an array" };
+          }
+          if (
+            noiseConfig.excludePatterns !== undefined &&
+            !Array.isArray(noiseConfig.excludePatterns)
+          ) {
+            return { ok: false, error: "Invalid noise.excludePatterns: must be an array" };
+          }
+          this.noiseFilter = new NoiseFilter(noiseConfig);
         }
       }
 

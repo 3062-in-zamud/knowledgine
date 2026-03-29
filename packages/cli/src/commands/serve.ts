@@ -85,7 +85,7 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
       ? { db, repository, graphRepository, authToken }
       : undefined;
 
-    const app = createRestApp(service, VERSION, captureOptions);
+    const app = createRestApp(service, VERSION, captureOptions, rcConfig?.projects);
     const port = parseInt(options.port ?? "3456", 10);
     const hostname = options.host ?? "127.0.0.1";
 
@@ -105,6 +105,11 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
         console.error(`  Search: ${searchMode}`);
         if (captureOptions) {
           console.error(`  Capture: POST /capture enabled (auth required)`);
+          if (hostname !== "127.0.0.1" && hostname !== "localhost") {
+            console.error(
+              `  Warning: POST /capture is enabled and server is bound to ${hostname} (non-localhost). Ensure this is intentional.`,
+            );
+          }
         }
       },
     );

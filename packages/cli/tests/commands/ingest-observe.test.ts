@@ -129,10 +129,9 @@ describe("--observe flag", () => {
     await ingestCommand({ source: "markdown", path: testDir, observe: true, observeLimit: 2 });
     expect(process.exitCode).toBeUndefined();
 
-    if (mockObserveBatch.mock.calls.length > 0) {
-      const notesArg = mockObserveBatch.mock.calls[0][0] as unknown[];
-      expect(notesArg.length).toBeLessThanOrEqual(2);
-    }
+    expect(mockObserveBatch).toHaveBeenCalled();
+    const notesArg = mockObserveBatch.mock.calls[0][0] as unknown[];
+    expect(notesArg.length).toBeLessThanOrEqual(2);
     errorSpy.mockRestore();
     logSpy.mockRestore();
   });

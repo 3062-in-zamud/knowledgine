@@ -568,7 +568,8 @@ export class EntityExtractor {
    */
   private stripUrls(content: string): string {
     // Strip Markdown image links first to prevent URL path fragments from matching
-    let result = content.replace(/!\[[^\]]*\]\([^)]+\)/g, " ");
+    // Length-bounded quantifiers prevent ReDoS on malicious input
+    let result = content.replace(/!\[[^\]]{0,1000}\]\([^)]{0,2000}\)/g, " ");
     // Match http(s):// URLs and protocol-relative //
     result = result.replace(/(?:https?:\/\/|\/\/)[^\s)>\]]+/g, " ");
     return result;
