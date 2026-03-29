@@ -251,6 +251,19 @@ async function suggestAction(
       return;
     }
     const content = readFileSync(filePath, "utf-8");
+
+    // Show file header (first 5 lines + truncation)
+    const lines = content.split("\n");
+    const headerLines = lines.slice(0, 5);
+    console.error(`File: ${options.file}`);
+    for (const line of headerLines) {
+      console.error(`  ${line}`);
+    }
+    if (lines.length > 5) {
+      console.error(`  ... (${lines.length - 5} more lines)`);
+    }
+    console.error("");
+
     effectiveQuery = extractSmartContent(content, { maxLength: 2000 });
   }
 
