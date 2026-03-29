@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Documentation
 
+- **MCP Memory Protocol SEP draft 最終仕上げ**: 参照実装リンク・`get_memory_capabilities` capabilities 記述を更新（KNOW-341）
+
 - **`docs/mcp-memory-protocol-proposal/implementation-guide.md`** 新規作成: `MemoryProvider` インターフェース実装方法、Zodスキーマを使ったツール登録、エラーハンドリング、conformance suite の実行方法（KNOW-340）
 - **`docs/mcp-memory-protocol-proposal/conformance-suite.md`** コード不整合修正: `ConformanceAdapter` → 実際の `ConformanceTestContext` インターフェース、API使用例を実際のエクスポートに合わせて修正（KNOW-340）
 - **`docs/mcp-memory-protocol-proposal/reference-impl.md`** 虚偽記述修正: `temporal_query`・`semantic_search`・`ttl` を "Implemented" → "Planned" に修正。ファイル構造と型名を実際のコードに合わせて修正（KNOW-340）
