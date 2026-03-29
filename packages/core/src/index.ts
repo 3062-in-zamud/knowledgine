@@ -19,6 +19,7 @@ export type {
   NoteLink,
   KnowledgeData,
   SearchResult,
+  FallbackInfo,
   EntityType,
   RelationType,
   ObservationType,

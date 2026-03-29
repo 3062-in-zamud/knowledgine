@@ -634,6 +634,41 @@ export class KnowledgeRepository {
   }
 
   /**
+   * Transform a user query into FTS5-compatible syntax.
+   * - "quoted phrases" are preserved as-is (FTS5 natively supports them)
+   * - `OR` between terms is preserved
+   * - All other terms are implicitly AND-joined (FTS5 default)
+   * - Special FTS5 characters are escaped
+   */
+  private transformQueryToFts5(query: string): string {
+    // Preserve quoted phrases by extracting them first
+    const phrases: string[] = [];
+    const remaining = query.replace(/"([^"]+)"/g, (_match, phrase) => {
+      phrases.push(`"${phrase}"`);
+      return `__PHRASE_${phrases.length - 1}__`;
+    });
+
+    // Split by OR (case-sensitive to avoid matching words like "for")
+    const orParts = remaining.split(/\bOR\b/);
+
+    const fts5Parts = orParts.map((part) => {
+      // Split into tokens
+      const tokens = part.trim().split(/\s+/).filter(Boolean);
+      return tokens
+        .map((t) => {
+          // Replace phrase placeholders
+          const phMatch = t.match(/^__PHRASE_(\d+)__$/);
+          if (phMatch) return phrases[parseInt(phMatch[1])];
+          // Escape FTS5 special characters in regular terms
+          return t.replace(/[*^"]/g, "");
+        })
+        .join(" ");
+    });
+
+    return fts5Parts.join(" OR ");
+  }
+
+  /**
    * FTS5 rank付きでノートを検索する
    */
   searchNotesWithRank(
@@ -653,6 +688,9 @@ export class KnowledgeRepository {
     const dateParams: string[] = [];
     if (dateFrom) dateParams.push(dateFrom);
     if (dateTo) dateParams.push(dateTo);
+
+    // Transform user query into FTS5-compatible syntax (OR, quoted phrases, escaping)
+    const ftsQuery = this.transformQueryToFts5(query);
 
     // CJK文字を含むクエリはtrigramテーブルを優先使用（trigramは最低3文字必要）
     const isCjk = hasCjkChars(query);
@@ -676,7 +714,7 @@ export class KnowledgeRepository {
         ORDER BY rank
         LIMIT ?
       `,
-      ).all(query, ...dateParams, limit * 3) as Array<KnowledgeNote & { rank: number }>;
+      ).all(ftsQuery, ...dateParams, limit * 3) as Array<KnowledgeNote & { rank: number }>;
 
       // CJKクエリでunicode61が0件の場合はLIKEフォールバック（短いCJKトークンの救済）
       if (rows.length === 0 && isCjk) {
@@ -743,6 +781,8 @@ export class KnowledgeRepository {
     const useTrigram = hasCjk && query.length >= 3;
     const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
 
+    const ftsQuery = this.transformQueryToFts5(query);
+
     try {
       // Use FTS5 snippet() function with Unicode markers for highlighting
       const rows = this.stmt(
@@ -758,7 +798,7 @@ export class KnowledgeRepository {
         ORDER BY rank
         LIMIT ?
       `,
-      ).all(query, ...dateParams, limit * 3) as Array<
+      ).all(ftsQuery, ...dateParams, limit * 3) as Array<
         KnowledgeNote & { rank: number; snippet: string }
       >;
 
