@@ -45,6 +45,7 @@ export class KnowledgeSearcher {
   private reranker: ReasoningReranker;
   private agenticReranker: ReasoningReranker;
   private orchestrator?: QueryOrchestrator;
+  private graphRepository?: GraphRepository;
 
   constructor(
     private repository: KnowledgeRepository,
@@ -53,6 +54,7 @@ export class KnowledgeSearcher {
     llmProvider?: LLMProvider,
     graphRepository?: GraphRepository,
   ) {
+    this.graphRepository = graphRepository;
     if (embeddingProvider) {
       this.semanticSearcher = new SemanticSearcher(repository, embeddingProvider);
       const modelFamily = MODEL_REGISTRY[DEFAULT_MODEL_NAME]?.family ?? "bert";
@@ -306,6 +308,41 @@ export class KnowledgeSearcher {
 
       // newness bonus 等の事後スコア調整後に降順ソート
       results.sort((a, b) => b.score - a.score);
+
+      // Entity-linked ranking boost (orchestrator-free path only)
+      // The orchestrator already handles graph-based boosting
+      if (this.graphRepository && results.length > 0) {
+        try {
+          const queryTerms = query
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((t) => t.length > 1);
+          const boostedNoteIds = new Set<number>();
+
+          for (const term of queryTerms) {
+            const entities = this.graphRepository.searchEntities(term, 5);
+            for (const entity of entities) {
+              const linkedNotes = this.graphRepository.getLinkedNotes(entity.id);
+              for (const link of linkedNotes) {
+                boostedNoteIds.add(link.noteId);
+              }
+            }
+          }
+
+          if (boostedNoteIds.size > 0) {
+            for (const result of results) {
+              if (boostedNoteIds.has(result.note.id)) {
+                result.score *= 1.2; // 20% boost for entity-linked notes
+                result.matchReason.push("エンティティ連動ブースト");
+              }
+            }
+            // Re-sort after boosting
+            results.sort((a, b) => b.score - a.score);
+          }
+        } catch {
+          // Entity boost is non-critical — silently continue
+        }
+      }
     }
 
     // agentic モード: LLMベース ReasoningReranker を使用
