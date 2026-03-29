@@ -1,8 +1,45 @@
-import { Hono } from "hono";
+import { Hono, type Context, type Next } from "hono";
 import { cors } from "hono/cors";
-import type { KnowledgeService } from "@knowledgine/core";
+import { timingSafeEqual } from "node:crypto";
+import { z } from "zod";
+import type { KnowledgeService, KnowledgeRepository, GraphRepository } from "@knowledgine/core";
+import { IncrementalExtractor, GraphRepository as GraphRepositoryImpl } from "@knowledgine/core";
+import type Database from "better-sqlite3";
 
-export function createRestApp(service: KnowledgeService, version: string): Hono {
+export interface CaptureOptions {
+  db: Database.Database;
+  repository: KnowledgeRepository;
+  graphRepository?: GraphRepository;
+  authToken: string;
+}
+
+const captureSchema = z.object({
+  content: z.string().min(1).max(100000),
+  title: z.string().max(200).optional(),
+  tags: z.array(z.string().max(50)).max(20).optional(),
+  source: z.string().max(100).optional(),
+});
+
+function createAuthMiddleware(token: string): (c: Context, next: Next) => Promise<Response | void> {
+  return async (c, next) => {
+    const auth = c.req.header("Authorization");
+    if (!auth?.startsWith("Bearer ")) {
+      return c.json({ error: "Authorization required" }, 401);
+    }
+    const provided = Buffer.from(auth.slice(7));
+    const expected = Buffer.from(token);
+    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+      return c.json({ error: "Invalid token" }, 401);
+    }
+    await next();
+  };
+}
+
+export function createRestApp(
+  service: KnowledgeService,
+  version: string,
+  capture?: CaptureOptions,
+): Hono {
   const app = new Hono();
 
   // CORS: localhostのみ許可
@@ -58,6 +95,52 @@ export function createRestApp(service: KnowledgeService, version: string): Hono 
     const result = await service.findRelated({ noteId, limit }); // async
     return c.json(result);
   });
+
+  // POST /capture (requires auth + capture options)
+  if (capture) {
+    app.post("/capture", createAuthMiddleware(capture.authToken), async (c) => {
+      const raw = await c.req.json().catch(() => null);
+      const parsed = captureSchema.safeParse(raw);
+      if (!parsed.success) {
+        return c.json({ error: "Invalid request body", details: parsed.error.issues }, 400);
+      }
+      const input = parsed.data;
+
+      const { EventWriter, sanitizeContent } = await import("@knowledgine/ingest");
+      const writer = new EventWriter(capture.db, capture.repository);
+      const title = input.title || input.content.slice(0, 50).replace(/\n/g, " ").trim();
+      const sourceUri = input.source ? `capture://${input.source}` : "capture://rest";
+      const event = {
+        sourceUri,
+        eventType: "capture" as const,
+        title,
+        content: sanitizeContent(input.content),
+        timestamp: new Date(),
+        metadata: {
+          sourcePlugin: "capture",
+          sourceId: `capture-${Date.now()}`,
+          tags: input.tags,
+        },
+      };
+      const result = writer.writeEvent(event);
+
+      const extractor = new IncrementalExtractor(
+        capture.repository,
+        capture.graphRepository ?? new GraphRepositoryImpl(capture.db),
+      );
+      await extractor.process([result.noteId]);
+
+      return c.json(
+        {
+          id: result.id,
+          title,
+          tags: input.tags ?? [],
+          sourceUri,
+        },
+        201,
+      );
+    });
+  }
 
   return app;
 }

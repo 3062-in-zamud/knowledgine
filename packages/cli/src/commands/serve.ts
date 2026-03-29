@@ -4,6 +4,7 @@ import { resolve } from "path";
 import { serve } from "@hono/node-server";
 import {
   loadConfig,
+  loadRcFile,
   resolveDefaultPath,
   createDatabase,
   loadSqliteVecExtension,
@@ -18,7 +19,7 @@ import {
   VERSION,
   checkSemanticReadiness,
 } from "@knowledgine/core";
-import { createRestApp } from "@knowledgine/mcp-server";
+import { createRestApp, type CaptureOptions } from "@knowledgine/mcp-server";
 
 export interface ServeCommandOptions {
   port?: string;
@@ -78,7 +79,13 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
       embeddingProvider,
     });
 
-    const app = createRestApp(service, VERSION);
+    const rcConfig = loadRcFile(rootPath);
+    const authToken = process.env.KNOWLEDGINE_API_TOKEN ?? rcConfig?.serve?.authToken;
+    const captureOptions: CaptureOptions | undefined = authToken
+      ? { db, repository, graphRepository, authToken }
+      : undefined;
+
+    const app = createRestApp(service, VERSION, captureOptions);
     const port = parseInt(options.port ?? "3456", 10);
     const hostname = options.host ?? "127.0.0.1";
 
@@ -96,6 +103,9 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
         console.error(`  URL:    http://${hostname}:${port}`);
         console.error(`  Notes:  ${stats.totalNotes} indexed`);
         console.error(`  Search: ${searchMode}`);
+        if (captureOptions) {
+          console.error(`  Capture: POST /capture enabled (auth required)`);
+        }
       },
     );
 

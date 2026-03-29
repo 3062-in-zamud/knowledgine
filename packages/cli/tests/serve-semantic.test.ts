@@ -29,6 +29,7 @@ vi.mock("@knowledgine/core", () => {
 
   return {
     loadConfig: vi.fn(),
+    loadRcFile: vi.fn().mockReturnValue(null),
     resolveDefaultPath: vi.fn((p: string) => p),
     createDatabase: vi.fn().mockReturnValue(mockDb),
     loadSqliteVecExtension: vi.fn().mockResolvedValue(undefined),
