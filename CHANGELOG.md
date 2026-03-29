@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-29
+
 ### Added
 
 #### MCP Memory Protocol (`@knowledgine/mcp-memory-protocol`)
