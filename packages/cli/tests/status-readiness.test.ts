@@ -45,7 +45,7 @@ describe("checkSemanticReadiness", () => {
     const result = checkSemanticReadiness(config, modelManager, repository);
 
     expect(result.ready).toBe(false);
-    expect(result.label).toBe("Ready (FTS5 only)");
+    expect(result.label).toBe("FTS5 only — run 'upgrade --semantic' to enable");
     expect(result.configEnabled).toBe(false);
     expect(result.embeddingsCount).toBe(0);
   });
@@ -58,7 +58,7 @@ describe("checkSemanticReadiness", () => {
     const result = checkSemanticReadiness(config, modelManager, repository);
 
     expect(result.ready).toBe(false);
-    expect(result.label).toBe("Ready (FTS5 only)");
+    expect(result.label).toBe("FTS5 only — run 'ingest --all' to generate embeddings");
     expect(result.modelAvailable).toBe(true);
     expect(result.configEnabled).toBe(true);
     expect(result.embeddingsCount).toBe(0);
@@ -108,7 +108,7 @@ describe("checkSemanticReadiness", () => {
 
     expect(result.ready).toBe(true);
     expect(result.embeddingsCount).toBe(3);
-    expect(result.label).toBe("Ready (semantic + FTS5)");
+    expect(result.label).toBe("Ready (semantic: 60% coverage + FTS5)");
   });
 
   it("returns correct counts", () => {
