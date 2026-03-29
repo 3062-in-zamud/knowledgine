@@ -25,6 +25,65 @@ import { createDefaultRegistry, initializePlugins } from "../lib/plugin-loader.j
 import { createProgress, formatDuration, createSummaryReport } from "../lib/progress.js";
 import { colors, symbols } from "../lib/ui/index.js";
 
+/** Generic entity names to exclude from "top entities" suggestions. */
+const GENERIC_ENTITIES = new Set([
+  "readme",
+  "package.json",
+  "src",
+  "test",
+  "tests",
+  "index",
+  "main",
+  "lib",
+  "dist",
+  "docs",
+  "config",
+  "node_modules",
+  "changelog",
+  "license",
+  "todo",
+  "app",
+  "utils",
+  "build",
+  ".github",
+  "public",
+  "assets",
+  "vendor",
+]);
+
+interface TopEntity {
+  name: string;
+  count: number;
+}
+
+function getTopEntities(repository: KnowledgeRepository, limit: number): TopEntity[] {
+  // Query the database for top entities by note count
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing internal db for summary query
+    const db = (repository as any).db;
+    if (!db) return [];
+    const rows = db
+      .prepare(
+        `
+      SELECT e.name, COUNT(DISTINCT ne.note_id) as cnt
+      FROM entities e
+      JOIN note_entities ne ON e.id = ne.entity_id
+      GROUP BY e.id
+      ORDER BY cnt DESC
+      LIMIT ?
+    `,
+      )
+      .all(limit + GENERIC_ENTITIES.size) as Array<{ name: string; cnt: number }>;
+
+    return rows
+      .filter((r) => !GENERIC_ENTITIES.has(r.name.toLowerCase()))
+      .slice(0, limit)
+      .map((r) => ({ name: r.name, count: r.cnt }));
+  } catch {
+    return [];
+  }
+}
+
 export interface IngestOptions {
   source?: string;
   path?: string;
@@ -292,11 +351,31 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       }
     }
 
+    // Intelligent post-ingest summary
+    const uniqueIngestedNoteIds = Array.from(new Set(ingestedNoteIds));
+    if (uniqueIngestedNoteIds.length > 0) {
+      try {
+        const topEntities = getTopEntities(repository, 5);
+        if (topEntities.length > 0) {
+          console.error("");
+          console.error("  Top entities discovered:");
+          for (const { name, count } of topEntities) {
+            console.error(`    • ${name} (${count} notes)`);
+          }
+          // Suggest search with top entity
+          const topEntity = topEntities[0];
+          console.error("");
+          console.error(`  → Try: knowledgine search '${topEntity.name}' --mode hybrid`);
+        }
+      } catch {
+        // Non-fatal: summary generation failure should not break ingest
+      }
+    }
+
     // Observer/Reflector post-processing
     const rcConfig = loadRcFile(rootPath);
     const shouldObserve = options.observe ?? rcConfig?.observer?.enabled ?? false;
 
-    const uniqueIngestedNoteIds = Array.from(new Set(ingestedNoteIds));
     if (shouldObserve && uniqueIngestedNoteIds.length > 0) {
       const observeLimit = options.observeLimit ?? rcConfig?.observer?.limit ?? 50;
       const noteIdsToObserve = uniqueIngestedNoteIds.slice(0, observeLimit);
