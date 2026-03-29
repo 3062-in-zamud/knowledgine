@@ -14,10 +14,20 @@ TypeScript types, Zod validation schemas, and the conformance test suite.
 packages/mcp-memory-protocol/
 ├── src/
 │   ├── types.ts          # MemoryEntry, MemoryMetadata, RecallFilter, etc.
-│   ├── schemas.ts        # Zod schemas for all operations
+│   ├── schema.ts         # Zod schemas for all operations
+│   ├── provider.ts       # MemoryProvider interface
+│   ├── errors.ts         # MemoryProtocolError and error factories
 │   └── index.ts
-└── conformance/
-    └── suite.ts          # Conformance test suite
+└── src/conformance/
+    ├── store.test-suite.ts
+    ├── recall.test-suite.ts
+    ├── update.test-suite.ts
+    ├── forget.test-suite.ts
+    ├── error-format.test-suite.ts
+    ├── versioning.test-suite.ts
+    ├── capabilities.test-suite.ts
+    ├── helpers.ts
+    └── index.ts
 ```
 
 **Install:**
@@ -31,19 +41,22 @@ npm install @knowledgine/mcp-memory-protocol
 ```typescript
 import type {
   MemoryEntry,
-  StoreMemoryInput,
-  RecallMemoryInput,
-  UpdateMemoryInput,
-  ForgetMemoryInput,
+  MemoryStoreRequest,
+  MemoryRecallRequest,
+  MemoryUpdateRequest,
+  MemoryForgetRequest,
 } from "@knowledgine/mcp-memory-protocol";
 ```
 
 **Use the Zod schemas for input validation:**
 
 ```typescript
-import { StoreMemoryInputSchema, RecallMemoryInputSchema } from "@knowledgine/mcp-memory-protocol";
+import {
+  MemoryStoreRequestSchema,
+  MemoryRecallRequestSchema,
+} from "@knowledgine/mcp-memory-protocol";
 
-const parsed = StoreMemoryInputSchema.safeParse(toolInput);
+const parsed = MemoryStoreRequestSchema.safeParse(toolInput);
 if (!parsed.success) {
   // return INVALID_PARAMETER error
 }
@@ -57,14 +70,14 @@ MCP server implementing all four core operations plus optional capabilities.
 
 **Supported capabilities:**
 
-| Capability        | Status                                          |
-| ----------------- | ----------------------------------------------- |
-| Core operations   | Implemented                                     |
-| `versioning`      | Implemented                                     |
-| `temporal_query`  | Implemented                                     |
-| `semantic_search` | Implemented (vector embeddings via local model) |
-| `layer_promotion` | Implemented                                     |
-| `ttl`             | Implemented                                     |
+| Capability        | Status      |
+| ----------------- | ----------- |
+| Core operations   | Implemented |
+| `versioning`      | Implemented |
+| `layer_promotion` | Implemented |
+| `temporal_query`  | Planned     |
+| `semantic_search` | Planned     |
+| `ttl`             | Planned     |
 
 **Run the server:**
 

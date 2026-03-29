@@ -2,8 +2,8 @@ import { Hono, type Context, type Next } from "hono";
 import { cors } from "hono/cors";
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import type { KnowledgeService, KnowledgeRepository, GraphRepository } from "@knowledgine/core";
-import { IncrementalExtractor, CrossProjectSearcher } from "@knowledgine/core";
+import type { KnowledgeService, KnowledgeRepository } from "@knowledgine/core";
+import { IncrementalExtractor, CrossProjectSearcher, GraphRepository } from "@knowledgine/core";
 import type { ProjectEntry } from "@knowledgine/core";
 import type Database from "better-sqlite3";
 
@@ -143,7 +143,7 @@ export function createRestApp(
 
       const extractor = new IncrementalExtractor(
         capture.repository,
-        capture.graphRepository ?? new GraphRepositoryImpl(capture.db),
+        capture.graphRepository ?? new GraphRepository(capture.db),
       );
       await extractor.process([result.noteId]);
 

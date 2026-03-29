@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+#### MCP Memory Protocol (`@knowledgine/mcp-memory-protocol`)
+
+- **Error format conformance suite** (`runErrorFormatTests`): エラーレスポンスが `{ isError: true, content: [{ type: "text", text: "CODE: ..." }] }` 形式であることを検証する conformance test suite を追加（KNOW-340）
+- **Capabilities conformance suite** (`runCapabilitiesTests`): `get_memory_capabilities` ツールが有効な `MemoryProviderCapabilities` 構造を返すことを検証する conformance test suite を追加（optional, KNOW-340）
+- **`npm` 公開準備**: `prepublishOnly` スクリプトと `@modelcontextprotocol/sdk` の peerDependency を追加（KNOW-340）
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **`get_memory_capabilities` ツール**: `MemoryProvider.capabilities()` の結果を返す MCP ツールを追加（KNOW-340）
+
+### Fixed
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **`GraphRepositoryImpl` 参照エラー修正**: `rest-server.ts` で存在しない `GraphRepositoryImpl` を参照していたビルドエラーを修正。`GraphRepository` クラスを直接使用するよう変更（KNOW-340）
+
+### Documentation
+
+- **`docs/mcp-memory-protocol-proposal/implementation-guide.md`** 新規作成: `MemoryProvider` インターフェース実装方法、Zodスキーマを使ったツール登録、エラーハンドリング、conformance suite の実行方法（KNOW-340）
+- **`docs/mcp-memory-protocol-proposal/conformance-suite.md`** コード不整合修正: `ConformanceAdapter` → 実際の `ConformanceTestContext` インターフェース、API使用例を実際のエクスポートに合わせて修正（KNOW-340）
+- **`docs/mcp-memory-protocol-proposal/reference-impl.md`** 虚偽記述修正: `temporal_query`・`semantic_search`・`ttl` を "Implemented" → "Planned" に修正。ファイル構造と型名を実際のコードに合わせて修正（KNOW-340）
+
 #### Core (`@knowledgine/core`)
 
 - **クロスプロジェクト横断検索 (`CrossProjectSearcher`)**: 複数プロジェクトの SQLite DB を read-only で横断検索する `CrossProjectSearcher` クラスを追加。スキーマバージョン 8 未満の DB は自動スキップ、DB 接続を try/finally で確実にクローズ、最大 10 プロジェクトまで同時検索をサポート（KNOW-338）
