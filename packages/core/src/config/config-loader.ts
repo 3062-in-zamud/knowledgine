@@ -100,10 +100,12 @@ export function loadConfig(rootPath: string): KnowledgineConfig {
   });
 }
 
+const rcConfigSchemaTyped = rcConfigSchema as z.ZodType<RcConfig>;
+
 function validateRcConfig(raw: unknown, filePath: string): RcConfig | null {
-  const result = rcConfigSchema.safeParse(raw);
+  const result = rcConfigSchemaTyped.safeParse(raw);
   if (result.success) {
-    return result.data as RcConfig;
+    return result.data;
   }
   console.warn(
     `Warning: Invalid config in ${filePath}, falling back to defaults: ${result.error.message}`,
