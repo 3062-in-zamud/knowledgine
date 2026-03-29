@@ -128,6 +128,13 @@ Example:
   )
   .action(statusCommand);
 
+// Top-level stats alias (shortcut for tool stats)
+program
+  .command("stats")
+  .description("Show knowledge base statistics (alias for status)")
+  .option("--path <dir>", "Root directory to check")
+  .action(statusCommand);
+
 program
   .command("upgrade")
   .description("Upgrade knowledgine capabilities")
