@@ -241,6 +241,7 @@ export { CodeBlockDetector } from "./utils/code-block-detector.js";
 export type { CodeBlockRange } from "./utils/code-block-detector.js";
 export { checkSemanticReadiness } from "./utils/semantic-readiness.js";
 export type { SemanticReadiness } from "./utils/semantic-readiness.js";
+export { hasCjk, cjkRatio, cjkCharCount } from "./utils/cjk.js";
 
 // Agents
 export type {

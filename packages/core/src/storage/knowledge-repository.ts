@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 import type { KnowledgeData, ExtractedPattern } from "../types.js";
 import { ValidationError, DatabaseError, KnowledgeNotFoundError } from "../errors.js";
 import { createHash } from "crypto";
+import { hasCjk as hasCjkChars } from "../utils/cjk.js";
 
 export interface KnowledgeNote {
   id: number;
@@ -654,8 +655,12 @@ export class KnowledgeRepository {
     if (dateTo) dateParams.push(dateTo);
 
     // CJK文字を含むクエリはtrigramテーブルを優先使用（trigramは最低3文字必要）
-    const hasCjk = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(query);
-    const useTrigram = hasCjk && query.length >= 3;
+    const isCjk = hasCjkChars(query);
+    // Short CJK queries (1-2 chars) → LIKE directly (FTS5 can't tokenize these properly)
+    if (isCjk && query.replace(/\s/g, "").length <= 2) {
+      return this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
+    }
+    const useTrigram = isCjk && query.length >= 3;
     const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
 
     try {
@@ -674,7 +679,7 @@ export class KnowledgeRepository {
       ).all(query, ...dateParams, limit * 3) as Array<KnowledgeNote & { rank: number }>;
 
       // CJKクエリでunicode61が0件の場合はLIKEフォールバック（短いCJKトークンの救済）
-      if (rows.length === 0 && hasCjk) {
+      if (rows.length === 0 && isCjk) {
         return this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
       }
 

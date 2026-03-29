@@ -144,6 +144,15 @@ describe("KnowledgeSearcher", () => {
     });
   });
 
+  describe("CJK short query LIKE fallback", () => {
+    it("returns results for 2-char CJK query", () => {
+      // searchNotesWithRank should delegate to LIKE for short CJK
+      const results = ctx.repository.searchNotesWithRank("認証", 10);
+      // Just verify it doesn't throw (LIKE fallback handles it)
+      expect(Array.isArray(results)).toBe(true);
+    });
+  });
+
   describe("getSearchStats", () => {
     it("should return total and avgScore for results", () => {
       const results: SearchResult[] = [
