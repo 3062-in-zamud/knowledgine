@@ -79,6 +79,41 @@ const STOP_LIST = new Set([
   "meta",
   "head",
   "body",
+  "readme",
+  "changelog",
+  "license",
+  "todo",
+  "fixme",
+  "hack",
+  "note",
+  "warning",
+  "deprecated",
+  "example",
+  "test",
+  "tests",
+  "spec",
+  "specs",
+  "index",
+  "main",
+  "app",
+  "utils",
+  "helpers",
+  "config",
+  "setup",
+  "build",
+  "dist",
+  "src",
+  "lib",
+  "docs",
+  "assets",
+  "public",
+  "static",
+  "package",
+  "node_modules",
+  "vendor",
+  "tmp",
+  "temp",
+  "cache",
 ]);
 
 /**
@@ -277,7 +312,10 @@ export class EntityExtractor {
     const codeBlocks = detector.detectCodeBlocks(content);
     const lines = content.split("\n");
     const filtered = detector.filterNonCodeLines(lines, codeBlocks);
-    const cleanContent = filtered.map((l) => l.line).join("\n");
+    let cleanContent = filtered.map((l) => l.line).join("\n");
+
+    // Strip Markdown syntax to prevent artifacts from being extracted as entities
+    cleanContent = this.stripMarkdownSyntax(cleanContent);
 
     results.push(...this.extractFromFrontmatterTags(frontmatter));
     results.push(...this.extractFromFrontmatterFields(frontmatter));
@@ -289,6 +327,9 @@ export class EntityExtractor {
 
     let deduped = this.deduplicate(results);
     deduped = this.resolveEntityTypes(deduped);
+
+    // Filter out low-confidence unknown entities (mention-only, no other signals)
+    deduped = deduped.filter((e) => !(e.entityType === "unknown" && e.sourceType === "mention"));
 
     if (this.rules) {
       deduped = this.applyRules(deduped);
@@ -607,6 +648,29 @@ export class EntityExtractor {
       char === "_" ||
       char === "$"
     );
+  }
+
+  /**
+   * Remove Markdown syntax elements that could be misidentified as entities.
+   * Strips: image links, regular links (keep text), headings markers, bold/italic markers,
+   * inline code backticks (already handled), horizontal rules.
+   */
+  private stripMarkdownSyntax(content: string): string {
+    let result = content;
+    // Remove image links: ![alt](url)
+    result = result.replace(/!\[[^\]]{0,1000}\]\([^)]{0,2000}\)/g, "");
+    // Replace markdown links with just the text: [text](url) → text
+    result = result.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+    // Remove heading markers: ## heading → heading
+    result = result.replace(/^#{1,6}\s+/gm, "");
+    // Remove bold/italic markers
+    result = result.replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1");
+    result = result.replace(/_{1,3}([^_]+)_{1,3}/g, "$1");
+    // Remove horizontal rules
+    result = result.replace(/^[-*_]{3,}\s*$/gm, "");
+    // Remove HTML tags
+    result = result.replace(/<[^>]+>/g, "");
+    return result;
   }
 
   private resolveEntityTypes(entities: ExtractedEntity[]): ExtractedEntity[] {
