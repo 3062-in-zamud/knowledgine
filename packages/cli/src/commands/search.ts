@@ -2,6 +2,7 @@ import { resolve } from "path";
 import { existsSync } from "fs";
 import {
   loadConfig,
+  loadRcFile,
   resolveDefaultPath,
   createDatabase,
   loadSqliteVecExtension,
@@ -14,6 +15,7 @@ import {
   ModelManager,
   DEFAULT_MODEL_NAME,
   checkSemanticReadiness,
+  CrossProjectSearcher,
 } from "@knowledgine/core";
 import type { EmbeddingProvider } from "@knowledgine/core";
 import { getDemoNotesPath } from "./demo.js";
@@ -35,11 +37,64 @@ export interface SearchCommandOptions {
   fallback?: boolean;
   agentic?: boolean;
   includeDeprecated?: boolean;
+  projects?: string;
 }
 
 export async function searchCommand(query: string, options: SearchCommandOptions): Promise<void> {
   const fallbackAllowed = options.fallback !== false;
   const rootPath = options.demo ? getDemoNotesPath() : resolveDefaultPath(options.path);
+
+  // --projects: クロスプロジェクト横断検索
+  if (options.projects) {
+    const rcConfig = loadRcFile(rootPath);
+    const requestedNames = new Set(
+      options.projects
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+    const projectsConfig = rcConfig?.projects ?? [];
+    const projectsToSearch = projectsConfig.filter((p) => requestedNames.has(p.name));
+
+    if (projectsToSearch.length === 0) {
+      console.error(
+        `No matching projects found for: ${options.projects}. Check your .knowledginerc projects config.`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    const format = (options.format as "json" | "table" | "plain") ?? "plain";
+    const limit = options.limit ?? 20;
+    const searcher = new CrossProjectSearcher(projectsToSearch);
+    try {
+      const results = await searcher.search(query, { limit });
+      if (format === "json") {
+        console.log(JSON.stringify({ ok: true, command: "search", crossProject: true, results }));
+      } else {
+        if (results.length === 0) {
+          console.error(
+            `${symbols.info} ${colors.hint(`No cross-project results for "${query}".`)}`,
+          );
+        } else {
+          console.error(
+            colors.bold(`Cross-project results for "${query}" (${results.length} matches):`),
+          );
+          console.error("");
+          for (let i = 0; i < results.length; i++) {
+            const r = results[i];
+            console.error(`  ${i + 1}. [${r.score.toFixed(2)}] [${r.projectName}] ${r.title}`);
+            console.error(`     ${r.content.slice(0, 80).replace(/\n/g, " ")}`);
+            console.error("");
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
 
   const knowledgineDir = resolve(rootPath, ".knowledgine");
   if (!existsSync(knowledgineDir)) {

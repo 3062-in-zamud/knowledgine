@@ -3,7 +3,8 @@ import { cors } from "hono/cors";
 import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { KnowledgeService, KnowledgeRepository, GraphRepository } from "@knowledgine/core";
-import { IncrementalExtractor, GraphRepository as GraphRepositoryImpl } from "@knowledgine/core";
+import { IncrementalExtractor, CrossProjectSearcher } from "@knowledgine/core";
+import type { ProjectEntry } from "@knowledgine/core";
 import type Database from "better-sqlite3";
 
 export interface CaptureOptions {
@@ -39,6 +40,7 @@ export function createRestApp(
   service: KnowledgeService,
   version: string,
   capture?: CaptureOptions,
+  projects?: ProjectEntry[],
 ): Hono {
   const app = new Hono();
 
@@ -51,14 +53,29 @@ export function createRestApp(
     return c.json({ ok: true, version, notes: stats.totalNotes });
   });
 
-  // GET /search?q=...&mode=keyword&limit=20
+  // GET /search?q=...&mode=keyword&limit=20&projects=a,b
   app.get("/search", async (c) => {
     const q = c.req.query("q");
     if (!q) return c.json({ error: "q parameter is required" }, 400);
     const mode = c.req.query("mode") ?? "keyword";
     const limit = parseInt(c.req.query("limit") ?? "20", 10);
     if (isNaN(limit) || limit < 1) return c.json({ error: "Invalid limit" }, 400);
+    const projectsParam = c.req.query("projects");
     const start = Date.now();
+
+    if (projectsParam && projects) {
+      const requestedNames = new Set(
+        projectsParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+      const projectsToSearch = projects.filter((p) => requestedNames.has(p.name));
+      const searcher = new CrossProjectSearcher(projectsToSearch);
+      const results = await searcher.search(q, { limit });
+      return c.json({ results, query: q, crossProject: true, took_ms: Date.now() - start });
+    }
+
     const result = await service.search({
       query: q,
       limit,
