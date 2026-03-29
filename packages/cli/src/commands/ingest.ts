@@ -15,6 +15,10 @@ import {
   ReflectorAgent,
   PatternExtractor,
   EntityExtractor,
+  ModelManager,
+  DEFAULT_MODEL_NAME,
+  loadSqliteVecExtension,
+  OnnxEmbeddingProvider,
 } from "@knowledgine/core";
 import { IngestEngine } from "@knowledgine/ingest";
 import { createDefaultRegistry, initializePlugins } from "../lib/plugin-loader.js";
@@ -37,6 +41,7 @@ export interface IngestOptions {
   skipExtraction?: boolean;
   observe?: boolean;
   observeLimit?: number;
+  noEmbeddings?: boolean;
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
@@ -336,6 +341,105 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         console.log(
           `Reflector: ${contradictions} contradictions, ${deprecations} deprecation candidates`,
         );
+      }
+    }
+
+    // === Embedding generation for newly ingested notes ===
+    // uniqueIngestedNoteIds is already declared above for the Observer block
+    if (options.noEmbeddings) {
+      if (uniqueIngestedNoteIds.length > 0) {
+        console.error(
+          `  ${symbols.warning} ${colors.warning("Embedding generation skipped (--no-embeddings). Semantic search will not work for these notes.")}`,
+        );
+      }
+    } else if (uniqueIngestedNoteIds.length > 0) {
+      const embeddingConfig = rcConfig?.embedding as
+        | { enabled?: boolean; modelName?: string }
+        | undefined;
+      const embeddingEnabled = embeddingConfig?.enabled ?? rcConfig?.semantic ?? false;
+
+      if (embeddingEnabled) {
+        const modelManager = new ModelManager();
+        const modelName = embeddingConfig?.modelName ?? DEFAULT_MODEL_NAME;
+
+        if (modelManager.isModelAvailable(modelName)) {
+          try {
+            const vecLoaded = await loadSqliteVecExtension(db);
+            if (vecLoaded) {
+              // Find notes that need embeddings before initializing the provider
+              const noteIdsNeedingEmbeddings = repository.getNotesWithoutEmbeddingIds();
+
+              if (noteIdsNeedingEmbeddings.length > 0) {
+                const embeddingProvider = new OnnxEmbeddingProvider(modelName, modelManager);
+                const BATCH_SIZE = 20;
+                const total = noteIdsNeedingEmbeddings.length;
+                console.error(`\n  ${symbols.info} Generating embeddings for ${total} notes...`);
+
+                let interrupted = false;
+                const onSigint = () => {
+                  interrupted = true;
+                };
+                process.on("SIGINT", onSigint);
+
+                try {
+                  for (let i = 0; i < noteIdsNeedingEmbeddings.length; i += BATCH_SIZE) {
+                    if (interrupted) break;
+
+                    const batchIds = noteIdsNeedingEmbeddings.slice(i, i + BATCH_SIZE);
+                    const noteRows = repository.getNotesByIds(batchIds);
+                    const noteMap = new Map(noteRows.map((n) => [n.id, n]));
+                    const orderedNotes = batchIds
+                      .map((id) => noteMap.get(id))
+                      .filter((n): n is NonNullable<typeof n> => n != null);
+                    if (orderedNotes.length === 0) continue;
+
+                    const embeddings = await embeddingProvider.embedBatch(
+                      orderedNotes.map((n) => n.content),
+                    );
+
+                    repository.saveEmbeddingBatch(
+                      orderedNotes.map((n, j) => ({
+                        noteId: n.id,
+                        embedding: embeddings[j],
+                        modelName,
+                      })),
+                    );
+
+                    // Progress
+                    const done = Math.min(i + BATCH_SIZE, total);
+                    const pct = Math.round((done / total) * 100);
+                    process.stderr.write(
+                      `\r  ${symbols.info} Embeddings: ${done}/${total} (${pct}%)`,
+                    );
+                  }
+                } finally {
+                  process.removeListener("SIGINT", onSigint);
+                }
+
+                if (!interrupted) {
+                  console.error(
+                    `\n  ${symbols.success} ${colors.success(`Embeddings generated for ${total} notes`)}`,
+                  );
+                } else {
+                  console.error(
+                    `\n  ${symbols.warning} ${colors.warning("Embedding generation interrupted.")}`,
+                  );
+                }
+
+                await embeddingProvider.close();
+              }
+            }
+          } catch (error) {
+            // Non-fatal: embedding generation failure should not break ingest
+            console.error(
+              `  ${symbols.info} ${colors.hint(`Embedding generation skipped: ${error instanceof Error ? error.message : String(error)}`)}`,
+            );
+          }
+        } else {
+          console.error(
+            `  ${symbols.info} ${colors.hint("Embedding model not available. Run 'knowledgine upgrade --semantic' to download.")}`,
+          );
+        }
       }
     }
   } catch (error) {

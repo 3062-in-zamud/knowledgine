@@ -162,6 +162,10 @@ program
   .option("--observe", "Run Observer/Reflector agents after ingestion")
   .option("--no-observe", "Skip Observer/Reflector agents")
   .option("--observe-limit <n>", "Max notes to process with Observer", parseInt)
+  .option(
+    "--no-embeddings",
+    "Skip embedding generation after ingest (semantic search will not work for these notes)",
+  )
   .addHelpText(
     "after",
     `
