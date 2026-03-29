@@ -42,8 +42,33 @@ export interface ExtractedPatternRow {
 
 export class KnowledgeRepository {
   private _stmtCache = new Map<string, Database.Statement>();
+  private _resultCache = new Map<string, { data: unknown; timestamp: number }>();
+  private static readonly CACHE_MAX_SIZE = 256;
+  private static readonly CACHE_TTL_MS = 5000; // 5 seconds
 
   constructor(private db: Database.Database) {}
+
+  private getCachedResult<T>(key: string): T | null {
+    const entry = this._resultCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > KnowledgeRepository.CACHE_TTL_MS) {
+      this._resultCache.delete(key);
+      return null;
+    }
+    return entry.data as T;
+  }
+
+  private setCachedResult<T>(key: string, data: T): void {
+    if (this._resultCache.size >= KnowledgeRepository.CACHE_MAX_SIZE) {
+      const firstKey = this._resultCache.keys().next().value;
+      if (firstKey) this._resultCache.delete(firstKey);
+    }
+    this._resultCache.set(key, { data, timestamp: Date.now() });
+  }
+
+  clearResultCache(): void {
+    this._resultCache.clear();
+  }
 
   private stmt(sql: string): Database.Statement {
     let s = this._stmtCache.get(sql);
@@ -122,6 +147,7 @@ export class KnowledgeRepository {
           codeLocationJson,
           existing.id,
         );
+        this.clearResultCache();
         return existing.id;
       } else {
         const info = this.stmt(
@@ -141,6 +167,7 @@ export class KnowledgeRepository {
           contentHash,
           codeLocationJson,
         );
+        this.clearResultCache();
         return Number(info.lastInsertRowid);
       }
     } catch (error) {
@@ -196,6 +223,7 @@ export class KnowledgeRepository {
   deleteNoteById(id: number): boolean {
     try {
       const info = this.stmt("DELETE FROM knowledge_notes WHERE id = ?").run(id);
+      if (info.changes > 0) this.clearResultCache();
       return info.changes > 0;
     } catch (error) {
       throw new DatabaseError("deleteNoteById", error, { id });
@@ -205,6 +233,7 @@ export class KnowledgeRepository {
   deleteNoteByPath(path: string): boolean {
     try {
       const info = this.stmt("DELETE FROM knowledge_notes WHERE file_path = ?").run(path);
+      if (info.changes > 0) this.clearResultCache();
       return info.changes > 0;
     } catch (error) {
       throw new DatabaseError("deleteNoteByPath", error, { path });
@@ -613,6 +642,10 @@ export class KnowledgeRepository {
     dateFrom?: string,
     dateTo?: string,
   ): Array<{ note: KnowledgeNote; rank: number }> {
+    const cacheKey = `search:${query}:${limit}:${includeDeprecated}:${dateFrom ?? ""}:${dateTo ?? ""}`;
+    const cached = this.getCachedResult<Array<{ note: KnowledgeNote; rank: number }>>(cacheKey);
+    if (cached) return cached;
+
     const deprecatedFilter = includeDeprecated ? "" : "AND n.deprecated = 0";
     const dateFromFilter = dateFrom ? "AND n.created_at >= ?" : "";
     const dateToFilter = dateTo ? "AND n.created_at <= ?" : "";
@@ -638,14 +671,18 @@ export class KnowledgeRepository {
         ORDER BY rank
         LIMIT ?
       `,
-      ).all(query, ...dateParams, limit) as Array<KnowledgeNote & { rank: number }>;
+      ).all(query, ...dateParams, limit * 3) as Array<KnowledgeNote & { rank: number }>;
 
       // CJKクエリでunicode61が0件の場合はLIKEフォールバック（短いCJKトークンの救済）
       if (rows.length === 0 && hasCjk) {
         return this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
       }
 
-      return rows.map(({ rank, ...note }) => ({ note: note as KnowledgeNote, rank }));
+      const results = rows
+        .slice(0, limit)
+        .map(({ rank, ...note }) => ({ note: note as KnowledgeNote, rank }));
+      this.setCachedResult(cacheKey, results);
+      return results;
     } catch {
       return this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
     }
