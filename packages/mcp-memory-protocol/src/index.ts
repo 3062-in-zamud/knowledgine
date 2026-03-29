@@ -47,6 +47,8 @@ export {
   runUpdateTests,
   runForgetTests,
   runVersioningTests,
+  runErrorFormatTests,
+  runCapabilitiesTests,
 } from "./conformance/index.js";
 export type {
   ConformanceTestContext,

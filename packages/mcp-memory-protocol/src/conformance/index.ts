@@ -4,6 +4,8 @@ export { runRecallTests } from "./recall.test-suite.js";
 export { runUpdateTests } from "./update.test-suite.js";
 export { runForgetTests } from "./forget.test-suite.js";
 export { runVersioningTests } from "./versioning.test-suite.js";
+export { runErrorFormatTests } from "./error-format.test-suite.js";
+export { runCapabilitiesTests } from "./capabilities.test-suite.js";
 
 import type { ConformanceTestContext, ConformanceResult } from "./helpers.js";
 import { runStoreTests } from "./store.test-suite.js";
@@ -11,9 +13,12 @@ import { runRecallTests } from "./recall.test-suite.js";
 import { runUpdateTests } from "./update.test-suite.js";
 import { runForgetTests } from "./forget.test-suite.js";
 import { runVersioningTests } from "./versioning.test-suite.js";
+import { runErrorFormatTests } from "./error-format.test-suite.js";
+import { runCapabilitiesTests } from "./capabilities.test-suite.js";
 
 export interface ConformanceSuiteOptions {
   includeVersioning?: boolean;
+  includeCapabilities?: boolean;
 }
 
 export async function runConformanceSuite(
@@ -25,8 +30,12 @@ export async function runConformanceSuite(
   results.push(...(await runRecallTests(ctx)));
   results.push(...(await runUpdateTests(ctx)));
   results.push(...(await runForgetTests(ctx)));
+  results.push(...(await runErrorFormatTests(ctx)));
   if (options.includeVersioning) {
     results.push(...(await runVersioningTests(ctx)));
+  }
+  if (options.includeCapabilities) {
+    results.push(...(await runCapabilitiesTests(ctx)));
   }
   return results;
 }

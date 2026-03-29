@@ -14,10 +14,19 @@
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
     "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
