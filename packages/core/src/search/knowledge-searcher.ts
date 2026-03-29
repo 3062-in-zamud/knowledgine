@@ -12,6 +12,7 @@ import { HybridSearcher } from "./hybrid-searcher.js";
 import { ReasoningReranker } from "./reasoning-reranker.js";
 import type { RerankerWeights } from "./reasoning-reranker.js";
 import { QueryOrchestrator } from "./query-orchestrator.js";
+import { MODEL_REGISTRY, DEFAULT_MODEL_NAME } from "../embedding/model-manager.js";
 
 export interface SearchOptions {
   query?: string;
@@ -31,6 +32,11 @@ export interface SearchResult {
   score: number;
   matchReason: string[];
   fellBack?: boolean;
+  fallbackInfo?: {
+    reason: string;
+    modeUsed: "keyword" | "semantic" | "hybrid";
+    originalMode: string;
+  };
 }
 
 export class KnowledgeSearcher {
@@ -49,7 +55,13 @@ export class KnowledgeSearcher {
   ) {
     if (embeddingProvider) {
       this.semanticSearcher = new SemanticSearcher(repository, embeddingProvider);
-      this.hybridSearcher = new HybridSearcher(repository, embeddingProvider, hybridAlpha);
+      const modelFamily = MODEL_REGISTRY[DEFAULT_MODEL_NAME]?.family ?? "bert";
+      this.hybridSearcher = new HybridSearcher(
+        repository,
+        embeddingProvider,
+        hybridAlpha,
+        modelFamily,
+      );
     }
     this.reranker = new ReasoningReranker(undefined, repository);
     this.agenticReranker = new ReasoningReranker(llmProvider, repository);
@@ -66,6 +78,27 @@ export class KnowledgeSearcher {
   }
 
   async search(options: SearchOptions): Promise<SearchResult[]> {
+    const { mode = "keyword" } = options;
+
+    // Capability pre-check: detect if requested mode is available BEFORE orchestrator delegation
+    const needsSemantic = mode === "semantic" || mode === "hybrid";
+    const semanticAvailable = !!this.semanticSearcher;
+
+    if (needsSemantic && !semanticAvailable && options.query) {
+      // Fallback to keyword search with transparent notification
+      const keywordOptions = { ...options, mode: "keyword" as const };
+      const keywordResults = await this.search(keywordOptions);
+      return keywordResults.map((r) => ({
+        ...r,
+        fellBack: true,
+        fallbackInfo: {
+          reason: "Embedding provider not available — semantic search requires embeddings",
+          modeUsed: "keyword" as const,
+          originalMode: mode,
+        },
+      }));
+    }
+
     // orchestratorが利用可能な場合はQueryOrchestratorに委譲
     if (this.orchestrator && options.query) {
       const results = await this.orchestrator.query(options);
@@ -79,7 +112,6 @@ export class KnowledgeSearcher {
     const {
       query,
       limit = 50,
-      mode = "keyword",
       rerank = false,
       rerankWeights,
       includeDeprecated = false,
@@ -168,6 +200,15 @@ export class KnowledgeSearcher {
           score,
           matchReason: reasons,
           fellBack,
+          ...(fellBack
+            ? {
+                fallbackInfo: {
+                  reason: `${mode} search unavailable — embeddings not found`,
+                  modeUsed: "keyword" as const,
+                  originalMode: mode,
+                },
+              }
+            : {}),
         };
       });
 

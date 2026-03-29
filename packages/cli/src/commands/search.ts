@@ -211,15 +211,20 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       includeDeprecated: options.includeDeprecated,
     });
 
-    const warnings = result.results.flatMap((r) =>
-      r.matchReason.filter((m) => m.startsWith("Warning:")),
-    );
-    if (warnings.length > 0) {
-      console.error(`\n${symbols.warning} ${colors.warning(warnings[0])}\n`);
-    }
-
-    // セマンティック検索が要求されたが利用不可の場合の警告（フォールバック許可時のみ）
-    if (semanticUnavailable) {
+    // Fallback notification using fallbackInfo (KNOW-378)
+    const fallbackResult = result.results.find((r) => r.fallbackInfo);
+    if (fallbackResult?.fallbackInfo) {
+      const info = fallbackResult.fallbackInfo;
+      console.error("");
+      console.error(
+        `  ${symbols.warning} ${colors.warning(`${info.originalMode} search unavailable — falling back to ${info.modeUsed} search.`)}`,
+      );
+      console.error(`    Reason: ${info.reason}`);
+      if (info.modeUsed === "keyword") {
+        console.error(`    Fix:    ${colors.hint("knowledgine ingest --all --path .")}`);
+      }
+      console.error("");
+    } else if (semanticUnavailable) {
       console.error(
         `${symbols.warning} ${colors.warning("Semantic search is not configured. Falling back to FTS5.")}`,
       );
@@ -227,13 +232,6 @@ export async function searchCommand(query: string, options: SearchCommandOptions
         `${symbols.arrow} ${colors.hint("Run 'knowledgine upgrade --semantic' to enable semantic search.")}`,
       );
       console.error("");
-    }
-
-    // actualMode が要求モードと異なる場合（フォールバック発生）の通知
-    if (result.actualMode !== result.mode) {
-      console.error(
-        `${symbols.info} ${colors.hint(`Requested mode: ${result.mode}, actual mode used: ${result.actualMode}`)}`,
-      );
     }
 
     if (format === "json") {

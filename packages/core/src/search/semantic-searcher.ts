@@ -18,7 +18,7 @@ export class SemanticSearcher {
   ) {}
 
   async search(query: string, limit: number = 20): Promise<SemanticSearchResult[]> {
-    const queryEmbedding = await this.embeddingProvider.embed(query);
+    const queryEmbedding = await this.embeddingProvider.embedQuery(query);
     const vecResults = this.repository.searchByVector(queryEmbedding, limit);
 
     if (vecResults.length === 0) {

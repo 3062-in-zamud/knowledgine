@@ -104,6 +104,30 @@ describe("KnowledgeSearcher", () => {
       // keyword modeではフォールバックしない
       expect(results[0].fellBack).toBeFalsy();
     });
+
+    it("should include fallbackInfo when semantic mode falls back due to no embeddingProvider", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "semantic" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].fallbackInfo).toBeDefined();
+      expect(results[0].fallbackInfo?.modeUsed).toBe("keyword");
+      expect(results[0].fallbackInfo?.originalMode).toBe("semantic");
+      expect(results[0].fallbackInfo?.reason).toContain("semantic");
+    });
+
+    it("should include fallbackInfo when hybrid mode falls back due to no embeddingProvider", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "hybrid" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].fallbackInfo).toBeDefined();
+      expect(results[0].fallbackInfo?.modeUsed).toBe("keyword");
+      expect(results[0].fallbackInfo?.originalMode).toBe("hybrid");
+      expect(results[0].fallbackInfo?.reason).toContain("hybrid");
+    });
+
+    it("should not include fallbackInfo for explicit keyword mode", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "keyword" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].fallbackInfo).toBeUndefined();
+    });
   });
 
   describe("searchByTag", () => {

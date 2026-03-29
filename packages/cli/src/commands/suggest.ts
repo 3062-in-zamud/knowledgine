@@ -183,6 +183,7 @@ async function suggestAction(
           query: searchQuery,
           mode: "hybrid",
           actualMode: "hybrid",
+          modeUsed: "hybrid",
           totalResults: 0,
           results: [],
         };
