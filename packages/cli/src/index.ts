@@ -247,6 +247,7 @@ program
   )
   .option("--agentic", "Include deprecated notes in search results (agentic mode)")
   .option("--include-deprecated", "Include deprecated notes in search results")
+  .option("--projects <names>", "Search across projects (comma-separated project names)")
   .action(
     (
       query: string,
@@ -261,6 +262,7 @@ program
         fallback?: boolean;
         agentic?: boolean;
         includeDeprecated?: boolean;
+        projects?: string;
       },
     ) => {
       return searchCommand(query, {
@@ -274,6 +276,7 @@ program
         fallback: opts.fallback,
         agentic: opts.agentic,
         includeDeprecated: opts.includeDeprecated,
+        projects: opts.projects,
       });
     },
   );

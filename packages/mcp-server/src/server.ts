@@ -13,6 +13,8 @@ import type Database from "better-sqlite3";
 import { formatToolResult, formatToolError } from "./helpers.js";
 import { KnowledgineMemoryProvider } from "./memory-adapter.js";
 import { registerMemoryTools } from "./memory-tools.js";
+import { CrossProjectSearcher } from "@knowledgine/core";
+import type { ProjectEntry } from "@knowledgine/core";
 
 export interface McpServerOptions {
   repository: KnowledgeRepository;
@@ -22,6 +24,7 @@ export interface McpServerOptions {
   feedbackRepository?: FeedbackRepository;
   db?: Database.Database;
   memoryManager?: MemoryManager;
+  projects?: ProjectEntry[];
 }
 
 export function createKnowledgineMcpServer(options: McpServerOptions): McpServer {
@@ -33,7 +36,7 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
     "search_knowledge",
     {
       description:
-        "Full-text and semantic search across notes in the knowledge base. Use mode='keyword' for exact matches, 'semantic' for conceptual similarity, or 'hybrid' to combine both. Set agentic=true (or includeDeprecated=true) to include deprecated notes.",
+        "Full-text and semantic search across notes in the knowledge base. Use mode='keyword' for exact matches, 'semantic' for conceptual similarity, or 'hybrid' to combine both. Set agentic=true (or includeDeprecated=true) to include deprecated notes. Specify projects to search across multiple project databases.",
       inputSchema: {
         query: z.string().describe("Search query"),
         limit: z.number().int().positive().optional().describe("Maximum number of results"),
@@ -49,10 +52,22 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
           .boolean()
           .optional()
           .describe("Include deprecated notes (default: false)"),
+        projects: z
+          .array(z.string())
+          .optional()
+          .describe("Project names to search across (cross-project search)"),
       },
     },
     async (input) => {
       try {
+        if (input.projects && input.projects.length > 0 && options.projects) {
+          const projectFilter = new Set(input.projects);
+          const projectsToSearch = options.projects.filter((p) => projectFilter.has(p.name));
+          const searcher = new CrossProjectSearcher(projectsToSearch);
+          const results = await searcher.search(input.query, { limit: input.limit ?? 20 });
+          return formatToolResult({ results, query: input.query, crossProject: true });
+        }
+
         const result = await service.search({
           query: input.query,
           limit: input.limit ?? 20,
