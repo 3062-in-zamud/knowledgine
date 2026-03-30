@@ -45,7 +45,7 @@ describe("checkSemanticReadiness", () => {
     const result = checkSemanticReadiness(config, modelManager, repository);
 
     expect(result.ready).toBe(false);
-    expect(result.label).toBe("FTS5 only — run 'upgrade --semantic' to enable");
+    expect(result.label).toBe("FTS5 only — embedding disabled in config");
     expect(result.configEnabled).toBe(false);
     expect(result.embeddingsCount).toBe(0);
   });

@@ -111,7 +111,7 @@ describe("searchCommand fallback notification", () => {
 
     const output = stderrOutput.join("\n");
     expect(output).toContain("Fix:");
-    expect(output).toContain("knowledgine ingest --all --path .");
+    expect(output).toContain("knowledgine ingest --all --path /fake/path");
   });
 
   it("should exit with error code when --no-fallback is specified and semantic is unavailable", async () => {
