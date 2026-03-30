@@ -230,7 +230,7 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       );
       console.error(`    Reason: ${info.reason}`);
       if (info.modeUsed === "keyword") {
-        console.error(`    Fix:    ${colors.hint("knowledgine ingest --all --path .")}`);
+        console.error(`    Fix:    ${colors.hint(`knowledgine ingest --all --path ${rootPath}`)}`);
       }
       console.error("");
     } else if (semanticUnavailable) {
