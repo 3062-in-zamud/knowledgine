@@ -87,6 +87,19 @@ export class KnowledgeRepository {
     this._stmtCache.clear();
   }
 
+  getTopEntities(limit: number): Array<{ name: string; count: number }> {
+    return this.stmt(
+      `
+      SELECT e.name, COUNT(DISTINCT ne.note_id) as count
+      FROM entities e
+      JOIN note_entities ne ON e.id = ne.entity_id
+      GROUP BY e.id
+      ORDER BY count DESC
+      LIMIT ?
+    `,
+    ).all(limit) as Array<{ name: string; count: number }>;
+  }
+
   private computeHash(content: string): string {
     return createHash("sha256").update(content).digest("hex");
   }

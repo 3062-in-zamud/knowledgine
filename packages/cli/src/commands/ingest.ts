@@ -57,28 +57,9 @@ interface TopEntity {
 }
 
 function getTopEntities(repository: KnowledgeRepository, limit: number): TopEntity[] {
-  // Query the database for top entities by note count
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accessing internal db for summary query
-    const db = (repository as any).db;
-    if (!db) return [];
-    const rows = db
-      .prepare(
-        `
-      SELECT e.name, COUNT(DISTINCT ne.note_id) as cnt
-      FROM entities e
-      JOIN note_entities ne ON e.id = ne.entity_id
-      GROUP BY e.id
-      ORDER BY cnt DESC
-      LIMIT ?
-    `,
-      )
-      .all(limit + GENERIC_ENTITIES.size) as Array<{ name: string; cnt: number }>;
-
-    return rows
-      .filter((r) => !GENERIC_ENTITIES.has(r.name.toLowerCase()))
-      .slice(0, limit)
-      .map((r) => ({ name: r.name, count: r.cnt }));
+    const rows = repository.getTopEntities(limit + GENERIC_ENTITIES.size);
+    return rows.filter((r) => !GENERIC_ENTITIES.has(r.name.toLowerCase())).slice(0, limit);
   } catch {
     return [];
   }
