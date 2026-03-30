@@ -17,7 +17,7 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
     this.modelManager = modelManager ?? new ModelManager();
   }
 
-  private get modelFamily(): "bert" | "e5" {
+  get modelFamily(): "bert" | "e5" {
     return MODEL_REGISTRY[this.modelName]?.family ?? "bert";
   }
 

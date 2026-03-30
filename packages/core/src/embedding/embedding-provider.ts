@@ -11,4 +11,6 @@ export interface EmbeddingProvider {
   embedBatch(texts: string[]): Promise<Float32Array[]>;
   /** 埋め込みの次元数を返す */
   getDimensions(): number;
+  /** モデルファミリー（オプション）。HybridSearcherのCJK alpha判定に使用 */
+  readonly modelFamily?: "bert" | "e5";
 }

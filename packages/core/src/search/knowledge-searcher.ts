@@ -57,7 +57,8 @@ export class KnowledgeSearcher {
     this.graphRepository = graphRepository;
     if (embeddingProvider) {
       this.semanticSearcher = new SemanticSearcher(repository, embeddingProvider);
-      const modelFamily = MODEL_REGISTRY[DEFAULT_MODEL_NAME]?.family ?? "bert";
+      const modelFamily =
+        embeddingProvider.modelFamily ?? MODEL_REGISTRY[DEFAULT_MODEL_NAME]?.family ?? "bert";
       this.hybridSearcher = new HybridSearcher(
         repository,
         embeddingProvider,
