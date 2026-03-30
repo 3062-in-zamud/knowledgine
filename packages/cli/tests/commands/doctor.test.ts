@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { randomUUID } from "crypto";
 import { createDatabase, Migrator, KnowledgeRepository, ALL_MIGRATIONS } from "@knowledgine/core";
 import {
   doctorCommand,
@@ -23,8 +22,7 @@ describe("doctor command", () => {
   let stderrSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-doctor-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-doctor-"));
     stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -91,8 +89,7 @@ describe("checkKnowledgineDir", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-doctor-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-doctor-"));
   });
 
   afterEach(() => {
@@ -117,8 +114,7 @@ describe("checkDatabaseExists", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-doctor-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-doctor-"));
   });
 
   afterEach(() => {
@@ -143,8 +139,7 @@ describe("checkDatabaseNotEmpty", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-doctor-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-doctor-"));
   });
 
   afterEach(() => {
@@ -177,8 +172,7 @@ describe("checkDatabasePermissions", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-doctor-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-doctor-"));
   });
 
   afterEach(() => {
@@ -203,8 +197,7 @@ describe("checkFTS5Integrity", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-doctor-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-doctor-"));
   });
 
   afterEach(() => {
@@ -252,8 +245,7 @@ describe("checkEmbeddingCoverage", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-doctor-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-doctor-"));
   });
 
   afterEach(() => {
@@ -300,8 +292,7 @@ describe("checkStaleEmbeddings", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-doctor-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-doctor-"));
   });
 
   afterEach(() => {
@@ -341,8 +332,7 @@ describe("checkSearchLatency", () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-doctor-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-doctor-"));
   });
 
   afterEach(() => {
@@ -371,8 +361,7 @@ describe("health score calculation", () => {
   let stderrSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `knowledgine-doctor-test-${randomUUID()}`);
-    mkdirSync(testDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-doctor-"));
     stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
