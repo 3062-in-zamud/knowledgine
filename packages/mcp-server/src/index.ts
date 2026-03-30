@@ -13,7 +13,7 @@ export {
 } from "./helpers.js";
 export { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 export { createRestApp } from "./rest-server.js";
-export type { CaptureOptions } from "./rest-server.js";
+export type { CaptureOptions, AuthConfig } from "./rest-server.js";
 
 async function main(): Promise<void> {
   const config = resolveConfig();

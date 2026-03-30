@@ -15,11 +15,55 @@ import {
   ReflectorAgent,
   PatternExtractor,
   EntityExtractor,
+  ModelManager,
+  DEFAULT_MODEL_NAME,
+  loadSqliteVecExtension,
+  OnnxEmbeddingProvider,
 } from "@knowledgine/core";
 import { IngestEngine } from "@knowledgine/ingest";
 import { createDefaultRegistry, initializePlugins } from "../lib/plugin-loader.js";
 import { createProgress, formatDuration, createSummaryReport } from "../lib/progress.js";
 import { colors, symbols } from "../lib/ui/index.js";
+
+/** Generic entity names to exclude from "top entities" suggestions. */
+const GENERIC_ENTITIES = new Set([
+  "readme",
+  "package.json",
+  "src",
+  "test",
+  "tests",
+  "index",
+  "main",
+  "lib",
+  "dist",
+  "docs",
+  "config",
+  "node_modules",
+  "changelog",
+  "license",
+  "todo",
+  "app",
+  "utils",
+  "build",
+  ".github",
+  "public",
+  "assets",
+  "vendor",
+]);
+
+interface TopEntity {
+  name: string;
+  count: number;
+}
+
+function getTopEntities(repository: KnowledgeRepository, limit: number): TopEntity[] {
+  try {
+    const rows = repository.getTopEntities(limit + GENERIC_ENTITIES.size);
+    return rows.filter((r) => !GENERIC_ENTITIES.has(r.name.toLowerCase())).slice(0, limit);
+  } catch {
+    return [];
+  }
+}
 
 export interface IngestOptions {
   source?: string;
@@ -37,6 +81,7 @@ export interface IngestOptions {
   skipExtraction?: boolean;
   observe?: boolean;
   observeLimit?: number;
+  noEmbeddings?: boolean;
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
@@ -216,6 +261,12 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       ];
       const report = createSummaryReport("knowledgine ingest", reportEntries);
       console.error("\n" + report);
+
+      // Next-step hint after --all ingest
+      const uniqueAllNoteIds = Array.from(new Set(ingestedNoteIds));
+      if (uniqueAllNoteIds.length > 0) {
+        console.error(`  → Try: knowledgine search '<your query>' --mode hybrid`);
+      }
     } else {
       const pluginConfig: Record<string, unknown> = {};
       if (options.limit !== undefined) pluginConfig.limit = options.limit;
@@ -272,6 +323,12 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         );
       }
 
+      // Next-step hint after single-source ingest
+      const uniqueSingleNoteIds = Array.from(new Set(ingestedNoteIds));
+      if (uniqueSingleNoteIds.length > 0) {
+        console.error(`  → Try: knowledgine search '<your query>' --mode hybrid`);
+      }
+
       // Show default limit hint for git-history when no explicit limit was set
       if (
         options.source === "git-history" &&
@@ -287,11 +344,31 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       }
     }
 
+    // Intelligent post-ingest summary
+    const uniqueIngestedNoteIds = Array.from(new Set(ingestedNoteIds));
+    if (uniqueIngestedNoteIds.length > 0) {
+      try {
+        const topEntities = getTopEntities(repository, 5);
+        if (topEntities.length > 0) {
+          console.error("");
+          console.error("  Top entities discovered:");
+          for (const { name, count } of topEntities) {
+            console.error(`    • ${name} (${count} notes)`);
+          }
+          // Suggest search with top entity
+          const topEntity = topEntities[0];
+          console.error("");
+          console.error(`  → Try: knowledgine search '${topEntity.name}' --mode hybrid`);
+        }
+      } catch {
+        // Non-fatal: summary generation failure should not break ingest
+      }
+    }
+
     // Observer/Reflector post-processing
     const rcConfig = loadRcFile(rootPath);
     const shouldObserve = options.observe ?? rcConfig?.observer?.enabled ?? false;
 
-    const uniqueIngestedNoteIds = Array.from(new Set(ingestedNoteIds));
     if (shouldObserve && uniqueIngestedNoteIds.length > 0) {
       const observeLimit = options.observeLimit ?? rcConfig?.observer?.limit ?? 50;
       const noteIdsToObserve = uniqueIngestedNoteIds.slice(0, observeLimit);
@@ -336,6 +413,105 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         console.log(
           `Reflector: ${contradictions} contradictions, ${deprecations} deprecation candidates`,
         );
+      }
+    }
+
+    // === Embedding generation for newly ingested notes ===
+    // uniqueIngestedNoteIds is already declared above for the Observer block
+    if (options.noEmbeddings) {
+      if (uniqueIngestedNoteIds.length > 0) {
+        console.error(
+          `  ${symbols.warning} ${colors.warning("Embedding generation skipped (--no-embeddings). Semantic search will not work for these notes.")}`,
+        );
+      }
+    } else if (uniqueIngestedNoteIds.length > 0) {
+      const embeddingConfig = rcConfig?.embedding as
+        | { enabled?: boolean; modelName?: string }
+        | undefined;
+      const embeddingEnabled = embeddingConfig?.enabled ?? rcConfig?.semantic ?? false;
+
+      if (embeddingEnabled) {
+        const modelManager = new ModelManager();
+        const modelName = embeddingConfig?.modelName ?? DEFAULT_MODEL_NAME;
+
+        if (modelManager.isModelAvailable(modelName)) {
+          try {
+            const vecLoaded = await loadSqliteVecExtension(db);
+            if (vecLoaded) {
+              // Find notes that need embeddings before initializing the provider
+              const noteIdsNeedingEmbeddings = repository.getNotesWithoutEmbeddingIds();
+
+              if (noteIdsNeedingEmbeddings.length > 0) {
+                const embeddingProvider = new OnnxEmbeddingProvider(modelName, modelManager);
+                const BATCH_SIZE = 20;
+                const total = noteIdsNeedingEmbeddings.length;
+                console.error(`\n  ${symbols.info} Generating embeddings for ${total} notes...`);
+
+                let interrupted = false;
+                const onSigint = () => {
+                  interrupted = true;
+                };
+                process.on("SIGINT", onSigint);
+
+                try {
+                  for (let i = 0; i < noteIdsNeedingEmbeddings.length; i += BATCH_SIZE) {
+                    if (interrupted) break;
+
+                    const batchIds = noteIdsNeedingEmbeddings.slice(i, i + BATCH_SIZE);
+                    const noteRows = repository.getNotesByIds(batchIds);
+                    const noteMap = new Map(noteRows.map((n) => [n.id, n]));
+                    const orderedNotes = batchIds
+                      .map((id) => noteMap.get(id))
+                      .filter((n): n is NonNullable<typeof n> => n != null);
+                    if (orderedNotes.length === 0) continue;
+
+                    const embeddings = await embeddingProvider.embedBatch(
+                      orderedNotes.map((n) => n.content),
+                    );
+
+                    repository.saveEmbeddingBatch(
+                      orderedNotes.map((n, j) => ({
+                        noteId: n.id,
+                        embedding: embeddings[j],
+                        modelName,
+                      })),
+                    );
+
+                    // Progress
+                    const done = Math.min(i + BATCH_SIZE, total);
+                    const pct = Math.round((done / total) * 100);
+                    process.stderr.write(
+                      `\r  ${symbols.info} Embeddings: ${done}/${total} (${pct}%)`,
+                    );
+                  }
+                } finally {
+                  process.removeListener("SIGINT", onSigint);
+                }
+
+                if (!interrupted) {
+                  console.error(
+                    `\n  ${symbols.success} ${colors.success(`Embeddings generated for ${total} notes`)}`,
+                  );
+                } else {
+                  console.error(
+                    `\n  ${symbols.warning} ${colors.warning("Embedding generation interrupted.")}`,
+                  );
+                }
+
+                await embeddingProvider.close();
+              }
+            }
+          } catch (error) {
+            // Non-fatal: embedding generation failure should not break ingest
+            console.error(
+              `  ${symbols.info} ${colors.hint(`Embedding generation skipped: ${error instanceof Error ? error.message : String(error)}`)}`,
+            );
+          }
+        } else {
+          console.error(
+            `  ${symbols.info} ${colors.hint("Embedding model not available. Run 'knowledgine upgrade --semantic' to download.")}`,
+          );
+        }
       }
     }
   } catch (error) {

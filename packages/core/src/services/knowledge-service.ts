@@ -22,6 +22,7 @@ export interface SearchKnowledgeResult {
   query: string;
   mode: "keyword" | "semantic" | "hybrid";
   actualMode: "keyword" | "semantic" | "hybrid";
+  modeUsed: "keyword" | "semantic" | "hybrid";
   totalResults: number;
   results: Array<{
     noteId: number;
@@ -29,7 +30,13 @@ export interface SearchKnowledgeResult {
     title: string;
     score: number;
     matchReason: string[];
+    snippet?: string;
     createdAt: string;
+    fallbackInfo?: {
+      reason: string;
+      modeUsed: "keyword" | "semantic" | "hybrid";
+      originalMode: string;
+    };
   }>;
 }
 
@@ -158,10 +165,15 @@ export class KnowledgeService {
     const didFallBack =
       (mode === "semantic" || mode === "hybrid") && !this.options.embeddingProvider;
     const actualMode: "keyword" | "semantic" | "hybrid" = didFallBack ? "keyword" : mode;
+    // Detect fallback from search results (KNOW-378)
+    const fallbackResult = results.find((r) => r.fallbackInfo);
+    const modeUsed = fallbackResult?.fallbackInfo?.modeUsed ?? actualMode;
+
     return {
       query,
       mode,
       actualMode,
+      modeUsed,
       totalResults: results.length,
       results: results.map((r) => ({
         noteId: r.note.id,
@@ -169,7 +181,9 @@ export class KnowledgeService {
         title: r.note.title,
         score: r.score,
         matchReason: r.matchReason,
+        snippet: r.snippet,
         createdAt: r.note.created_at,
+        ...(r.fallbackInfo ? { fallbackInfo: r.fallbackInfo } : {}),
       })),
     };
   }

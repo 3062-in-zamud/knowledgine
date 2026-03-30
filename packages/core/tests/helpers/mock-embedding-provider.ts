@@ -17,6 +17,12 @@ export class MockEmbeddingProvider implements EmbeddingProvider {
     return this.computeDeterministicEmbedding(text);
   }
 
+  async embedQuery(text: string): Promise<Float32Array> {
+    // E5 query: prefix would normally be added by the real provider.
+    // In tests, delegate to the same deterministic embedding.
+    return this.computeDeterministicEmbedding(text);
+  }
+
   async embedBatch(texts: string[]): Promise<Float32Array[]> {
     return texts.map((t) => this.computeDeterministicEmbedding(t));
   }

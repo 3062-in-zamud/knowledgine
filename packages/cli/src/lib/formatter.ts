@@ -56,13 +56,28 @@ export function formatStats(stats: StatsResult, format: OutputFormat): string {
   if (format === "json") {
     return JSON.stringify(stats, null, 2);
   }
+  const embeddingsGenerated =
+    stats.embeddingStatus.notesWithoutEmbeddings !== null
+      ? stats.totalNotes - stats.embeddingStatus.notesWithoutEmbeddings
+      : null;
+  const embeddingCoverage =
+    embeddingsGenerated !== null && stats.totalNotes > 0
+      ? Math.round((embeddingsGenerated / stats.totalNotes) * 100)
+      : null;
+  const embeddingDisplay =
+    embeddingsGenerated !== null && embeddingCoverage !== null
+      ? `${embeddingsGenerated}/${stats.totalNotes} (${embeddingCoverage}%)`
+      : stats.embeddingStatus.available
+        ? "enabled"
+        : "disabled";
+
   if (format === "plain") {
     return [
       `Notes: ${stats.totalNotes}`,
       `Patterns: ${stats.totalPatterns}`,
       `Links: ${stats.totalLinks}`,
       `Pairs: ${stats.totalPairs}`,
-      `Embeddings: ${stats.embeddingStatus.available ? "enabled" : "disabled"}`,
+      `Embeddings: ${embeddingDisplay}`,
     ].join("\n");
   }
   // table
@@ -71,14 +86,8 @@ export function formatStats(stats: StatsResult, format: OutputFormat): string {
     ["Total Patterns", colors.info(String(stats.totalPatterns))],
     ["Total Links", colors.info(String(stats.totalLinks))],
     ["Total Pairs", colors.info(String(stats.totalPairs))],
-    ["Embeddings Available", colors.info(String(stats.embeddingStatus.available))],
+    ["Embeddings", colors.info(embeddingDisplay)],
   ];
-  if (stats.embeddingStatus.notesWithoutEmbeddings !== null) {
-    rows.push([
-      "Notes Without Embeddings",
-      colors.info(String(stats.embeddingStatus.notesWithoutEmbeddings)),
-    ]);
-  }
   if (stats.graphStats) {
     rows.push(["Graph Entities", colors.info(String(stats.graphStats.totalEntities))]);
     rows.push(["Graph Relations", colors.info(String(stats.graphStats.totalRelations))]);

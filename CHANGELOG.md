@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-03-29
+
+### Critical Fixes (Phase 1)
+
+- **KNOW-382**: DB file permissions hardened to 600 (owner-only access)
+- **KNOW-370**: Accurate embedding coverage display with percentage in status/stats
+- **KNOW-371**: Keyword search latency optimization with LRU cache (256 entries, 5s TTL)
+- **KNOW-375**: Multilingual embedding model support (multilingual-e5-small) with E5 prefix handling
+- **KNOW-377**: Input validation for CLI search, setup, and MCP server
+- **KNOW-389**: New `doctor` command with 11 health diagnostics and auto-fix
+- **KNOW-369**: Automatic embedding generation after ingest with SIGINT safety
+- **KNOW-372**: Dynamic hybrid search alpha based on model capability (E5 CJK=0.5, MiniLM CJK=1.0)
+- **KNOW-378**: Capability pre-check with structured fallback notifications
+
+### Search Quality (Phase 2)
+
+- **KNOW-376**: CJK keyword search quality with LIKE fallback for 2-char queries
+- **KNOW-387**: Search result context snippets with FTS5 and LIKE fallback
+- **KNOW-373**: Compound keyword search with OR support, phrase search, AND-to-OR fallback
+- **KNOW-374**: Entity-linked ranking boost (1.2x) for orchestrator-free search path
+
+### UX Improvements (Phase 2)
+
+- **KNOW-385**: Init→ingest→search journey with next-step hints and dynamic hybrid default
+- **KNOW-388**: Intelligent post-ingest summary with top entities
+- **KNOW-383**: REST API `--auth` flag, rate limiting (100 req/min), and 0.0.0.0 security warning
+- **KNOW-379**: Entity extraction noise removal (Markdown stripping, expanded STOP_LIST)
+
+### Infrastructure (Phase 2)
+
+- **KNOW-390**: CI performance benchmark with artifact storage (Node 22, continue-on-error)
+
+### Polish (Phase 3)
+
+- **KNOW-380**: Deprecation-check multilingual bigram tokenization and translation file exclusion
+- **KNOW-381**: `suggest --file` header display with 5-line truncation
+- **KNOW-384**: Empty DB prevention with zero-byte check and WAL checkpoint
+- **KNOW-386**: CLI command improvements (`stats` top-level alias, updated help text)
+- **KNOW-391**: Dogfooding evaluation framework documentation
+
 ## [0.6.1] - 2026-03-29
 
 ### Fixed

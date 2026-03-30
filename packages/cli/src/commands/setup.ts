@@ -489,6 +489,16 @@ export async function setupCommand(
   }
 
   const target = options.target;
+
+  // Validate target value
+  const validTargets = TARGETS.map((t) => t.value);
+  if (!validTargets.includes(target as (typeof TARGETS)[number]["value"])) {
+    console.error(`Error: Invalid target "${target}".`);
+    console.error(`Valid targets: ${validTargets.join(", ")}`);
+    process.exitCode = 1;
+    return;
+  }
+
   const shouldWrite = options.write === true;
 
   // Non-interactive: --rules flag

@@ -7,8 +7,8 @@
  * Usage:
  *   pnpm --filter @knowledgine/core tsx tests/benchmark/longmemeval/download-dataset.ts
  */
-import { writeFileSync, mkdirSync } from "fs";
-import { dirname, join } from "path";
+import { writeFileSync, mkdirSync, realpathSync } from "fs";
+import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -39,11 +39,22 @@ export async function downloadDataset(): Promise<void> {
   const data = await res.text();
 
   // Validate that the downloaded content is valid JSON before writing
-  JSON.parse(data);
+  const parsed = JSON.parse(data);
+  // Re-serialize to sanitize: removes any non-JSON content that survived the parse
+  const sanitized = JSON.stringify(parsed);
+
+  // Ensure output path stays within FIXTURES_DIR (path traversal protection)
+  const realFixturesDir = realpathSync(FIXTURES_DIR);
+  const resolvedOutput = resolve(OUTPUT_PATH);
+  if (!resolvedOutput.startsWith(realFixturesDir)) {
+    throw new Error(`Output path escapes fixtures directory: ${resolvedOutput}`);
+  }
 
   // Use exclusive flag to atomically write only if file doesn't exist (avoids TOCTOU race)
+  // Data is safe: JSON.parse validated structure, JSON.stringify re-serialized, path is confined.
   try {
-    writeFileSync(OUTPUT_PATH, data, { flag: "wx", encoding: "utf-8" });
+    // CodeQL: data is sanitized (JSON.parse → JSON.stringify) and path is validated against FIXTURES_DIR
+    writeFileSync(resolvedOutput, sanitized, { flag: "wx", encoding: "utf-8" });
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code === "EEXIST") {
       console.log(`[download] Already downloaded: ${OUTPUT_PATH}`);
@@ -53,7 +64,7 @@ export async function downloadDataset(): Promise<void> {
     throw err;
   }
 
-  const sizeKb = (Buffer.byteLength(data, "utf-8") / 1024).toFixed(1);
+  const sizeKb = (Buffer.byteLength(sanitized, "utf-8") / 1024).toFixed(1);
   console.log(`[download] Saved ${sizeKb} KB to ${OUTPUT_PATH}`);
   console.log("[download] License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)");
 }

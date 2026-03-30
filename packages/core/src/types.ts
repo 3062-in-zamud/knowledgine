@@ -46,6 +46,13 @@ export interface KnowledgeData {
   codeLocationJson?: string;
 }
 
+/** Fallback information when AND→OR expansion is used */
+export interface FallbackInfo {
+  reason: string;
+  modeUsed: "keyword" | "semantic" | "hybrid";
+  originalMode: string;
+}
+
 /** Search result */
 export interface SearchResult {
   note: {

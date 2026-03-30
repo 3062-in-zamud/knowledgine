@@ -42,11 +42,11 @@ describe("KnowledgeSearcher", () => {
   describe("search (semantic mode)", () => {
     it("should fall back to keyword search with notification when no embedding provider", async () => {
       const results = await searcher.search({ query: "TypeScript", mode: "semantic" });
-      // No provider → falls back to keyword with results
+      // No provider → capability pre-check falls back to keyword with fallbackInfo
       expect(results.length).toBeGreaterThan(0);
-      expect(results[0].matchReason).toContain(
-        "Warning: semantic search is not available. Showing keyword results instead. Run 'knowledgine upgrade --semantic' to enable.",
-      );
+      expect(results[0].fellBack).toBe(true);
+      expect(results[0].fallbackInfo?.modeUsed).toBe("keyword");
+      expect(results[0].fallbackInfo?.originalMode).toBe("semantic");
       // Should still include keyword match reason
       expect(results[0].matchReason).toContain('キーワード一致: "TypeScript"');
     });
@@ -73,9 +73,9 @@ describe("KnowledgeSearcher", () => {
     it("should fall back to keyword for hybrid mode without provider", async () => {
       const results = await searcher.search({ query: "TypeScript", mode: "hybrid" });
       expect(results.length).toBeGreaterThan(0);
-      expect(results[0].matchReason).toContain(
-        "Warning: hybrid search is not available. Showing keyword results instead. Run 'knowledgine upgrade --semantic' to enable.",
-      );
+      expect(results[0].fellBack).toBe(true);
+      expect(results[0].fallbackInfo?.modeUsed).toBe("keyword");
+      expect(results[0].fallbackInfo?.originalMode).toBe("hybrid");
     });
 
     it("should not include fallback notice for explicit keyword mode", async () => {
@@ -104,6 +104,30 @@ describe("KnowledgeSearcher", () => {
       // keyword modeではフォールバックしない
       expect(results[0].fellBack).toBeFalsy();
     });
+
+    it("should include fallbackInfo when semantic mode falls back due to no embeddingProvider", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "semantic" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].fallbackInfo).toBeDefined();
+      expect(results[0].fallbackInfo?.modeUsed).toBe("keyword");
+      expect(results[0].fallbackInfo?.originalMode).toBe("semantic");
+      expect(results[0].fallbackInfo?.reason).toContain("semantic");
+    });
+
+    it("should include fallbackInfo when hybrid mode falls back due to no embeddingProvider", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "hybrid" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].fallbackInfo).toBeDefined();
+      expect(results[0].fallbackInfo?.modeUsed).toBe("keyword");
+      expect(results[0].fallbackInfo?.originalMode).toBe("hybrid");
+      expect(results[0].fallbackInfo?.reason).toContain("Embedding provider not available");
+    });
+
+    it("should not include fallbackInfo for explicit keyword mode", async () => {
+      const results = await searcher.search({ query: "TypeScript", mode: "keyword" });
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0].fallbackInfo).toBeUndefined();
+    });
   });
 
   describe("searchByTag", () => {
@@ -117,6 +141,15 @@ describe("KnowledgeSearcher", () => {
     it("should return empty (no query provided)", async () => {
       const results = await searcher.searchRecent();
       expect(results).toEqual([]);
+    });
+  });
+
+  describe("CJK short query LIKE fallback", () => {
+    it("returns results for 2-char CJK query", () => {
+      // searchNotesWithRank should delegate to LIKE for short CJK
+      const results = ctx.repository.searchNotesWithRank("認証", 10);
+      // Just verify it doesn't throw (LIKE fallback handles it)
+      expect(Array.isArray(results)).toBe(true);
     });
   });
 

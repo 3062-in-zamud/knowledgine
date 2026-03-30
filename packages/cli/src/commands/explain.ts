@@ -36,7 +36,11 @@ function formatPlain(
   const lines: string[] = [];
 
   lines.push(`Entity: ${entityGraph.name}`);
-  lines.push(`Type: ${entityGraph.entityType}`);
+  const typeDisplay =
+    entityGraph.entityType === "unknown"
+      ? `unknown (detected in ${entityGraph.linkedNotes.length} note${entityGraph.linkedNotes.length !== 1 ? "s" : ""}, type not yet classified)`
+      : entityGraph.entityType;
+  lines.push(`Type: ${typeDisplay}`);
   if (entityGraph.description) {
     lines.push(`Description: ${entityGraph.description}`);
   }

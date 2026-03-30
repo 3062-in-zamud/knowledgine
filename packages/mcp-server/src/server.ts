@@ -38,7 +38,7 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
       description:
         "Full-text and semantic search across notes in the knowledge base. Use mode='keyword' for exact matches, 'semantic' for conceptual similarity, or 'hybrid' to combine both. Set agentic=true (or includeDeprecated=true) to include deprecated notes. Specify projects to search across multiple project databases.",
       inputSchema: {
-        query: z.string().describe("Search query"),
+        query: z.string().min(1, "Query cannot be empty").describe("Search query"),
         limit: z.number().int().positive().optional().describe("Maximum number of results"),
         mode: z
           .enum(["keyword", "semantic", "hybrid"])
