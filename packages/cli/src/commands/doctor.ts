@@ -580,6 +580,26 @@ export async function doctorCommand(options: DoctorOptions): Promise<void> {
     });
   }
 
+  // Auto-fix: attempt to repair issues when --fix is specified
+  if (options.fix) {
+    for (const result of results) {
+      if (result.status !== "pass" && result.fix) {
+        // Auto-fix DB permissions
+        if (result.name === "database permissions" && existsSync(dbPath)) {
+          try {
+            const { chmodSync } = await import("fs");
+            chmodSync(dbPath, 0o600);
+            result.status = "pass";
+            result.message = "database file permissions fixed (chmod 600)";
+            console.error(`  ${symbols.success} ${colors.success(`Fixed: ${result.name}`)}`);
+          } catch {
+            /* non-fatal */
+          }
+        }
+      }
+    }
+  }
+
   // Output: failures first, then success summary
   const failures = results.filter((r) => r.status !== "pass");
   const passes = results.filter((r) => r.status === "pass");
