@@ -230,6 +230,13 @@ export function checkEmbeddingCoverage(dbPath: string): DiagnosticResult {
       const withEmbeddings = stats.totalNotes - withoutEmbeddings;
       const coverage = Math.round((withEmbeddings / stats.totalNotes) * 100);
 
+      // Determine correct fix command: if model exists, suggest ingest; otherwise, suggest upgrade
+      const modelManager = new ModelManager();
+      const modelExists = modelManager.isModelAvailable();
+      const fixCommand = modelExists
+        ? "knowledgine ingest --all"
+        : "knowledgine upgrade --semantic";
+
       if (coverage === 100) {
         return {
           name: "embedding coverage",
@@ -247,14 +254,14 @@ export function checkEmbeddingCoverage(dbPath: string): DiagnosticResult {
           name: "embedding coverage",
           status: "warning",
           message: `${coverage}% coverage — ${withoutEmbeddings} notes missing embeddings`,
-          fix: "knowledgine upgrade --semantic",
+          fix: fixCommand,
         };
       } else {
         return {
           name: "embedding coverage",
           status: "warning",
           message: "no embeddings generated yet — semantic search is unavailable",
-          fix: "knowledgine upgrade --semantic",
+          fix: fixCommand,
         };
       }
     } finally {
