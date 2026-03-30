@@ -12,6 +12,7 @@ import { HybridSearcher } from "./hybrid-searcher.js";
 import { ReasoningReranker } from "./reasoning-reranker.js";
 import type { RerankerWeights } from "./reasoning-reranker.js";
 import { QueryOrchestrator } from "./query-orchestrator.js";
+import { MODEL_REGISTRY, DEFAULT_MODEL_NAME } from "../embedding/model-manager.js";
 
 export interface SearchOptions {
   query?: string;
@@ -26,11 +27,16 @@ export interface SearchOptions {
   agentic?: boolean;
 }
 
+export type { FallbackInfo } from "../types.js";
+import type { FallbackInfo } from "../types.js";
+
 export interface SearchResult {
   note: KnowledgeNote | KnowledgeNoteSummary;
   score: number;
   matchReason: string[];
+  snippet?: string;
   fellBack?: boolean;
+  fallbackInfo?: FallbackInfo;
 }
 
 export class KnowledgeSearcher {
@@ -39,6 +45,7 @@ export class KnowledgeSearcher {
   private reranker: ReasoningReranker;
   private agenticReranker: ReasoningReranker;
   private orchestrator?: QueryOrchestrator;
+  private graphRepository?: GraphRepository;
 
   constructor(
     private repository: KnowledgeRepository,
@@ -47,9 +54,17 @@ export class KnowledgeSearcher {
     llmProvider?: LLMProvider,
     graphRepository?: GraphRepository,
   ) {
+    this.graphRepository = graphRepository;
     if (embeddingProvider) {
       this.semanticSearcher = new SemanticSearcher(repository, embeddingProvider);
-      this.hybridSearcher = new HybridSearcher(repository, embeddingProvider, hybridAlpha);
+      const modelFamily =
+        embeddingProvider.modelFamily ?? MODEL_REGISTRY[DEFAULT_MODEL_NAME]?.family ?? "bert";
+      this.hybridSearcher = new HybridSearcher(
+        repository,
+        embeddingProvider,
+        hybridAlpha,
+        modelFamily,
+      );
     }
     this.reranker = new ReasoningReranker(undefined, repository);
     this.agenticReranker = new ReasoningReranker(llmProvider, repository);
@@ -66,6 +81,27 @@ export class KnowledgeSearcher {
   }
 
   async search(options: SearchOptions): Promise<SearchResult[]> {
+    const { mode = "keyword" } = options;
+
+    // Capability pre-check: detect if requested mode is available BEFORE orchestrator delegation
+    const needsSemantic = mode === "semantic" || mode === "hybrid";
+    const semanticAvailable = !!this.semanticSearcher;
+
+    if (needsSemantic && !semanticAvailable && options.query) {
+      // Fallback to keyword search with transparent notification
+      const keywordOptions = { ...options, mode: "keyword" as const };
+      const keywordResults = await this.search(keywordOptions);
+      return keywordResults.map((r) => ({
+        ...r,
+        fellBack: true,
+        fallbackInfo: {
+          reason: "Embedding provider not available — semantic search requires embeddings",
+          modeUsed: "keyword" as const,
+          originalMode: mode,
+        },
+      }));
+    }
+
     // orchestratorが利用可能な場合はQueryOrchestratorに委譲
     if (this.orchestrator && options.query) {
       const results = await this.orchestrator.query(options);
@@ -79,7 +115,6 @@ export class KnowledgeSearcher {
     const {
       query,
       limit = 50,
-      mode = "keyword",
       rerank = false,
       rerankWeights,
       includeDeprecated = false,
@@ -105,8 +140,14 @@ export class KnowledgeSearcher {
         ((mode === "semantic" && !this.semanticSearcher) ||
           (mode === "hybrid" && !this.hybridSearcher));
 
-      // keyword mode (デフォルト) — FTS5
-      const rows = this.repository.searchNotesWithRank(
+      // BM25 rank はマイナス値で、より負の値ほど良いスコア
+      // CHANGELOG / CHANGES / HISTORY は 70% discount: rank を 0.3 倍して 0 に近づける（悪くする）
+      // newness bonus: 新しいノートの rank をより負にして良くする（乗算ボーナス）
+      const CHANGELOG_PATTERN = /^(CHANGELOG|CHANGES|HISTORY)\.(md|txt|rst)$/i;
+      const CHANGELOG_DISCOUNT = 0.3;
+
+      // keyword mode (デフォルト) — FTS5 + snippet
+      const rows = this.repository.searchNotesWithSnippet(
         query,
         limit,
         includeDeprecated,
@@ -114,15 +155,100 @@ export class KnowledgeSearcher {
         dateTo,
       );
 
+      // AND→OR fallback: if AND (default) returns 0 results, try OR
       if (rows.length === 0) {
+        const terms = query.trim().split(/\s+/);
+        if (terms.length > 1 && !query.includes(" OR ")) {
+          const orQuery = terms.join(" OR ");
+          const orRows = this.repository.searchNotesWithSnippet(
+            orQuery,
+            limit,
+            includeDeprecated,
+            dateFrom,
+            dateTo,
+          );
+
+          if (orRows.length > 0) {
+            const orAdjustedRanks = orRows.map(({ note, rank }) => {
+              let adjusted = rank;
+              const validFrom = note.valid_from ?? note.created_at;
+              if (validFrom) {
+                const yearsSinceNow =
+                  (Date.now() - new Date(validFrom).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+                if (Number.isFinite(yearsSinceNow)) {
+                  const boost = 1 + Math.min(0.3, Math.max(0, 0.3 - yearsSinceNow * 0.06));
+                  adjusted = adjusted * boost;
+                }
+              }
+              if (CHANGELOG_PATTERN.test(basename(note.file_path))) {
+                adjusted = adjusted * CHANGELOG_DISCOUNT;
+              }
+              return adjusted;
+            });
+
+            const orMinRank = Math.min(...orAdjustedRanks);
+            const orMaxRank = Math.max(...orAdjustedRanks);
+            const orRange = orMaxRank - orMinRank;
+
+            results = orRows.map(({ note }, i) => {
+              const normalized = orRange > 0 ? (orAdjustedRanks[i] - orMinRank) / orRange : 0;
+              const score = 1 - normalized;
+              return {
+                note,
+                score,
+                matchReason: [`キーワード一致 (OR): "${orQuery}"`],
+                fellBack: true,
+                fallbackInfo: {
+                  reason: `No results for AND query "${query}" — expanded to OR`,
+                  modeUsed: "keyword" as const,
+                  originalMode: "keyword",
+                },
+              };
+            });
+
+            results.sort((a, b) => b.score - a.score);
+
+            // Skip normal keyword processing, jump to reranking
+            if (agentic && results.length > 0) {
+              const reranked = await this.agenticReranker.rerank(query, results);
+              return reranked.map((r) => ({
+                note: r.note,
+                score: r.score,
+                matchReason: [
+                  ...r.matchReason,
+                  ...(r.reasoning ? [`LLM推論: ${r.reasoning}`] : []),
+                ],
+                fellBack: true,
+                fallbackInfo: results.find((orig) => orig.note.id === r.note.id)?.fallbackInfo,
+              }));
+            }
+
+            if (rerank && results.length > 0) {
+              const currentReranker = rerankWeights
+                ? new ReasoningReranker(undefined, this.repository, rerankWeights)
+                : this.reranker;
+              const rerankInputs = results.map((r) => ({
+                note: r.note,
+                baseScore: r.score,
+                matchReason: r.matchReason,
+              }));
+              const reranked = await currentReranker.rerankLegacy(rerankInputs, { query });
+              return reranked.map((r) => ({
+                note: r.note,
+                score: r.finalScore,
+                matchReason: r.matchReason,
+                fellBack: true,
+                fallbackInfo: results.find((orig) => orig.note.id === r.note.id)?.fallbackInfo,
+              }));
+            }
+
+            return results;
+          }
+        }
+
         return [];
       }
 
-      // BM25 rank はマイナス値で、より負の値ほど良いスコア
-      // CHANGELOG / CHANGES / HISTORY は 70% discount: rank を 0.3 倍して 0 に近づける（悪くする）
-      // newness bonus: 新しいノートの rank をより負にして良くする（乗算ボーナス）
-      const CHANGELOG_PATTERN = /^(CHANGELOG|CHANGES|HISTORY)\.(md|txt|rst)$/i;
-      const CHANGELOG_DISCOUNT = 0.3;
       const adjustedRanks = rows.map(({ note, rank }) => {
         let adjusted = rank;
 
@@ -153,7 +279,7 @@ export class KnowledgeSearcher {
       const maxRank = Math.max(...adjustedRanks);
       const range = maxRank - minRank;
 
-      results = rows.map(({ note }, i) => {
+      results = rows.map(({ note, snippet }, i) => {
         const normalized = range > 0 ? (adjustedRanks[i] - minRank) / range : 0;
         const score = 1 - normalized;
 
@@ -167,12 +293,57 @@ export class KnowledgeSearcher {
           note,
           score,
           matchReason: reasons,
+          snippet,
           fellBack,
+          ...(fellBack
+            ? {
+                fallbackInfo: {
+                  reason: `${mode} search unavailable — embeddings not found`,
+                  modeUsed: "keyword" as const,
+                  originalMode: mode,
+                },
+              }
+            : {}),
         };
       });
 
       // newness bonus 等の事後スコア調整後に降順ソート
       results.sort((a, b) => b.score - a.score);
+
+      // Entity-linked ranking boost (orchestrator-free path only)
+      // The orchestrator already handles graph-based boosting
+      if (this.graphRepository && results.length > 0) {
+        try {
+          const queryTerms = query
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((t) => t.length > 1);
+          const boostedNoteIds = new Set<number>();
+
+          for (const term of queryTerms) {
+            const entities = this.graphRepository.searchEntities(term, 5);
+            for (const entity of entities) {
+              const linkedNotes = this.graphRepository.getLinkedNotes(entity.id);
+              for (const link of linkedNotes) {
+                boostedNoteIds.add(link.noteId);
+              }
+            }
+          }
+
+          if (boostedNoteIds.size > 0) {
+            for (const result of results) {
+              if (boostedNoteIds.has(result.note.id)) {
+                result.score *= 1.2; // 20% boost for entity-linked notes
+                result.matchReason.push("エンティティ連動ブースト");
+              }
+            }
+            // Re-sort after boosting
+            results.sort((a, b) => b.score - a.score);
+          }
+        } catch {
+          // Entity boost is non-critical — silently continue
+        }
+      }
     }
 
     // agentic モード: LLMベース ReasoningReranker を使用

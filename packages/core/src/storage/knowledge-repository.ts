@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 import type { KnowledgeData, ExtractedPattern } from "../types.js";
 import { ValidationError, DatabaseError, KnowledgeNotFoundError } from "../errors.js";
 import { createHash } from "crypto";
+import { hasCjk as hasCjkChars } from "../utils/cjk.js";
 
 export interface KnowledgeNote {
   id: number;
@@ -42,8 +43,36 @@ export interface ExtractedPatternRow {
 
 export class KnowledgeRepository {
   private _stmtCache = new Map<string, Database.Statement>();
+  private _resultCache = new Map<string, { data: unknown; timestamp: number }>();
+  private static readonly CACHE_MAX_SIZE = 256;
+  private static readonly CACHE_TTL_MS = 5000; // 5 seconds
 
   constructor(private db: Database.Database) {}
+
+  private getCachedResult<T>(key: string): T | null {
+    const entry = this._resultCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > KnowledgeRepository.CACHE_TTL_MS) {
+      this._resultCache.delete(key);
+      return null;
+    }
+    // Move to end (LRU: mark as recently used)
+    this._resultCache.delete(key);
+    this._resultCache.set(key, entry);
+    return entry.data as T;
+  }
+
+  private setCachedResult<T>(key: string, data: T): void {
+    if (this._resultCache.size >= KnowledgeRepository.CACHE_MAX_SIZE) {
+      const firstKey = this._resultCache.keys().next().value;
+      if (firstKey) this._resultCache.delete(firstKey);
+    }
+    this._resultCache.set(key, { data, timestamp: Date.now() });
+  }
+
+  clearResultCache(): void {
+    this._resultCache.clear();
+  }
 
   private stmt(sql: string): Database.Statement {
     let s = this._stmtCache.get(sql);
@@ -56,6 +85,19 @@ export class KnowledgeRepository {
 
   clearStatementCache(): void {
     this._stmtCache.clear();
+  }
+
+  getTopEntities(limit: number): Array<{ name: string; count: number }> {
+    return this.stmt(
+      `
+      SELECT e.name, COUNT(DISTINCT ne.note_id) as count
+      FROM entities e
+      JOIN note_entities ne ON e.id = ne.entity_id
+      GROUP BY e.id
+      ORDER BY count DESC
+      LIMIT ?
+    `,
+    ).all(limit) as Array<{ name: string; count: number }>;
   }
 
   private computeHash(content: string): string {
@@ -122,6 +164,7 @@ export class KnowledgeRepository {
           codeLocationJson,
           existing.id,
         );
+        this.clearResultCache();
         return existing.id;
       } else {
         const info = this.stmt(
@@ -141,6 +184,7 @@ export class KnowledgeRepository {
           contentHash,
           codeLocationJson,
         );
+        this.clearResultCache();
         return Number(info.lastInsertRowid);
       }
     } catch (error) {
@@ -196,6 +240,7 @@ export class KnowledgeRepository {
   deleteNoteById(id: number): boolean {
     try {
       const info = this.stmt("DELETE FROM knowledge_notes WHERE id = ?").run(id);
+      if (info.changes > 0) this.clearResultCache();
       return info.changes > 0;
     } catch (error) {
       throw new DatabaseError("deleteNoteById", error, { id });
@@ -205,6 +250,7 @@ export class KnowledgeRepository {
   deleteNoteByPath(path: string): boolean {
     try {
       const info = this.stmt("DELETE FROM knowledge_notes WHERE file_path = ?").run(path);
+      if (info.changes > 0) this.clearResultCache();
       return info.changes > 0;
     } catch (error) {
       throw new DatabaseError("deleteNoteByPath", error, { path });
@@ -604,6 +650,41 @@ export class KnowledgeRepository {
   }
 
   /**
+   * Transform a user query into FTS5-compatible syntax.
+   * - "quoted phrases" are preserved as-is (FTS5 natively supports them)
+   * - `OR` between terms is preserved
+   * - All other terms are implicitly AND-joined (FTS5 default)
+   * - Special FTS5 characters are escaped
+   */
+  private transformQueryToFts5(query: string): string {
+    // Preserve quoted phrases by extracting them first
+    const phrases: string[] = [];
+    const remaining = query.replace(/"([^"]+)"/g, (_match, phrase) => {
+      phrases.push(`"${phrase}"`);
+      return `__PHRASE_${phrases.length - 1}__`;
+    });
+
+    // Split by OR (case-sensitive to avoid matching words like "for")
+    const orParts = remaining.split(/\bOR\b/);
+
+    const fts5Parts = orParts.map((part) => {
+      // Split into tokens
+      const tokens = part.trim().split(/\s+/).filter(Boolean);
+      return tokens
+        .map((t) => {
+          // Replace phrase placeholders
+          const phMatch = t.match(/^__PHRASE_(\d+)__$/);
+          if (phMatch) return phrases[parseInt(phMatch[1])];
+          // Escape FTS5 special characters in regular terms
+          return t.replace(/[*^"]/g, "");
+        })
+        .join(" ");
+    });
+
+    return fts5Parts.join(" OR ");
+  }
+
+  /**
    * FTS5 rank付きでノートを検索する
    */
   searchNotesWithRank(
@@ -613,6 +694,10 @@ export class KnowledgeRepository {
     dateFrom?: string,
     dateTo?: string,
   ): Array<{ note: KnowledgeNote; rank: number }> {
+    const cacheKey = `search:${query}:${limit}:${includeDeprecated}:${dateFrom ?? ""}:${dateTo ?? ""}`;
+    const cached = this.getCachedResult<Array<{ note: KnowledgeNote; rank: number }>>(cacheKey);
+    if (cached) return cached;
+
     const deprecatedFilter = includeDeprecated ? "" : "AND n.deprecated = 0";
     const dateFromFilter = dateFrom ? "AND n.created_at >= ?" : "";
     const dateToFilter = dateTo ? "AND n.created_at <= ?" : "";
@@ -620,9 +705,16 @@ export class KnowledgeRepository {
     if (dateFrom) dateParams.push(dateFrom);
     if (dateTo) dateParams.push(dateTo);
 
+    // Transform user query into FTS5-compatible syntax (OR, quoted phrases, escaping)
+    const ftsQuery = this.transformQueryToFts5(query);
+
     // CJK文字を含むクエリはtrigramテーブルを優先使用（trigramは最低3文字必要）
-    const hasCjk = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(query);
-    const useTrigram = hasCjk && query.length >= 3;
+    const isCjk = hasCjkChars(query);
+    // Short CJK queries (1-2 chars) → LIKE directly (FTS5 can't tokenize these properly)
+    if (isCjk && query.replace(/\s/g, "").length <= 2) {
+      return this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
+    }
+    const useTrigram = isCjk && query.length >= 3;
     const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
 
     try {
@@ -638,14 +730,18 @@ export class KnowledgeRepository {
         ORDER BY rank
         LIMIT ?
       `,
-      ).all(query, ...dateParams, limit) as Array<KnowledgeNote & { rank: number }>;
+      ).all(ftsQuery, ...dateParams, limit * 3) as Array<KnowledgeNote & { rank: number }>;
 
       // CJKクエリでunicode61が0件の場合はLIKEフォールバック（短いCJKトークンの救済）
-      if (rows.length === 0 && hasCjk) {
+      if (rows.length === 0 && isCjk) {
         return this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
       }
 
-      return rows.map(({ rank, ...note }) => ({ note: note as KnowledgeNote, rank }));
+      const results = rows
+        .slice(0, limit)
+        .map(({ rank, ...note }) => ({ note: note as KnowledgeNote, rank }));
+      this.setCachedResult(cacheKey, results);
+      return results;
     } catch {
       return this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
     }
@@ -671,6 +767,112 @@ export class KnowledgeRepository {
       KnowledgeNote & { rank: number }
     >;
     return fallbackRows.map((row) => ({ note: row as KnowledgeNote, rank: 0 }));
+  }
+
+  /**
+   * FTS5 rank付き + スニペット付きでノートを検索する。
+   * searchNotesWithRank の拡張版で、FTS5 snippet() によるコンテキスト抜粋を含む。
+   */
+  searchNotesWithSnippet(
+    query: string,
+    limit: number = 50,
+    includeDeprecated: boolean = false,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Array<{ note: KnowledgeNote; rank: number; snippet?: string }> {
+    const hasCjk = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(query);
+
+    // Short CJK (1-2 chars) → LIKE with JS snippet
+    if (hasCjk && query.replace(/\s/g, "").length <= 2) {
+      return this.searchNotesWithLikeSnippet(query, limit, includeDeprecated, dateFrom, dateTo);
+    }
+
+    const deprecatedFilter = includeDeprecated ? "" : "AND n.deprecated = 0";
+    const dateFromFilter = dateFrom ? "AND n.created_at >= ?" : "";
+    const dateToFilter = dateTo ? "AND n.created_at <= ?" : "";
+    const dateParams: string[] = [];
+    if (dateFrom) dateParams.push(dateFrom);
+    if (dateTo) dateParams.push(dateTo);
+
+    const useTrigram = hasCjk && query.length >= 3;
+    const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
+
+    const ftsQuery = this.transformQueryToFts5(query);
+
+    try {
+      // Use FTS5 snippet() function with Unicode markers for highlighting
+      const rows = this.stmt(
+        `
+        SELECT n.*, bm25(${ftsTable}, 10.0, 1.0) AS rank,
+               snippet(${ftsTable}, 1, '\uFFF0', '\uFFF1', '...', 32) AS snippet
+        FROM knowledge_notes n
+        JOIN ${ftsTable} fts ON n.id = fts.rowid
+        WHERE ${ftsTable} MATCH ?
+        ${deprecatedFilter}
+        ${dateFromFilter}
+        ${dateToFilter}
+        ORDER BY rank
+        LIMIT ?
+      `,
+      ).all(ftsQuery, ...dateParams, limit * 3) as Array<
+        KnowledgeNote & { rank: number; snippet: string }
+      >;
+
+      if (rows.length === 0 && hasCjk) {
+        return this.searchNotesWithLikeSnippet(query, limit, includeDeprecated, dateFrom, dateTo);
+      }
+
+      return rows.slice(0, limit).map(({ rank, snippet, ...note }) => ({
+        note: note as KnowledgeNote,
+        rank,
+        snippet: snippet || undefined,
+      }));
+    } catch {
+      return this.searchNotesWithLikeSnippet(query, limit, includeDeprecated, dateFrom, dateTo);
+    }
+  }
+
+  /**
+   * LIKE-based search with JS-generated snippets.
+   * Used when FTS5 is unavailable or for short CJK queries.
+   */
+  private searchNotesWithLikeSnippet(
+    query: string,
+    limit: number,
+    includeDeprecated: boolean,
+    dateFrom?: string,
+    dateTo?: string,
+  ): Array<{ note: KnowledgeNote; rank: number; snippet?: string }> {
+    const results = this.searchNotesWithLike(query, limit, includeDeprecated, dateFrom, dateTo);
+    return results.map(({ note, rank }) => ({
+      note,
+      rank,
+      snippet: this.generateJsSnippet(note.content, query),
+    }));
+  }
+
+  /**
+   * Generate a snippet by finding query text in content and extracting surrounding context.
+   */
+  private generateJsSnippet(content: string, query: string): string | undefined {
+    const lowerContent = content.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const idx = lowerContent.indexOf(lowerQuery);
+    if (idx === -1) return undefined;
+
+    const CONTEXT_CHARS = 50;
+    const start = Math.max(0, idx - CONTEXT_CHARS);
+    const end = Math.min(content.length, idx + query.length + CONTEXT_CHARS);
+
+    let snippet = "";
+    if (start > 0) snippet += "...";
+    const before = content.slice(start, idx);
+    const match = content.slice(idx, idx + query.length);
+    const after = content.slice(idx + query.length, end);
+    snippet += before + "\uFFF0" + match + "\uFFF1" + after;
+    if (end < content.length) snippet += "...";
+
+    return snippet;
   }
 
   /**
@@ -987,6 +1189,49 @@ export class KnowledgeRepository {
       results.push(...(stmt.all(...chunk) as KnowledgeNote[]));
     }
     return results;
+  }
+
+  /**
+   * 現在 note_embeddings テーブルに存在するモデル名を取得する。
+   * 混合モデル検出に使用する。
+   */
+  getExistingEmbeddingModelNames(): string[] {
+    const rows = this.stmt(
+      "SELECT DISTINCT model_name FROM note_embeddings WHERE model_name IS NOT NULL",
+    )
+      .pluck()
+      .all() as string[];
+    return rows;
+  }
+
+  /**
+   * 既存の埋め込みが指定モデル名と一致するか検証する。
+   * 異なるモデルの埋め込みが混在する場合は consistent: false を返す。
+   */
+  checkEmbeddingModelConsistency(currentModelName: string): {
+    consistent: boolean;
+    existingModels: string[];
+  } {
+    const existingModels = this.getExistingEmbeddingModelNames();
+    if (existingModels.length === 0) {
+      return { consistent: true, existingModels: [] };
+    }
+    const consistent = existingModels.every((m) => m === currentModelName);
+    return { consistent, existingModels };
+  }
+
+  /**
+   * すべての埋め込みを削除する（reindex 用）
+   */
+  deleteAllEmbeddings(): number {
+    const info = this.db.prepare("DELETE FROM note_embeddings").run();
+    // vec0 テーブルも削除（存在する場合）
+    try {
+      this.db.prepare("DELETE FROM note_embeddings_vec").run();
+    } catch {
+      // vec0 テーブルが存在しない場合は無視
+    }
+    return info.changes;
   }
 
   close(): void {

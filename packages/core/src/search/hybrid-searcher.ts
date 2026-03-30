@@ -5,20 +5,47 @@ import type { SemanticSearchResult } from "./semantic-searcher.js";
 export class HybridSearcher {
   /**
    * @param alpha - FTSスコアの重み (0-1)。デフォルト 0.3。残り (1-α) がベクトルスコアの重み。
+   * @param modelFamily - 使用するモデルファミリー。CJKクエリの動的alpha判定に使用。
    */
   constructor(
     private repository: KnowledgeRepository,
     private embeddingProvider: EmbeddingProvider,
     private alpha: number = 0.3,
+    private modelFamily: "bert" | "e5" = "bert",
   ) {}
 
+  /**
+   * クエリに応じてalphaを動的に決定する。
+   * CJK文字が支配的な場合、モデルの多言語能力に応じてalphaを調整する。
+   *
+   * - CJK割合 < 30%: 通常のalpha（主にラテン文字クエリ）
+   * - CJK支配的 + e5モデル: alpha=0.5（多言語モデルはblendedが有効）
+   * - CJK支配的 + bertモデル: alpha=1.0（英語専用モデルはキーワードのみ）
+   */
+  private determineAlpha(query: string): number {
+    const cjkChars = query.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/g);
+    if (!cjkChars) return this.alpha; // CJKなし → 通常のalpha
+
+    const cjkRatio = cjkChars.length / query.length;
+    if (cjkRatio < 0.3) return this.alpha; // 主にラテン文字 → 通常
+
+    // CJK支配的なクエリ
+    if (this.modelFamily === "e5") return 0.5; // 多言語モデル → blended
+    return 1.0; // 英語専用モデル → キーワードのみ
+  }
+
   async search(query: string, limit: number = 20): Promise<SemanticSearchResult[]> {
-    // 両方のスコアを並行取得
+    const effectiveAlpha = this.determineAlpha(query);
+
+    // 両方のスコアを並行取得。alpha=1.0のときはベクトル検索をスキップ。
     const [ftsRows, vecResults] = await Promise.all([
       Promise.resolve(this.repository.searchNotesWithRank(query, limit * 2)),
-      this.embeddingProvider
-        .embed(query)
-        .then((emb) => this.repository.searchByVector(emb, limit * 2)),
+      effectiveAlpha < 1.0
+        ? this.embeddingProvider
+            .embedQuery(query)
+            .then((emb) => this.repository.searchByVector(emb, limit * 2))
+            .catch(() => []) // 埋め込み失敗時はgraceful fallback
+        : Promise.resolve([]),
     ]);
 
     // FTSスコアのMin-Max正規化（rankは負値なので絶対値を使う）
@@ -49,7 +76,7 @@ export class HybridSearcher {
     for (const noteId of allIds) {
       const ftsScore = ftsMap.get(noteId) ?? 0;
       const vecScore = vecMap.get(noteId) ?? 0;
-      const finalScore = this.alpha * ftsScore + (1 - this.alpha) * vecScore;
+      const finalScore = effectiveAlpha * ftsScore + (1 - effectiveAlpha) * vecScore;
       scored.push({ noteId, score: finalScore });
     }
 

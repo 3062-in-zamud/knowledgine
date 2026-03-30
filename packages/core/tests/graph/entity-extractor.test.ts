@@ -84,13 +84,12 @@ foo.require('lodash');
   });
 
   describe("extract @mentions", () => {
-    it("should extract unknown entities from @username patterns (conservative classification)", () => {
+    it("should filter out mention-only unknown entities (KNOW-379)", () => {
       const content = "cc @alice @bob please review";
       const result = extractor.extract(content);
-      // fallback is now 'unknown' — persons must be declared via frontmatter
-      const unknowns = result.filter((e) => e.entityType === "unknown");
-      expect(unknowns.some((e) => e.name === "alice")).toBe(true);
-      expect(unknowns.some((e) => e.name === "bob")).toBe(true);
+      // mention-only unknown entities are now filtered out as low-confidence noise
+      expect(result.find((e) => e.name === "alice")).toBeUndefined();
+      expect(result.find((e) => e.name === "bob")).toBeUndefined();
     });
   });
 
@@ -282,12 +281,12 @@ main/examples is just a directory listing
       expect(k8s!.entityType).toBe("technology");
     });
 
-    it("should classify unknown @mentions as unknown, not person", () => {
+    it("should filter out mention-only unknown @mentions (KNOW-379)", () => {
       const content = "cc @alice @bob please review";
       const result = extractor.extract(content);
-      const alice = result.find((e) => e.name === "alice");
-      expect(alice).toBeDefined();
-      expect(alice!.entityType).toBe("unknown");
+      // mention-only unknown entities are now filtered as low-confidence noise
+      expect(result.find((e) => e.name === "alice")).toBeUndefined();
+      expect(result.find((e) => e.name === "bob")).toBeUndefined();
     });
 
     it("should keep tag-based technology classification for @react", () => {
@@ -321,10 +320,10 @@ main/examples is just a directory listing
       expect(docker?.entityType).toBe("technology");
     });
 
-    it("should classify unknown mentions as unknown (not person)", () => {
+    it("should filter out mention-only unknown entities (KNOW-379)", () => {
       const entities = extractor.extract("@randomname mentioned it");
-      const random = entities.find((e) => e.name === "randomname");
-      expect(random?.entityType).toBe("unknown");
+      // mention-only unknown entities are now filtered as low-confidence noise
+      expect(entities.find((e) => e.name === "randomname")).toBeUndefined();
     });
 
     it("should classify new TECH_DICTIONARY entries correctly", () => {
@@ -385,6 +384,107 @@ import { useState } from 'react';
       // deduplicate は "tag:react" で1件に絞るため resolveEntityTypes に来る時点で既に1件
       // ただし大文字小文字正規化後に同一キーになることを確認
       expect(reactEntities.length).toBe(1);
+    });
+  });
+
+  describe("Markdown syntax stripping (KNOW-379)", () => {
+    it("does not extract entities from image links", () => {
+      const content = "![logo](https://example.com/logo.png)\nUsing React for UI.";
+      const entities = extractor.extract(content);
+      // "logo" should NOT be extracted
+      expect(entities.find((e) => e.name === "logo")).toBeUndefined();
+    });
+
+    it("does not extract URL fragments from markdown links", () => {
+      const content = "See [docs](https://github.com/example/repo/blob/main/README.md)";
+      const entities = extractor.extract(content);
+      // Path fragments like "blob", "main", "readme" should not appear
+      expect(entities.find((e) => e.name === "blob")).toBeUndefined();
+    });
+
+    it("extracts entity names from link text via inline code after stripping", () => {
+      // After Markdown stripping, [React](url) becomes "React" as plain text.
+      // Plain text alone doesn't trigger extraction (no @mention, import, or inline code).
+      // But if the entity also appears in frontmatter or inline code, it is still extracted.
+      const content = "We use [React](https://reactjs.org) and `react` for the frontend.";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "react")).toBeDefined();
+    });
+
+    it("strips heading markers without losing entity names", () => {
+      const content = "## Using Docker for deployment";
+      const entities = extractor.extract(content);
+      // Docker should still be detected from @mention or inline code patterns
+      // Heading marker ## should be stripped
+      expect(entities.find((e) => e.name === "##")).toBeUndefined();
+    });
+
+    it("strips bold/italic markers", () => {
+      const content = "We use **React** and *TypeScript* for development.";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "**react**")).toBeUndefined();
+      expect(entities.find((e) => e.name === "*typescript*")).toBeUndefined();
+    });
+
+    it("strips HTML tags", () => {
+      const content = "<div>Using `vitest` for testing</div>";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "div")).toBeUndefined();
+      expect(entities.find((e) => e.name === "vitest")).toBeDefined();
+    });
+  });
+
+  describe("STOP_LIST expansion (KNOW-379)", () => {
+    it("filters out common generic terms", () => {
+      const content = "The `readme` and `changelog` were updated along with `config` files.";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "readme")).toBeUndefined();
+      expect(entities.find((e) => e.name === "changelog")).toBeUndefined();
+      expect(entities.find((e) => e.name === "config")).toBeUndefined();
+    });
+
+    it("filters out directory-like terms", () => {
+      const content = "Files in `src`, `lib`, `dist`, and `docs` directories.";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "src")).toBeUndefined();
+      expect(entities.find((e) => e.name === "lib")).toBeUndefined();
+      expect(entities.find((e) => e.name === "dist")).toBeUndefined();
+      expect(entities.find((e) => e.name === "docs")).toBeUndefined();
+    });
+
+    it("filters out workflow terms", () => {
+      const content = "Check the `todo` and `fixme` items in `setup` and `build`.";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "todo")).toBeUndefined();
+      expect(entities.find((e) => e.name === "fixme")).toBeUndefined();
+      expect(entities.find((e) => e.name === "setup")).toBeUndefined();
+      expect(entities.find((e) => e.name === "build")).toBeUndefined();
+    });
+  });
+
+  describe("unknown type filtering (KNOW-379)", () => {
+    it("filters out mention-only unknown entities", () => {
+      const content = "Talked to @someRandomPerson about the project.";
+      const entities = extractor.extract(content);
+      // @someRandomPerson with type "unknown" from mention should be filtered
+      const found = entities.find((e) => e.name === "somerandomperson");
+      expect(found).toBeUndefined();
+    });
+
+    it("keeps unknown entities that have higher-priority sources", () => {
+      // If an entity has a frontmatter source, it should not be filtered
+      const content = "Working with @react on the project.";
+      const entities = extractor.extract(content, { tags: ["react"] });
+      const react = entities.find((e) => e.name === "react");
+      expect(react).toBeDefined();
+      expect(react!.entityType).toBe("technology");
+    });
+
+    it("keeps known tech mentions even with @prefix", () => {
+      const content = "Using @docker and @redis for infrastructure.";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "docker")).toBeDefined();
+      expect(entities.find((e) => e.name === "redis")).toBeDefined();
     });
   });
 });

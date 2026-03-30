@@ -96,7 +96,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   }
 
   // readiness is always set if we reach here (no early return from catch)
-  const { modelAvailable, embeddingsCount: embeddingsGenerated } = readiness!;
+  const { modelAvailable, embeddingsCount: embeddingsGenerated, embeddingCoverage } = readiness!;
   const semanticMode = readiness!.ready;
 
   // MCP config checks — check all supported targets (global + project level)
@@ -141,6 +141,11 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
       `${symbols.arrow} ${colors.hint("Run 'knowledgine upgrade --semantic' to enable semantic search.")}`,
     );
   }
+  if (semanticMode && embeddingCoverage < 80 && totalNotes > 0) {
+    hints.push(
+      `${symbols.arrow} ${colors.hint(`Embedding coverage is ${embeddingCoverage}%. Run 'knowledgine ingest --all' to improve coverage.`)}`,
+    );
+  }
   if (configuredTools.length === 0 && totalNotes > 0) {
     hints.push(
       `${symbols.arrow} ${colors.hint("Run 'knowledgine setup' to configure your AI tools.")}`,
@@ -166,7 +171,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     `  ${pad("Notes:")}${colors.info(String(totalNotes))} indexed`,
     ...(sourceEntries.length > 1 ? sourceLines : []),
     `  ${pad("Patterns:")}${colors.info(String(totalPatterns))} extracted`,
-    `  ${pad("Embeddings:")}${colors.info(`${embeddingsGenerated}/${totalNotes}`)} generated`,
+    `  ${pad("Embeddings:")}${colors.info(`${embeddingsGenerated}/${totalNotes} (${embeddingCoverage}%)`)} generated`,
     "",
     `${colors.bold("Model:")}  ${modelLine}`,
     `${colors.bold("Search:")} ${semanticMode ? "semantic + FTS5" : "FTS5 only"}`,

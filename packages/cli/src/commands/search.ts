@@ -41,6 +41,23 @@ export interface SearchCommandOptions {
 }
 
 export async function searchCommand(query: string, options: SearchCommandOptions): Promise<void> {
+  // Validate query
+  if (!query || !query.trim()) {
+    console.error("Error: Search query cannot be empty.");
+    console.error('Usage: knowledgine search "your query" [--mode keyword|semantic|hybrid]');
+    process.exitCode = 1;
+    return;
+  }
+
+  // Validate mode
+  const validModes = ["keyword", "semantic", "hybrid"];
+  if (options.mode && !validModes.includes(options.mode)) {
+    console.error(`Error: Invalid search mode "${options.mode}".`);
+    console.error(`Valid modes: ${validModes.join(", ")}`);
+    process.exitCode = 1;
+    return;
+  }
+
   const fallbackAllowed = options.fallback !== false;
   const rootPath = options.demo ? getDemoNotesPath() : resolveDefaultPath(options.path);
 
@@ -119,7 +136,16 @@ export async function searchCommand(query: string, options: SearchCommandOptions
     const repository = new KnowledgeRepository(db);
     const graphRepository = new GraphRepository(db);
 
-    const mode = (options.mode as "keyword" | "semantic" | "hybrid") ?? "keyword";
+    // Dynamic default mode: hybrid when embeddings available, keyword otherwise
+    let mode: "keyword" | "semantic" | "hybrid";
+    if (options.mode) {
+      mode = options.mode as "keyword" | "semantic" | "hybrid";
+    } else {
+      // Check if embeddings are available for dynamic default
+      const modelManager = new ModelManager();
+      const semanticReadiness = checkSemanticReadiness(config, modelManager, repository);
+      mode = semanticReadiness.ready ? "hybrid" : "keyword";
+    }
     const limit = options.limit ?? 20;
     const format = (options.format as OutputFormat) ?? "plain";
 
@@ -194,15 +220,20 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       includeDeprecated: options.includeDeprecated,
     });
 
-    const warnings = result.results.flatMap((r) =>
-      r.matchReason.filter((m) => m.startsWith("Warning:")),
-    );
-    if (warnings.length > 0) {
-      console.error(`\n${symbols.warning} ${colors.warning(warnings[0])}\n`);
-    }
-
-    // セマンティック検索が要求されたが利用不可の場合の警告（フォールバック許可時のみ）
-    if (semanticUnavailable) {
+    // Fallback notification using fallbackInfo (KNOW-378)
+    const fallbackResult = result.results.find((r) => r.fallbackInfo);
+    if (fallbackResult?.fallbackInfo) {
+      const info = fallbackResult.fallbackInfo;
+      console.error("");
+      console.error(
+        `  ${symbols.warning} ${colors.warning(`${info.originalMode} search unavailable — falling back to ${info.modeUsed} search.`)}`,
+      );
+      console.error(`    Reason: ${info.reason}`);
+      if (info.modeUsed === "keyword") {
+        console.error(`    Fix:    ${colors.hint(`knowledgine ingest --all --path ${rootPath}`)}`);
+      }
+      console.error("");
+    } else if (semanticUnavailable) {
       console.error(
         `${symbols.warning} ${colors.warning("Semantic search is not configured. Falling back to FTS5.")}`,
       );
@@ -210,13 +241,6 @@ export async function searchCommand(query: string, options: SearchCommandOptions
         `${symbols.arrow} ${colors.hint("Run 'knowledgine upgrade --semantic' to enable semantic search.")}`,
       );
       console.error("");
-    }
-
-    // actualMode が要求モードと異なる場合（フォールバック発生）の通知
-    if (result.actualMode !== result.mode) {
-      console.error(
-        `${symbols.info} ${colors.hint(`Requested mode: ${result.mode}, actual mode used: ${result.actualMode}`)}`,
-      );
     }
 
     if (format === "json") {
@@ -242,7 +266,7 @@ export async function searchCommand(query: string, options: SearchCommandOptions
 /** 後方互換のためのレガシー出力形式 */
 function formatLegacySearchResults(
   query: string,
-  results: Array<{ score: number; filePath: string; title: string }>,
+  results: Array<{ score: number; filePath: string; title: string; snippet?: string }>,
 ): void {
   if (results.length === 0) {
     console.error(`${symbols.info} ${colors.hint(`No results for "${query}".`)}`);
@@ -257,6 +281,11 @@ function formatLegacySearchResults(
     const score = r.score.toFixed(2);
     console.error(`  ${i + 1}. [${score}] ${r.filePath}`);
     console.error(`     ${r.title}`);
+    if (r.snippet) {
+      // Convert Unicode markers to * for plain text highlighting
+      const displaySnippet = r.snippet.replace(/\uFFF0/g, "*").replace(/\uFFF1/g, "*");
+      console.error(`     ${displaySnippet}`);
+    }
     console.error("");
   }
 }

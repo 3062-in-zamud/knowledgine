@@ -14,6 +14,7 @@ import { SemanticSearcher } from "./semantic-searcher.js";
 import { HybridSearcher } from "./hybrid-searcher.js";
 import { ReasoningReranker } from "./reasoning-reranker.js";
 import { classifyQuery, getWeightsForQueryType } from "./query-classifier.js";
+import { MODEL_REGISTRY, DEFAULT_MODEL_NAME } from "../embedding/model-manager.js";
 
 export interface OrchestratedResult {
   note: KnowledgeNote | KnowledgeNoteSummary;
@@ -53,7 +54,9 @@ export class QueryOrchestrator {
   ) {
     if (embeddingProvider) {
       this.semanticSearcher = new SemanticSearcher(repository, embeddingProvider);
-      this.hybridSearcher = new HybridSearcher(repository, embeddingProvider);
+      const modelFamily =
+        embeddingProvider.modelFamily ?? MODEL_REGISTRY[DEFAULT_MODEL_NAME]?.family ?? "bert";
+      this.hybridSearcher = new HybridSearcher(repository, embeddingProvider, 0.3, modelFamily);
     }
     this.agenticReranker = new ReasoningReranker(llmProvider, repository);
     this.maxResults = config?.maxResults ?? DEFAULT_MAX_RESULTS;

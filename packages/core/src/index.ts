@@ -19,6 +19,7 @@ export type {
   NoteLink,
   KnowledgeData,
   SearchResult,
+  FallbackInfo,
   EntityType,
   RelationType,
   ObservationType,
@@ -64,7 +65,7 @@ export {
 export type { RcConfig } from "./config/config-loader.js";
 
 // Storage
-export { createDatabase, loadSqliteVecExtension } from "./storage/database.js";
+export { createDatabase, loadSqliteVecExtension, closeDatabase } from "./storage/database.js";
 export { KnowledgeRepository } from "./storage/knowledge-repository.js";
 export type {
   KnowledgeNote,
@@ -176,9 +177,17 @@ export { createLLMProvider } from "./llm/provider-factory.js";
 // Embedding
 export type { EmbeddingProvider } from "./embedding/embedding-provider.js";
 export { OnnxEmbeddingProvider } from "./embedding/onnx-embedding-provider.js";
-export { ModelManager, DEFAULT_MODEL_NAME } from "./embedding/model-manager.js";
-export { downloadModel, MODEL_FILES } from "./embedding/model-downloader.js";
+export {
+  ModelManager,
+  DEFAULT_MODEL_NAME,
+  LEGACY_MODEL_NAME,
+  MODEL_REGISTRY,
+} from "./embedding/model-manager.js";
+export type { ModelConfig } from "./embedding/model-manager.js";
+export { downloadModel, getModelFiles, MODEL_FILES } from "./embedding/model-downloader.js";
 export type { DownloadProgress, DownloadOptions, ModelFile } from "./embedding/model-downloader.js";
+export { createTokenizer } from "./embedding/tokenizer-factory.js";
+export type { Tokenizer } from "./embedding/tokenizer-factory.js";
 
 // Search (semantic)
 export { SemanticSearcher } from "./search/semantic-searcher.js";
@@ -233,6 +242,7 @@ export { CodeBlockDetector } from "./utils/code-block-detector.js";
 export type { CodeBlockRange } from "./utils/code-block-detector.js";
 export { checkSemanticReadiness } from "./utils/semantic-readiness.js";
 export type { SemanticReadiness } from "./utils/semantic-readiness.js";
+export { hasCjk, cjkRatio, cjkCharCount } from "./utils/cjk.js";
 
 // Agents
 export type {

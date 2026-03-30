@@ -26,6 +26,7 @@ import { registerFeedbackSuggestCommand } from "./commands/feedback-suggest.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { deprecationCheckCommand } from "./commands/deprecation-check.js";
 import { undeprecateCommand } from "./commands/undeprecate.js";
+import { doctorCommand } from "./commands/doctor.js";
 import { createOutputErrorHandler } from "./lib/unknown-command-handler.js";
 
 const program = new Command();
@@ -39,13 +40,16 @@ program
   .addHelpText(
     "after",
     `
-Workflow:
-  1. knowledgine init --path ~/notes    Index your files (FTS5 full-text search)
-  2. knowledgine setup --target claude-desktop  Configure AI tool
-  3. knowledgine start --path ~/notes    Start MCP server
+Quick Start:
+  1. knowledgine init --path .          Index your files
+  2. knowledgine ingest --all --path .  Ingest from all sources
+  3. knowledgine search "query"         Search your knowledge base
 
-Optional:
-  knowledgine upgrade --semantic         Enable semantic search (downloads ~23MB model)
+MCP Integration:
+  1. knowledgine init --path .
+  2. knowledgine ingest --all --path .
+  3. knowledgine setup --target claude-code
+  4. knowledgine start --path .
 
 Run 'knowledgine <command> --help' for more information on a command.`,
   );
@@ -124,16 +128,28 @@ Example:
   )
   .action(statusCommand);
 
+// Top-level stats alias (shortcut for tool stats)
+program
+  .command("stats")
+  .description("Show knowledge base statistics (alias for status)")
+  .option("--path <dir>", "Root directory to check")
+  .action(statusCommand);
+
 program
   .command("upgrade")
   .description("Upgrade knowledgine capabilities")
   .option("--semantic", "Enable semantic search (download model + generate embeddings)")
+  .option(
+    "--reindex",
+    "Delete and regenerate all embeddings (use after switching embedding models)",
+  )
   .option("--path <dir>", "Root directory")
   .addHelpText(
     "after",
     `
-Example:
-  knowledgine upgrade --semantic --path ~/notes`,
+Examples:
+  knowledgine upgrade --semantic --path ~/notes
+  knowledgine upgrade --reindex`,
   )
   .action(upgradeCommand);
 
@@ -156,6 +172,10 @@ program
   .option("--observe", "Run Observer/Reflector agents after ingestion")
   .option("--no-observe", "Skip Observer/Reflector agents")
   .option("--observe-limit <n>", "Max notes to process with Observer", parseInt)
+  .option(
+    "--no-embeddings",
+    "Skip embedding generation after ingest (semantic search will not work for these notes)",
+  )
   .addHelpText(
     "after",
     `
@@ -235,7 +255,7 @@ program
   .command("search <query>")
   .description("Search indexed notes")
   .option("--demo", "Search in demo notes")
-  .option("--mode <mode>", "Search mode: keyword, semantic, hybrid", "keyword")
+  .option("--mode <mode>", "Search mode: keyword, semantic, hybrid (default: auto-detect)")
   .option("--limit <n>", "Maximum results", "20")
   .option("--format <format>", "Output format: json, table, plain", "plain")
   .option("--related <noteId>", "Find related notes by note ID")
@@ -317,6 +337,7 @@ program
   .option("--path <dir>", "Root directory")
   .option("--apply", "Apply deprecation (default: dry-run)")
   .option("--threshold <n>", "Similarity threshold (0-1, default: 0.8)", "0.8")
+  .option("--exclude-translations", "Exclude translation files (.po, .xlf) from comparison")
   .action(deprecationCheckCommand);
 
 program
@@ -324,6 +345,19 @@ program
   .description("Restore a deprecated note to active status")
   .option("--path <dir>", "Root directory")
   .action(undeprecateCommand);
+
+program
+  .command("doctor")
+  .description("Run comprehensive health checks on your knowledge base")
+  .option("--path <dir>", "Root directory to check")
+  .option("--fix", "Automatically fix issues where possible")
+  .addHelpText(
+    "after",
+    `
+Example:
+  knowledgine doctor --path ~/notes`,
+  )
+  .action(doctorCommand);
 
 program.showSuggestionAfterError(true);
 program.configureOutput({

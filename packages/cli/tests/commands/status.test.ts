@@ -104,8 +104,8 @@ describe("status command", () => {
     await statusCommand({ path: testDir });
 
     const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
-    // Status should contain "Ready" regardless of semantic mode
-    expect(output).toContain("Ready");
+    // Status should contain readiness info (FTS5 only when no embeddings)
+    expect(output).toContain("FTS5 only");
   });
 
   it("should show 'FTS5 only' when notes exist but no embeddings", async () => {
