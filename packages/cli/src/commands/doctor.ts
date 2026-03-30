@@ -7,6 +7,7 @@ import {
   KnowledgeRepository,
   ALL_MIGRATIONS,
   ModelManager,
+  DEFAULT_MODEL_NAME,
 } from "@knowledgine/core";
 import { colors, symbols } from "../lib/ui/index.js";
 
@@ -183,14 +184,14 @@ export function checkModelFiles(): DiagnosticResult {
       return {
         name: "embedding model",
         status: "warning",
-        message: "all-MiniLM-L6-v2 model files not found — semantic search unavailable",
+        message: `${DEFAULT_MODEL_NAME} model files not found — semantic search unavailable`,
         fix: "knowledgine upgrade --semantic",
       };
     }
     return {
       name: "embedding model",
       status: "pass",
-      message: "all-MiniLM-L6-v2 model files are present",
+      message: `${DEFAULT_MODEL_NAME} model files are present`,
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
