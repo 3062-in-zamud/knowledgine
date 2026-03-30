@@ -127,13 +127,8 @@ async function serveAction(options: ServeCommandOptions): Promise<void> {
         console.error(`  URL:    http://${hostname}:${port}`);
         console.error(`  Notes:  ${stats.totalNotes} indexed`);
         console.error(`  Search: ${searchMode}`);
-        if (useAuth && effectiveAuthToken && !authToken) {
-          const masked = effectiveAuthToken.slice(0, 8) + "..." + effectiveAuthToken.slice(-4);
-          console.error(
-            `  Auth:   Bearer ${masked} (set KNOWLEDGINE_API_TOKEN to use a fixed token)`,
-          );
-        } else if (effectiveAuthToken) {
-          console.error(`  Auth:   enabled (token from env/config)`);
+        if (effectiveAuthToken) {
+          console.error(`  Auth:   enabled`);
         }
         if (captureOptions) {
           console.error(`  Capture: POST /capture enabled (auth required)`);
