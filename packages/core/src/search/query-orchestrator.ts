@@ -54,7 +54,8 @@ export class QueryOrchestrator {
   ) {
     if (embeddingProvider) {
       this.semanticSearcher = new SemanticSearcher(repository, embeddingProvider);
-      const modelFamily = MODEL_REGISTRY[DEFAULT_MODEL_NAME]?.family ?? "bert";
+      const modelFamily =
+        embeddingProvider.modelFamily ?? MODEL_REGISTRY[DEFAULT_MODEL_NAME]?.family ?? "bert";
       this.hybridSearcher = new HybridSearcher(repository, embeddingProvider, 0.3, modelFamily);
     }
     this.agenticReranker = new ReasoningReranker(llmProvider, repository);
