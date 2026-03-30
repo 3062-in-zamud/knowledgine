@@ -56,6 +56,9 @@ export class KnowledgeRepository {
       this._resultCache.delete(key);
       return null;
     }
+    // Move to end (LRU: mark as recently used)
+    this._resultCache.delete(key);
+    this._resultCache.set(key, entry);
     return entry.data as T;
   }
 
