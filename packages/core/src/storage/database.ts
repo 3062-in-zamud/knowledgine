@@ -79,15 +79,23 @@ export function createDatabase(
     try {
       const stat = statSync(dbPath);
       if (stat.size === 0) {
-        db.close();
-        unlinkSync(dbPath);
+        try {
+          db.close();
+        } catch {
+          /* ignore close error */
+        }
+        try {
+          unlinkSync(dbPath);
+        } catch {
+          /* ignore unlink error */
+        }
         throw new DatabaseError("initialization - Database file is empty (0 bytes)", undefined, {
           dbPath,
         });
       }
     } catch (error) {
       if (error instanceof DatabaseError) throw error;
-      // statSync failed — non-fatal
+      // statSync failed — non-fatal (file may not exist yet due to WAL)
     }
   }
 
