@@ -32,6 +32,8 @@ export function checkSemanticReadiness(
   let label: string;
   if (totalNotes === 0) {
     label = "Not initialized";
+  } else if (!configEnabled) {
+    label = "FTS5 only — embedding disabled in config";
   } else if (!modelAvailable) {
     label = "FTS5 only — run 'upgrade --semantic' to enable";
   } else if (embeddingsCount === 0) {
