@@ -668,8 +668,14 @@ export class EntityExtractor {
     result = result.replace(/_{1,3}([^_]+)_{1,3}/g, "$1");
     // Remove horizontal rules
     result = result.replace(/^[-*_]{3,}\s*$/gm, "");
-    // Remove HTML tags
-    result = result.replace(/<[^>]+>/g, "");
+    // Remove HTML tags — apply repeatedly to handle nested/split constructs
+    let prev;
+    do {
+      prev = result;
+      result = result.replace(/<[^>]*>/g, "");
+    } while (result !== prev);
+    // Remove any remaining angle brackets that could form tags
+    result = result.replace(/</g, "").replace(/>/g, "");
     return result;
   }
 
