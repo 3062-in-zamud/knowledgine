@@ -31,7 +31,8 @@ export interface SearchCommandOptions {
   mode?: string;
   limit?: number;
   format?: string;
-  related?: string;
+  related?: boolean;
+  relatedEntity?: string;
   relatedFile?: string;
   path?: string;
   fallback?: boolean;
@@ -155,11 +156,17 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       let noteId: number | undefined;
       let entityName: string | undefined;
       if (options.related) {
-        const parsed = parseInt(options.related, 10);
-        if (!isNaN(parsed) && parsed > 0 && String(parsed) === options.related) {
-          noteId = parsed;
+        // --related は boolean フラグ。entity name は --related-entity か query から取得。
+        if (options.relatedEntity) {
+          entityName = options.relatedEntity;
         } else {
-          entityName = options.related;
+          // query が数値なら noteId、そうでなければ entity name として扱う
+          const parsed = parseInt(query, 10);
+          if (!isNaN(parsed) && parsed > 0 && String(parsed) === query) {
+            noteId = parsed;
+          } else {
+            entityName = query;
+          }
         }
       }
       try {
