@@ -48,24 +48,33 @@ export async function benchmarkCommand(options: BenchmarkOptions): Promise<void>
     process.exit(1);
   }
 
-  // Fetch embeddings directly from note_embeddings table
+  // Count total embeddings first to avoid loading all BLOBs into memory.
   type EmbRow = { note_id: number; embedding: Buffer; dimensions: number };
-  const rows = db
-    .prepare("SELECT note_id, embedding, dimensions FROM note_embeddings ORDER BY note_id")
-    .all() as EmbRow[];
+  const countRow = db.prepare("SELECT COUNT(*) AS count FROM note_embeddings").get() as
+    | { count: number }
+    | undefined;
 
-  if (rows.length === 0) {
+  const totalEmbeddings = countRow?.count ?? 0;
+
+  if (totalEmbeddings === 0) {
     console.error("No embeddings found. Run 'knowledgine upgrade --semantic' first.");
     db.close();
     process.exit(0);
   }
 
   const MAX_SAMPLES = 50;
-  const indices = sampleIndices(rows.length, MAX_SAMPLES);
-  const sample = indices.map((i) => rows[i]);
+  const indices = sampleIndices(totalEmbeddings, MAX_SAMPLES);
+
+  // Fetch only the sampled rows by offset to avoid loading all BLOBs.
+  const stmtOffset = db.prepare(
+    "SELECT note_id, embedding, dimensions FROM note_embeddings ORDER BY note_id LIMIT 1 OFFSET ?",
+  );
+  const sample: EmbRow[] = indices
+    .map((offset) => stmtOffset.get(offset) as EmbRow | undefined)
+    .filter((row): row is EmbRow => row !== undefined);
 
   console.error(`\nSemantic Score Distribution Benchmark`);
-  console.error(`Total embeddings: ${rows.length}`);
+  console.error(`Total embeddings: ${totalEmbeddings}`);
   console.error(`Sample size: ${sample.length}`);
   console.error(`Computing pairwise cosine similarities...\n`);
 
