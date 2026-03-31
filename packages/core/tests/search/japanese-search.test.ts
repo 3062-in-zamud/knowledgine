@@ -81,4 +81,32 @@ describe("Japanese search (KNOW-366)", () => {
     const results = await searcher.search({ query: "バグ修正" });
     expect(results.length).toBeGreaterThan(0);
   });
+
+  it("KNOW-393: should find compound Japanese noun phrases via trigram (推論エンジンの最適化)", async () => {
+    const now = new Date().toISOString();
+    repository.saveNote({
+      filePath: "inference-engine.md",
+      title: "推論エンジンの最適化",
+      content: "推論エンジンの最適化により、レスポンス速度が30%向上した",
+      createdAt: now,
+    });
+
+    // Compound query should match via trigram — FTS5 boolean syntax must NOT be applied
+    const results = await searcher.search({ query: "推論エンジンの最適化" });
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.some((r) => r.note.file_path === "inference-engine.md")).toBe(true);
+  });
+
+  it("KNOW-393: should not throw on CJK query with OR-like content in trigram path", async () => {
+    const now = new Date().toISOString();
+    repository.saveNote({
+      filePath: "search-or.md",
+      title: "検索機能の改善",
+      content: "全文検索とセマンティック検索を組み合わせた改善",
+      createdAt: now,
+    });
+
+    // Query containing CJK should use trigram table without FTS5 boolean syntax
+    await expect(searcher.search({ query: "検索機能" })).resolves.toBeDefined();
+  });
 });
