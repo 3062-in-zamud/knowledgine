@@ -155,7 +155,7 @@ export async function benchmarkCommand(options: BenchmarkOptions): Promise<void>
   console.log(
     JSON.stringify(
       {
-        totalEmbeddings: rows.length,
+        totalEmbeddings: totalEmbeddings,
         sampleSize: sample.length,
         pairCount: n,
         mean: parseFloat((mean * 100).toFixed(4)),
