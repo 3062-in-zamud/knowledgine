@@ -65,10 +65,11 @@ export class HybridSearcher {
       }
     }
 
-    // ベクトルスコアマップ (distance → 0-1 score)。semanticThreshold 未満は除外。
+    // ベクトルスコアマップ (L2 distance → cosine similarity)。semanticThreshold 未満は除外。
+    // SemanticSearcher と同じ変換式: cosine_similarity = 1 - L2_distance² / 2 (unit vectors)
     const vecMap = new Map<number, number>();
     for (const { note_id, distance } of vecResults) {
-      const score = 1 / (1 + distance);
+      const score = Math.max(0, 1 - (distance * distance) / 2);
       if (score >= this.semanticThreshold) {
         vecMap.set(note_id, score);
       }

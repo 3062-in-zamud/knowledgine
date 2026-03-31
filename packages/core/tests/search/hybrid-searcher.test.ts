@@ -107,7 +107,7 @@ describe("HybridSearcher", () => {
       const embedQuerySpy = vi.spyOn(provider, "embedQuery");
 
       // Mock が返す距離は MockEmbeddingProvider の実装次第だが、
-      // threshold=0.99 は score = 1/(1+distance) >= 0.99 つまり distance <= 0.01 の場合のみ通過
+      // threshold=0.99 は score = 1 - dist²/2 >= 0.99 つまり dist <= ~0.141 の場合のみ通過
       // 実際には MockEmbeddingProvider が高距離を返すため vecMap は空になる
       const results = await strictSearcher.search("TypeScript");
 
