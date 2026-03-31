@@ -715,8 +715,8 @@ export class KnowledgeRepository {
     const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
 
     // trigram テーブルは FTS5 boolean 構文（AND/OR/quoted phrase）を解釈しない。
-    // CJK クエリはクエリ文字列をそのまま MATCH に渡す（シングルクォートのみエスケープ）。
-    const ftsQuery = useTrigram ? query.replace(/'/g, "''") : this.transformQueryToFts5(query);
+    // MATCH ? はバインドパラメータなので SQL エスケープ不要。CJK はそのまま渡す。
+    const ftsQuery = useTrigram ? query : this.transformQueryToFts5(query);
 
     try {
       const rows = this.stmt(
@@ -798,8 +798,8 @@ export class KnowledgeRepository {
     const useTrigram = hasCjk && query.length >= 3;
     const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
 
-    // trigram テーブルは FTS5 boolean 構文を解釈しないため、CJK はそのまま渡す
-    const ftsQuery = useTrigram ? query.replace(/'/g, "''") : this.transformQueryToFts5(query);
+    // trigram テーブルは FTS5 boolean 構文を解釈しない。MATCH ? はバインドパラメータなので SQL エスケープ不要。
+    const ftsQuery = useTrigram ? query : this.transformQueryToFts5(query);
 
     try {
       // Use FTS5 snippet() function with Unicode markers for highlighting
