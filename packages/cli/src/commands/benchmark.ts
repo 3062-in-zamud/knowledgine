@@ -78,27 +78,46 @@ export async function benchmarkCommand(options: BenchmarkOptions): Promise<void>
   console.error(`Sample size: ${sample.length}`);
   console.error(`Computing pairwise cosine similarities...\n`);
 
+  const BYTES_PER_FLOAT32 = 4;
   const scores: number[] = [];
+  let skippedPairs = 0;
+
   for (let i = 0; i < sample.length; i++) {
-    const a = new Float32Array(
-      sample[i].embedding.buffer,
-      sample[i].embedding.byteOffset,
-      sample[i].embedding.byteLength / 4,
-    );
+    const rowA = sample[i];
+    const dimsA = rowA.dimensions;
+    const maxFloatsA = rowA.embedding.byteLength / BYTES_PER_FLOAT32;
+    if (!Number.isInteger(dimsA) || dimsA <= 0 || dimsA > maxFloatsA) continue;
+
+    const a = new Float32Array(rowA.embedding.buffer, rowA.embedding.byteOffset, dimsA);
+
     for (let j = i + 1; j < sample.length; j++) {
-      const b = new Float32Array(
-        sample[j].embedding.buffer,
-        sample[j].embedding.byteOffset,
-        sample[j].embedding.byteLength / 4,
-      );
+      const rowB = sample[j];
+      const dimsB = rowB.dimensions;
+      const maxFloatsB = rowB.embedding.byteLength / BYTES_PER_FLOAT32;
+      if (!Number.isInteger(dimsB) || dimsB <= 0 || dimsB > maxFloatsB || dimsB !== dimsA) {
+        skippedPairs++;
+        continue;
+      }
+      const b = new Float32Array(rowB.embedding.buffer, rowB.embedding.byteOffset, dimsB);
       scores.push(cosineSimilarityFromL2(a, b));
     }
   }
 
   if (scores.length === 0) {
-    console.error("Not enough samples to compute distribution (need at least 2).");
+    console.error(
+      "Not enough samples to compute distribution (need at least 2 valid matching-dimension embeddings).",
+    );
+    if (skippedPairs > 0) {
+      console.error(
+        `Note: Skipped ${skippedPairs} pair(s) due to invalid or mismatched dimensions.`,
+      );
+    }
     db.close();
     return;
+  }
+
+  if (skippedPairs > 0) {
+    console.error(`Note: Skipped ${skippedPairs} pair(s) with invalid or mismatched dimensions.`);
   }
 
   scores.sort((a, b) => a - b);
