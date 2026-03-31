@@ -6,12 +6,14 @@ export class HybridSearcher {
   /**
    * @param alpha - FTSスコアの重み (0-1)。デフォルト 0.3。残り (1-α) がベクトルスコアの重み。
    * @param modelFamily - 使用するモデルファミリー。CJKクエリの動的alpha判定に使用。
+   * @param semanticThreshold - semantic スコアの最低閾値。これ未満のエントリは vecMap から除外。デフォルト 0.5。
    */
   constructor(
     private repository: KnowledgeRepository,
     private embeddingProvider: EmbeddingProvider,
     private alpha: number = 0.3,
     private modelFamily: "bert" | "e5" = "bert",
+    private semanticThreshold: number = 0.5,
   ) {}
 
   /**
@@ -63,10 +65,13 @@ export class HybridSearcher {
       }
     }
 
-    // ベクトルスコアマップ (distance → 0-1 score)
+    // ベクトルスコアマップ (distance → 0-1 score)。semanticThreshold 未満は除外。
     const vecMap = new Map<number, number>();
     for (const { note_id, distance } of vecResults) {
-      vecMap.set(note_id, 1 / (1 + distance));
+      const score = 1 / (1 + distance);
+      if (score >= this.semanticThreshold) {
+        vecMap.set(note_id, score);
+      }
     }
 
     // 全ノートIDを統合
