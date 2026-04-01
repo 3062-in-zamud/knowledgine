@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-04-01
+
+### Added
+
+#### CLI (`@knowledgine/cli`)
+
+- **`knowledgine benchmark --semantic`**: New command that samples up to 50 embeddings, computes all pairwise cosine similarities, and reports mean, stddev, min, p25, median, p75, p90, and max. Warns when stddev < 5%, indicating score flattening. Output also available as JSON on stdout for scripting.
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **Commit note context enrichment**: Git-history plugin now appends a `## Changed Files` section (with per-file `+N/-N` line counts) to each commit note's content. Improves embedding quality by giving the model file-level context beyond the commit message alone.
+
+### Fixed
+
+#### Core — search (`@knowledgine/core`)
+
+- **Semantic similarity formula**: `SemanticSearcher` and `HybridSearcher` now both use `1 - L2_distance² / 2` (cosine similarity for L2-normalized unit vectors) instead of `1 / (1 + distance)`. The old formula compressed scores into a narrow 63–66% band, making ranking ineffective.
+- **Hybrid semantic threshold**: `HybridSearcher` now filters out semantic results below a configurable threshold (default 0.5) before blending with FTS scores, preventing low-quality semantic matches from degrading hybrid results below keyword-only quality.
+- **CJK trigram FTS query**: `searchNotesWithRank()` and `searchNotesWithSnippet()` no longer apply `transformQueryToFts5()` boolean syntax when routing to the trigram FTS5 table. The trigram tokenizer does not parse FTS5 boolean operators, causing zero results for compound Japanese queries.
+- **Trigram MATCH escaping**: Removed incorrect SQL single-quote escaping (`replace(/'/g, "''")`) from trigram queries. `MATCH ?` uses a bound parameter, so SQL-style escaping is both unnecessary and corrupts the query string (e.g. `O'Reilly` → `O''Reilly`).
+
+#### CLI (`@knowledgine/cli`)
+
+- **`--related` flag**: Changed from `--related <noteId>` (value-taking) to `--related` (boolean). Passing a multi-word quoted query no longer triggers "too many arguments". Added `--related-entity <name>` for explicit entity name lookup.
+- **`benchmark --semantic` memory usage**: Replaced full-table BLOB load with `COUNT(*)` + `LIMIT 1 OFFSET ?` per sample, avoiding loading all embeddings into memory on large knowledge bases.
+- **`benchmark --semantic` dimension validation**: Added guards to skip embeddings with invalid or out-of-range `dimensions` values and skip pairs where dimensions do not match, preventing NaN results from corrupted data.
+
 ## [0.6.2] - 2026-03-29
 
 ### Critical Fixes (Phase 1)
@@ -480,4 +507,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Configurable watch patterns and ignore patterns
 - Graceful shutdown handling (SIGINT/SIGTERM)
 
+[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.2...v0.6.3
 [0.0.1]: https://github.com/3062-in-zamud/knowledgine/releases/tag/v0.0.1

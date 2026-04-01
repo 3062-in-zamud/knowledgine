@@ -142,6 +142,48 @@ function extractChangedPaths(diff: string): string[] {
   return paths;
 }
 
+interface FileChangeStat {
+  path: string;
+  added: number;
+  removed: number;
+}
+
+function extractFileStats(diff: string): FileChangeStat[] {
+  const stats: FileChangeStat[] = [];
+  const lines = diff.split("\n");
+  let currentPath: string | null = null;
+  let added = 0;
+  let removed = 0;
+
+  for (const line of lines) {
+    const fileMatch = line.match(/^diff --git a\/.+ b\/(.+)$/);
+    if (fileMatch && fileMatch[1]) {
+      if (currentPath !== null) {
+        stats.push({ path: currentPath, added, removed });
+      }
+      currentPath = fileMatch[1];
+      added = 0;
+      removed = 0;
+      continue;
+    }
+    if (currentPath !== null) {
+      if (line.startsWith("+") && !line.startsWith("+++")) added++;
+      else if (line.startsWith("-") && !line.startsWith("---")) removed++;
+    }
+  }
+  if (currentPath !== null) {
+    stats.push({ path: currentPath, added, removed });
+  }
+  return stats;
+}
+
+function buildChangedFilesSummary(diff: string): string {
+  const stats = extractFileStats(diff);
+  if (stats.length === 0) return "";
+  const lines = stats.map((s) => `- ${s.path} (+${s.added}/-${s.removed} lines)`);
+  return `\n\n## Changed Files\n${lines.join("\n")}`;
+}
+
 export function commitToNormalizedEvent(
   commit: ParsedCommit,
   diff: string,
@@ -156,11 +198,13 @@ export function commitToNormalizedEvent(
     ...(currentBranch !== undefined ? { branch: currentBranch } : {}),
   };
 
+  const changedFilesSummary = buildChangedFilesSummary(diff);
+
   return {
     sourceUri: `git://${repoPath}/commit/${commit.hash}`,
     eventType: "change",
     title: commit.subject,
-    content: `Author: ${commit.authorName} <${commit.authorEmail}>\nDate: ${commit.authorDate}\n\n${commit.subject}\n\n${commit.body}\n\n---\n${diff}`,
+    content: `Author: ${commit.authorName} <${commit.authorEmail}>\nDate: ${commit.authorDate}\n\n${commit.subject}\n\n${commit.body}${changedFilesSummary}\n\n---\n${diff}`,
     timestamp: new Date(commit.authorDate),
     metadata,
     relatedPaths: extractChangedPaths(diff),

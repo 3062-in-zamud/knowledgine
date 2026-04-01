@@ -27,6 +27,7 @@ import { registerServeCommand } from "./commands/serve.js";
 import { deprecationCheckCommand } from "./commands/deprecation-check.js";
 import { undeprecateCommand } from "./commands/undeprecate.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { benchmarkCommand } from "./commands/benchmark.js";
 import { createOutputErrorHandler } from "./lib/unknown-command-handler.js";
 
 const program = new Command();
@@ -258,7 +259,8 @@ program
   .option("--mode <mode>", "Search mode: keyword, semantic, hybrid (default: auto-detect)")
   .option("--limit <n>", "Maximum results", "20")
   .option("--format <format>", "Output format: json, table, plain", "plain")
-  .option("--related <noteId>", "Find related notes by note ID")
+  .option("--related", "Find related notes (uses query as note ID or entity name)")
+  .option("--related-entity <name>", "Explicitly specify entity name for related search")
   .option("--related-file <path>", "Find related notes by file path")
   .option("--path <dir>", "Root directory")
   .option(
@@ -276,7 +278,8 @@ program
         mode?: string;
         limit?: string;
         format?: string;
-        related?: string;
+        related?: boolean;
+        relatedEntity?: string;
         relatedFile?: string;
         path?: string;
         fallback?: boolean;
@@ -291,6 +294,7 @@ program
         limit: Number(opts.limit),
         format: opts.format,
         related: opts.related,
+        relatedEntity: opts.relatedEntity,
         relatedFile: opts.relatedFile,
         path: opts.path,
         fallback: opts.fallback,
@@ -358,6 +362,19 @@ Example:
   knowledgine doctor --path ~/notes`,
   )
   .action(doctorCommand);
+
+program
+  .command("benchmark")
+  .description("Run benchmarks on the knowledge base")
+  .option("--path <dir>", "Root directory")
+  .option("--semantic", "Analyze semantic score distribution (requires embeddings)")
+  .addHelpText(
+    "after",
+    `
+Example:
+  knowledgine benchmark --semantic --path ~/notes`,
+  )
+  .action(benchmarkCommand);
 
 program.showSuggestionAfterError(true);
 program.configureOutput({
