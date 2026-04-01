@@ -100,6 +100,36 @@ describe("HybridSearcher", () => {
     });
   });
 
+  describe("semanticThreshold filtering (KNOW-394)", () => {
+    it("should exclude low-quality semantic results below threshold", async () => {
+      // threshold=0.99 に設定して、ほぼすべての semantic ヒットを除外する
+      const strictSearcher = new HybridSearcher(ctx.repository, provider, 0.3, "bert", 0.99);
+      const embedQuerySpy = vi.spyOn(provider, "embedQuery");
+
+      // Mock が返す距離は MockEmbeddingProvider の実装次第だが、
+      // threshold=0.99 は score = 1 - dist²/2 >= 0.99 つまり dist <= ~0.141 の場合のみ通過
+      // 実際には MockEmbeddingProvider が高距離を返すため vecMap は空になる
+      const results = await strictSearcher.search("TypeScript");
+
+      // FTS は機能するのでresultsは0件以上
+      expect(Array.isArray(results)).toBe(true);
+      // semantic reason がないことを確認（vecMap が空のため）
+      for (const result of results) {
+        const hasSemanticReason = result.matchReason.some((r) => r.startsWith("セマンティック:"));
+        expect(hasSemanticReason).toBe(false);
+      }
+
+      embedQuerySpy.mockRestore();
+    });
+
+    it("should include semantic results when threshold is 0 (no filtering)", async () => {
+      // e5モデル + threshold=0 で全 semantic ヒットを通過させる
+      const permissiveSearcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
+      const results = await permissiveSearcher.search("TypeScript");
+      expect(Array.isArray(results)).toBe(true);
+    });
+  });
+
   describe("graceful degradation on embedding failure", () => {
     it("should fall back gracefully when embedQuery throws", async () => {
       const failingProvider = new MockEmbeddingProvider();

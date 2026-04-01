@@ -705,9 +705,6 @@ export class KnowledgeRepository {
     if (dateFrom) dateParams.push(dateFrom);
     if (dateTo) dateParams.push(dateTo);
 
-    // Transform user query into FTS5-compatible syntax (OR, quoted phrases, escaping)
-    const ftsQuery = this.transformQueryToFts5(query);
-
     // CJK文字を含むクエリはtrigramテーブルを優先使用（trigramは最低3文字必要）
     const isCjk = hasCjkChars(query);
     // Short CJK queries (1-2 chars) → LIKE directly (FTS5 can't tokenize these properly)
@@ -716,6 +713,10 @@ export class KnowledgeRepository {
     }
     const useTrigram = isCjk && query.length >= 3;
     const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
+
+    // trigram テーブルは FTS5 boolean 構文（AND/OR/quoted phrase）を解釈しない。
+    // MATCH ? はバインドパラメータなので SQL エスケープ不要。CJK はそのまま渡す。
+    const ftsQuery = useTrigram ? query : this.transformQueryToFts5(query);
 
     try {
       const rows = this.stmt(
@@ -797,7 +798,8 @@ export class KnowledgeRepository {
     const useTrigram = hasCjk && query.length >= 3;
     const ftsTable = useTrigram ? "knowledge_notes_fts_trigram" : "knowledge_notes_fts";
 
-    const ftsQuery = this.transformQueryToFts5(query);
+    // trigram テーブルは FTS5 boolean 構文を解釈しない。MATCH ? はバインドパラメータなので SQL エスケープ不要。
+    const ftsQuery = useTrigram ? query : this.transformQueryToFts5(query);
 
     try {
       // Use FTS5 snippet() function with Unicode markers for highlighting

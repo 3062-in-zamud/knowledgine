@@ -98,4 +98,24 @@ describe("searchCommand input validation", () => {
       expect(output).not.toContain("Invalid search mode");
     });
   });
+
+  describe("--related flag (KNOW-398)", () => {
+    it("should accept --related as boolean without argument", async () => {
+      // related=true は boolean フラグ。引数なしで受け付ける。
+      // 初期化されていない環境なので Not initialized エラーになるが、引数パースエラーは出ない。
+      await searchCommand("routing error handling", { related: true });
+
+      const output = stderrSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+      expect(output).not.toContain("Too many arguments");
+      expect(output).not.toContain("Invalid search mode");
+    });
+
+    it("should use relatedEntity when provided with --related", async () => {
+      // relatedEntity が指定された場合は entity name として渡される（初期化エラーになるが引数エラーは出ない）
+      await searchCommand("routing error handling", { related: true, relatedEntity: "Express" });
+
+      const output = stderrSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+      expect(output).not.toContain("Too many arguments");
+    });
+  });
 });

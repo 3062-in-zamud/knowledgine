@@ -35,9 +35,10 @@ export class SemanticSearcher {
       const note = noteMap.get(note_id);
       if (!note) continue;
 
-      // sqlite-vec distance (0=identical, higher=less similar)
-      // Normalize to 0-1 score where 1=most similar
-      const score = Math.max(0, 1 / (1 + distance));
+      // sqlite-vec vec0 returns L2 distance on unit vectors.
+      // For L2-normalized embeddings: cosine_similarity = 1 - L2_distance² / 2
+      // This gives a proper 0-1 range that separates similar vs dissimilar results.
+      const score = Math.max(0, 1 - (distance * distance) / 2);
 
       results.push({
         note,
