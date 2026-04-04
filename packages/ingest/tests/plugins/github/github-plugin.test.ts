@@ -11,15 +11,22 @@ vi.mock("../../../src/plugins/github/gh-parser.js", async (importOriginal) => {
     execGh: vi.fn(),
     checkGhAuth: vi.fn(),
     checkGhVersion: vi.fn(),
+    fetchRepoMeta: vi.fn(),
   };
 });
 
 import { GitHubPlugin } from "../../../src/plugins/github/index.js";
-import { execGh, checkGhAuth, checkGhVersion } from "../../../src/plugins/github/gh-parser.js";
+import {
+  execGh,
+  checkGhAuth,
+  checkGhVersion,
+  fetchRepoMeta,
+} from "../../../src/plugins/github/gh-parser.js";
 
 const mockedExecGh = vi.mocked(execGh);
 const mockedCheckGhAuth = vi.mocked(checkGhAuth);
 const mockedCheckGhVersion = vi.mocked(checkGhVersion);
+const mockedFetchRepoMeta = vi.mocked(fetchRepoMeta);
 
 const fixturesDir = join(__dirname, "../../fixtures/github");
 
@@ -33,6 +40,13 @@ describe("GitHubPlugin", () => {
   beforeEach(() => {
     plugin = new GitHubPlugin();
     vi.clearAllMocks();
+    // デフォルトでは has_issues: true（通常フロー）
+    mockedFetchRepoMeta.mockResolvedValue({
+      has_issues: true,
+      has_wiki: true,
+      is_archived: false,
+      default_branch: "main",
+    });
   });
 
   it("should have correct manifest", () => {
@@ -343,8 +357,11 @@ describe("GitHubPlugin", () => {
         events.push(event);
       }
 
-      // 2 PRs only (detail fetch failures are swallowed)
-      expect(events).toHaveLength(2);
+      // 2 PRs + 2 error events (one per failed detail fetch)
+      expect(events).toHaveLength(4);
+      const errorEvents = events.filter((e) => e.metadata.skippedReason === "api_error");
+      expect(errorEvents).toHaveLength(2);
+      expect(errorEvents[0].metadata.extra?.errorCategory).toBe("network");
     });
 
     it("should yield inline review comment events with code location metadata", async () => {

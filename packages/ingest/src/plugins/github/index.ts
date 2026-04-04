@@ -6,12 +6,14 @@ import type {
   PluginInitResult,
   NormalizedEvent,
   SourceURI,
+  ErrorCategory,
 } from "../../types.js";
 import {
   execGh,
   checkGhAuth,
   checkGhVersion,
   parseGitHubSourceUri,
+  fetchRepoMeta,
   parsePRList,
   parseIssueList,
   prToNormalizedEvent,
@@ -20,8 +22,18 @@ import {
   reviewToNormalizedEvent,
   parseReviewComments,
 } from "./gh-parser.js";
+import type { RepoMeta } from "./gh-parser.js";
 
 const PAGE_SIZE = 100;
+
+function categorizeError(err: unknown): ErrorCategory {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  if (msg.includes("rate limit")) return "rate_limit";
+  if (msg.includes("403") || msg.includes("forbidden") || msg.includes("permission"))
+    return "permission";
+  if (msg.includes("json") || msg.includes("parse") || msg.includes("syntax")) return "parse";
+  return "network";
+}
 
 export class GitHubPlugin implements IngestPlugin {
   readonly manifest: PluginManifest = {
@@ -61,6 +73,17 @@ export class GitHubPlugin implements IngestPlugin {
 
   async *ingestAll(sourceUri: SourceURI): AsyncGenerator<NormalizedEvent> {
     const { owner, repo } = parseGitHubSourceUri(sourceUri);
+
+    // リポジトリメタ情報の事前チェック
+    let repoMeta: RepoMeta | undefined;
+    try {
+      repoMeta = await fetchRepoMeta(owner, repo);
+    } catch {
+      // 事前チェック失敗は通常フローにフォールバック
+    }
+    if (repoMeta?.has_issues === false) {
+      process.stderr.write(`  ⚠ Issues: disabled on ${owner}/${repo} (skipped)\n`);
+    }
 
     // PRs with date-based cursor pagination
     let oldestPRSeen: string | undefined;
@@ -129,8 +152,23 @@ export class GitHubPlugin implements IngestPlugin {
               yield reviewToNormalizedEvent(review, pr.number, owner, repo);
             }
           }
-        } catch {
-          // 詳細取得失敗は警告のみ（PR本体は既にyield済み）
+        } catch (err) {
+          yield {
+            sourceUri: `github://${owner}/${repo}/pr/${pr.number}/details`,
+            eventType: "discussion" as const,
+            title: `[error] PR #${pr.number} details fetch failed`,
+            content: "",
+            timestamp: new Date(),
+            metadata: {
+              sourcePlugin: "github",
+              sourceId: `pr-${pr.number}-details-error`,
+              skippedReason: "api_error",
+              extra: {
+                errorCategory: categorizeError(err),
+                errorMessage: err instanceof Error ? err.message : String(err),
+              },
+            },
+          };
         }
 
         // インラインレビューコメント（ファイル位置情報付き）
@@ -151,9 +189,23 @@ export class GitHubPlugin implements IngestPlugin {
               { path: rc.path, line: rc.line, side: rc.side, diffHunk: rc.diff_hunk },
             );
           }
-        } catch {
-          // graceful degradation: warn only
-          process.stderr.write(`  Could not fetch inline review comments for PR #${pr.number}\n`);
+        } catch (err) {
+          yield {
+            sourceUri: `github://${owner}/${repo}/pr/${pr.number}/inline-comments`,
+            eventType: "discussion" as const,
+            title: `[error] PR #${pr.number} inline review comments fetch failed`,
+            content: "",
+            timestamp: new Date(),
+            metadata: {
+              sourcePlugin: "github",
+              sourceId: `pr-${pr.number}-inline-comments-error`,
+              skippedReason: "api_error",
+              extra: {
+                errorCategory: categorizeError(err),
+                errorMessage: err instanceof Error ? err.message : String(err),
+              },
+            },
+          };
         }
       }
 
@@ -175,57 +227,59 @@ export class GitHubPlugin implements IngestPlugin {
     }
 
     // Issues with date-based cursor pagination
-    let oldestIssueSeen: string | undefined;
-    let totalIssues = 0;
+    if (repoMeta?.has_issues !== false) {
+      let oldestIssueSeen: string | undefined;
+      let totalIssues = 0;
 
-    while (true) {
-      const issueArgs = [
-        "issue",
-        "list",
-        "-R",
-        `${owner}/${repo}`,
-        "--json",
-        "number,title,body,author,labels,createdAt,updatedAt,url,state",
-        "--limit",
-        String(PAGE_SIZE),
-        "--state",
-        "all",
-      ];
-      if (oldestIssueSeen) {
-        // created:<= to include items with the exact same timestamp.
-        // Duplicates from boundary overlap are deduplicated by IngestEngine via sourceUri uniqueness.
-        issueArgs.push("--search", `created:<=${oldestIssueSeen}`);
-      }
+      while (true) {
+        const issueArgs = [
+          "issue",
+          "list",
+          "-R",
+          `${owner}/${repo}`,
+          "--json",
+          "number,title,body,author,labels,createdAt,updatedAt,url,state",
+          "--limit",
+          String(PAGE_SIZE),
+          "--state",
+          "all",
+        ];
+        if (oldestIssueSeen) {
+          // created:<= to include items with the exact same timestamp.
+          // Duplicates from boundary overlap are deduplicated by IngestEngine via sourceUri uniqueness.
+          issueArgs.push("--search", `created:<=${oldestIssueSeen}`);
+        }
 
-      const issueJson = await this.execWithRetry(issueArgs);
-      const issues = parseIssueList(issueJson);
-      if (issues.length === 0) break;
+        const issueJson = await this.execWithRetry(issueArgs);
+        const issues = parseIssueList(issueJson);
+        if (issues.length === 0) break;
 
-      let hitIssueLimit = false;
-      for (const issue of issues) {
-        if (totalIssues >= this.itemLimit) {
-          hitIssueLimit = true;
+        let hitIssueLimit = false;
+        for (const issue of issues) {
+          if (totalIssues >= this.itemLimit) {
+            hitIssueLimit = true;
+            break;
+          }
+          yield issueToNormalizedEvent(issue, owner, repo);
+          totalIssues++;
+        }
+
+        process.stderr.write(`  Fetching issues... (${totalIssues} fetched)\n`);
+
+        if (hitIssueLimit) break;
+        // 取得件数が PAGE_SIZE 未満なら最終ページ
+        if (issues.length < PAGE_SIZE) break;
+
+        // カーソルを最古の createdAt に更新（無限ループ防止）
+        const newIssueCursor = issues[issues.length - 1].createdAt;
+        if (newIssueCursor === oldestIssueSeen) {
+          process.stderr.write(
+            `  ⚠ Pagination stalled: ${PAGE_SIZE}+ issues share timestamp ${newIssueCursor}. Breaking.\n`,
+          );
           break;
         }
-        yield issueToNormalizedEvent(issue, owner, repo);
-        totalIssues++;
+        oldestIssueSeen = newIssueCursor;
       }
-
-      process.stderr.write(`  Fetching issues... (${totalIssues} fetched)\n`);
-
-      if (hitIssueLimit) break;
-      // 取得件数が PAGE_SIZE 未満なら最終ページ
-      if (issues.length < PAGE_SIZE) break;
-
-      // カーソルを最古の createdAt に更新（無限ループ防止）
-      const newIssueCursor = issues[issues.length - 1].createdAt;
-      if (newIssueCursor === oldestIssueSeen) {
-        process.stderr.write(
-          `  ⚠ Pagination stalled: ${PAGE_SIZE}+ issues share timestamp ${newIssueCursor}. Breaking.\n`,
-        );
-        break;
-      }
-      oldestIssueSeen = newIssueCursor;
     }
   }
 
@@ -234,6 +288,17 @@ export class GitHubPlugin implements IngestPlugin {
     checkpoint: string,
   ): AsyncGenerator<NormalizedEvent> {
     const { owner, repo } = parseGitHubSourceUri(sourceUri);
+
+    // リポジトリメタ情報の事前チェック
+    let repoMeta: RepoMeta | undefined;
+    try {
+      repoMeta = await fetchRepoMeta(owner, repo);
+    } catch {
+      // 事前チェック失敗は通常フローにフォールバック
+    }
+    if (repoMeta?.has_issues === false) {
+      process.stderr.write(`  ⚠ Issues: disabled on ${owner}/${repo} (skipped)\n`);
+    }
 
     // checkpoint を1分前にオフセット（GitHub検索APIの分単位精度対応）
     const checkpointDate = new Date(checkpoint);
@@ -275,37 +340,39 @@ export class GitHubPlugin implements IngestPlugin {
     }
 
     // Issues (incremental) with pagination
-    let oldestIssueSeen: string | undefined;
+    if (repoMeta?.has_issues !== false) {
+      let oldestIssueSeen: string | undefined;
 
-    while (true) {
-      const issueArgs = [
-        "issue",
-        "list",
-        "-R",
-        `${owner}/${repo}`,
-        "--json",
-        "number,title,body,author,labels,createdAt,updatedAt,url,state",
-        "--limit",
-        String(PAGE_SIZE),
-        "--state",
-        "all",
-        "--search",
-        oldestIssueSeen
-          ? // created:<= to include boundary items; dedup handled by IngestEngine via sourceUri
-            `updated:>=${adjustedCheckpoint} created:<=${oldestIssueSeen}`
-          : `updated:>=${adjustedCheckpoint}`,
-      ];
+      while (true) {
+        const issueArgs = [
+          "issue",
+          "list",
+          "-R",
+          `${owner}/${repo}`,
+          "--json",
+          "number,title,body,author,labels,createdAt,updatedAt,url,state",
+          "--limit",
+          String(PAGE_SIZE),
+          "--state",
+          "all",
+          "--search",
+          oldestIssueSeen
+            ? // created:<= to include boundary items; dedup handled by IngestEngine via sourceUri
+              `updated:>=${adjustedCheckpoint} created:<=${oldestIssueSeen}`
+            : `updated:>=${adjustedCheckpoint}`,
+        ];
 
-      const issueJson = await this.execWithRetry(issueArgs);
-      const issues = parseIssueList(issueJson);
-      if (issues.length === 0) break;
+        const issueJson = await this.execWithRetry(issueArgs);
+        const issues = parseIssueList(issueJson);
+        if (issues.length === 0) break;
 
-      for (const issue of issues) {
-        yield issueToNormalizedEvent(issue, owner, repo);
+        for (const issue of issues) {
+          yield issueToNormalizedEvent(issue, owner, repo);
+        }
+
+        if (issues.length < PAGE_SIZE) break;
+        oldestIssueSeen = issues[issues.length - 1].createdAt;
       }
-
-      if (issues.length < PAGE_SIZE) break;
-      oldestIssueSeen = issues[issues.length - 1].createdAt;
     }
   }
 

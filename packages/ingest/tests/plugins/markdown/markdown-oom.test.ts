@@ -80,7 +80,7 @@ describe("MarkdownPlugin OOM対策", () => {
   });
 
   describe("file size limit", () => {
-    it("should skip files larger than MAX_FILE_SIZE_BYTES", async () => {
+    it("should yield a skip event with empty content for files larger than MAX_FILE_SIZE_BYTES", async () => {
       // Create a file larger than 10MB
       const largeContent = "x".repeat(11 * 1024 * 1024);
       await writeFile(join(testDir, "huge.md"), largeContent);
@@ -91,8 +91,15 @@ describe("MarkdownPlugin OOM対策", () => {
         events.push(event);
       }
 
-      expect(events).toHaveLength(1);
-      expect(events[0].title).toBe("Small File");
+      // Both files yield events; large file has empty content and too_large skip reason
+      expect(events).toHaveLength(2);
+      const largeEvent = events.find((e) => e.sourceUri === "huge.md");
+      const smallEvent = events.find((e) => e.title === "Small File");
+      expect(largeEvent).toBeDefined();
+      expect(largeEvent!.content).toBe("");
+      expect(largeEvent!.metadata.skippedReason).toBe("too_large");
+      expect(smallEvent).toBeDefined();
+      expect(smallEvent!.content).not.toBe("");
     });
 
     it("should include files at or under MAX_FILE_SIZE_BYTES", async () => {
@@ -125,7 +132,7 @@ describe("MarkdownPlugin OOM対策", () => {
       expect(events[0].title).toBe("New File");
     });
 
-    it("should skip oversized files in incremental mode", async () => {
+    it("should yield skip event with empty content for oversized files in incremental mode", async () => {
       const checkpoint = new Date(Date.now() - 5000).toISOString();
       const largeContent = "x".repeat(11 * 1024 * 1024);
       await writeFile(join(testDir, "huge.md"), largeContent);
@@ -136,8 +143,14 @@ describe("MarkdownPlugin OOM対策", () => {
         events.push(event);
       }
 
-      expect(events).toHaveLength(1);
-      expect(events[0].title).toBe("Small");
+      // Both files yield events; large file has empty content and too_large skip reason
+      expect(events).toHaveLength(2);
+      const largeEvent = events.find((e) => e.sourceUri === "huge.md");
+      const smallEvent = events.find((e) => e.title === "Small");
+      expect(largeEvent).toBeDefined();
+      expect(largeEvent!.content).toBe("");
+      expect(largeEvent!.metadata.skippedReason).toBe("too_large");
+      expect(smallEvent).toBeDefined();
     });
   });
 });

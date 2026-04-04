@@ -113,8 +113,18 @@ export interface IngestCursorData {
 
 export type SkipReason = "already_indexed" | "no_source_data" | "all_filtered";
 
+export type FileSkipReason = "empty_content" | "too_large" | "excluded_pattern" | "read_error";
+
 export type { ExtractionSummary } from "@knowledgine/core";
 import type { ExtractionSummary } from "@knowledgine/core";
+
+export type ErrorCategory = "network" | "parse" | "rate_limit" | "permission" | "unknown";
+
+export interface IngestError {
+  sourceUri: string;
+  category: ErrorCategory;
+  message: string;
+}
 
 export interface IngestSummary {
   pluginId: string;
@@ -131,4 +141,10 @@ export interface IngestSummary {
   noteIds?: number[];
   /** Summary of entity extraction run after ingest (only present when graphRepository is provided) */
   extractionSummary?: ExtractionSummary;
+  /** Details of individual errors encountered during ingest */
+  errorDetails?: IngestError[];
+  /** Breakdown of skip reasons with counts */
+  skippedByReason?: Partial<Record<FileSkipReason, number>>;
+  /** Paths of skipped files with reasons (populated when verbose) */
+  skipDetails?: Array<{ path: string; reason: FileSkipReason }>;
 }

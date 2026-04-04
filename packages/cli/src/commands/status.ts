@@ -143,7 +143,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   }
   if (semanticMode && embeddingCoverage < 80 && totalNotes > 0) {
     hints.push(
-      `${symbols.arrow} ${colors.hint(`Embedding coverage is ${embeddingCoverage}%. Run 'knowledgine ingest --all' to improve coverage.`)}`,
+      `${symbols.arrow} ${colors.hint(`Embedding coverage is ${embeddingCoverage}%. Run 'knowledgine ingest --embed-missing' to improve coverage.`)}`,
     );
   }
   if (configuredTools.length === 0 && totalNotes > 0) {
