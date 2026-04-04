@@ -625,19 +625,21 @@ export class KnowledgeRepository {
   }
 
   getVectorIndexStats(): VectorIndexStats {
-    const embeddingRows = (
-      this.stmt("SELECT COUNT(*) as c FROM note_embeddings").get() as { c: number } | undefined
-    )?.c ?? 0;
+    const embeddingRows =
+      (this.stmt("SELECT COUNT(*) as c FROM note_embeddings").get() as { c: number } | undefined)
+        ?.c ?? 0;
 
     try {
-      const vectorRows = (
-        this.db.prepare("SELECT COUNT(*) as c FROM note_embeddings_vec").get() as
-          | { c: number }
-          | undefined
-      )?.c ?? 0;
+      const vectorRows =
+        (
+          this.db.prepare("SELECT COUNT(*) as c FROM note_embeddings_vec").get() as
+            | { c: number }
+            | undefined
+        )?.c ?? 0;
       const missingVectorRows =
-        vectorRows < embeddingRows
-          ? (this.db.prepare(
+        (
+          this.db
+            .prepare(
               `
               SELECT COUNT(*) as c
               FROM note_embeddings e
@@ -647,8 +649,9 @@ export class KnowledgeRepository {
                 WHERE v.note_id = e.note_id
               )
             `,
-            ).get() as { c: number } | undefined)?.c ?? 0
-          : 0;
+            )
+            .get() as { c: number } | undefined
+        )?.c ?? 0;
 
       return {
         vecAvailable: true,
