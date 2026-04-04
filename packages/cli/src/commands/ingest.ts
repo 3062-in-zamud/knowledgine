@@ -310,6 +310,36 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       const report = createSummaryReport("knowledgine ingest", entries);
       console.error("\n" + report);
 
+      // Show error details when errors occurred
+      if (summary.errors > 0 && summary.errorDetails && summary.errorDetails.length > 0) {
+        const displayCount = options.verbose
+          ? summary.errorDetails.length
+          : Math.min(5, summary.errorDetails.length);
+        console.error(
+          `\n  ${symbols.warning} ${colors.warning(`${summary.errors} error(s) during ingest:`)}`,
+        );
+        for (let i = 0; i < displayCount; i++) {
+          const e = summary.errorDetails[i];
+          console.error(`    [${e.category}] ${e.sourceUri} — ${e.message}`);
+        }
+        if (!options.verbose && summary.errorDetails.length > 5) {
+          console.error(
+            `    ... and ${summary.errorDetails.length - 5} more (use --verbose to see all)`,
+          );
+        }
+        if (options.verbose) {
+          // category breakdown
+          const counts: Record<string, number> = {};
+          for (const e of summary.errorDetails) {
+            counts[e.category] = (counts[e.category] ?? 0) + 1;
+          }
+          const breakdown = Object.entries(counts)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(", ");
+          console.error(`    Categories: ${breakdown}`);
+        }
+      }
+
       // Show skip reason when 0 events processed
       if (summary.processed === 0 && summary.skipReason) {
         const reasons: Record<string, string> = {

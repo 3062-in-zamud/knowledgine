@@ -116,6 +116,14 @@ export type SkipReason = "already_indexed" | "no_source_data" | "all_filtered";
 export type { ExtractionSummary } from "@knowledgine/core";
 import type { ExtractionSummary } from "@knowledgine/core";
 
+export type ErrorCategory = "network" | "parse" | "rate_limit" | "permission" | "unknown";
+
+export interface IngestError {
+  sourceUri: string;
+  category: ErrorCategory;
+  message: string;
+}
+
 export interface IngestSummary {
   pluginId: string;
   processed: number;
@@ -131,4 +139,6 @@ export interface IngestSummary {
   noteIds?: number[];
   /** Summary of entity extraction run after ingest (only present when graphRepository is provided) */
   extractionSummary?: ExtractionSummary;
+  /** Details of individual errors encountered during ingest */
+  errorDetails?: IngestError[];
 }

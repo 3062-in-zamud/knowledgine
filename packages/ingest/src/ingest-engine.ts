@@ -1,7 +1,14 @@
 import type Database from "better-sqlite3";
 import type { KnowledgeRepository, GraphRepository } from "@knowledgine/core";
 import { IncrementalExtractor } from "@knowledgine/core";
-import type { IngestSummary, ExtractionSummary, NormalizedEvent, SkipReason } from "./types.js";
+import type {
+  IngestSummary,
+  ExtractionSummary,
+  NormalizedEvent,
+  SkipReason,
+  IngestError,
+  ErrorCategory,
+} from "./types.js";
 import type { PluginRegistry } from "./plugin-registry.js";
 import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
@@ -71,6 +78,7 @@ export class IngestEngine {
         ? picomatch(options.excludePatterns)
         : null;
 
+    const errorDetails: IngestError[] = [];
     const processedPaths = new Set<string>();
     let batch: NormalizedEvent[] = [];
     let heapWarned = false;
@@ -88,6 +96,24 @@ export class IngestEngine {
         event.metadata.skippedReason = "exclude-pattern";
         if (options?.verbose) {
           process.stderr.write(`  [skip] exclude-pattern match: ${event.sourceUri}\n`);
+        }
+        continue;
+      }
+
+      if (event.metadata.skippedReason === "api_error") {
+        const extra = event.metadata.extra as
+          | { errorCategory?: string; errorMessage?: string }
+          | undefined;
+        errorDetails.push({
+          sourceUri: event.sourceUri,
+          category: (extra?.errorCategory ?? "unknown") as ErrorCategory,
+          message: extra?.errorMessage ?? "Unknown error",
+        });
+        errors++;
+        if (options?.verbose) {
+          process.stderr.write(
+            `  [error] [${extra?.errorCategory ?? "unknown"}] ${event.sourceUri} — ${extra?.errorMessage ?? "Unknown error"}\n`,
+          );
         }
         continue;
       }
@@ -184,6 +210,7 @@ export class IngestEngine {
       elapsedMs: Date.now() - start,
       noteIds: allNoteIds,
       ...(extractionSummary ? { extractionSummary } : {}),
+      ...(errorDetails.length > 0 ? { errorDetails } : {}),
     };
   }
 

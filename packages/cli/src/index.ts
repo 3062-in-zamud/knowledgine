@@ -69,6 +69,7 @@ program
   .option("--force", "Skip confirmation prompts", false)
   .option("-y, --yes", "Automatically answer yes to all prompts")
   .option("--save-config", "Save defaultPath to .knowledginerc.json in current directory")
+  .option("--verbose", "Show details of errors and skipped items")
   .addHelpText(
     "after",
     `

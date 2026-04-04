@@ -32,6 +32,7 @@ export interface InitOptions {
   force?: boolean;
   yes?: boolean;
   saveConfig?: boolean;
+  verbose?: boolean;
 }
 
 /**
@@ -243,7 +244,10 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const engine = new IngestEngine(registry, db, repository);
   let ingestSummary;
   try {
-    ingestSummary = await engine.ingest("markdown", rootPath, { full: true });
+    ingestSummary = await engine.ingest("markdown", rootPath, {
+      full: true,
+      verbose: options.verbose,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (
@@ -302,6 +306,20 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
   if (ingestSummary.errors > 0) {
     stepProgress.warn(`${ingestSummary.errors} file(s) could not be indexed`);
+    if (ingestSummary.errorDetails && ingestSummary.errorDetails.length > 0) {
+      const displayCount = options.verbose
+        ? ingestSummary.errorDetails.length
+        : Math.min(5, ingestSummary.errorDetails.length);
+      for (let i = 0; i < displayCount; i++) {
+        const e = ingestSummary.errorDetails[i];
+        console.error(`    [${e.category}] ${e.sourceUri} — ${e.message}`);
+      }
+      if (!options.verbose && ingestSummary.errorDetails.length > 5) {
+        console.error(
+          `    ... and ${ingestSummary.errorDetails.length - 5} more (use --verbose to see all)`,
+        );
+      }
+    }
   }
 
   stepProgress.completeStep("Indexing markdown files");
