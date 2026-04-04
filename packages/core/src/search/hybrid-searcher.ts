@@ -39,9 +39,10 @@ export class HybridSearcher {
   async search(query: string, limit: number = 20): Promise<SemanticSearchResult[]> {
     const effectiveAlpha = this.determineAlpha(query);
     if (effectiveAlpha < 1.0) {
-      const vectorStats = this.repository.getVectorIndexStats();
-      if (vectorStats.missingVectorRows > 0) {
+      try {
         this.repository.syncMissingVectorsFromEmbeddings();
+      } catch {
+        // ベクトル同期失敗時もFTSのみで継続してgraceful degradationする
       }
     }
 
