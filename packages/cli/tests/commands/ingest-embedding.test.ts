@@ -53,16 +53,14 @@ vi.mock("@knowledgine/core", async (importOriginal) => {
       setIngestCursor: vi.fn(),
       deleteStaleNotes: vi.fn().mockReturnValue(0),
       count: vi.fn().mockReturnValue(0),
-      getStats: vi
-        .fn()
-        .mockReturnValue({
-          totalNotes: 0,
-          totalPatterns: 0,
-          totalLinks: 0,
-          totalPairs: 0,
-          patternsByType: {},
-          notesBySource: {},
-        }),
+      getStats: vi.fn().mockReturnValue({
+        totalNotes: 0,
+        totalPatterns: 0,
+        totalLinks: 0,
+        totalPairs: 0,
+        patternsByType: {},
+        notesBySource: {},
+      }),
       getTopEntities: vi.fn().mockReturnValue([]),
     })),
     GraphRepository: vi.fn().mockImplementation(() => ({
