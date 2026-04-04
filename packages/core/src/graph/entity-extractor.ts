@@ -1,6 +1,7 @@
 import type { EntityType } from "../types.js";
 import type { ExtractionRules } from "../feedback/feedback-learner.js";
 import { CodeBlockDetector } from "../utils/code-block-detector.js";
+import { normalizeEntityName } from "./entity-utils.js";
 
 export interface ExtractedEntity {
   name: string;
@@ -346,8 +347,11 @@ export class EntityExtractor {
   private applyRules(entities: ExtractedEntity[]): ExtractedEntity[] {
     const rules = this.rules!;
 
-    // 1. Filter out blacklisted entities
-    let filtered = entities.filter((e) => !rules.entityBlacklist.includes(e.name));
+    // 1. Filter out blacklisted entities (normalize both sides for matching)
+    const normalizedBlacklist = rules.entityBlacklist.map(normalizeEntityName);
+    let filtered = entities.filter(
+      (e) => !normalizedBlacklist.includes(normalizeEntityName(e.name)),
+    );
 
     // 2. Apply type overrides
     filtered = filtered.map((e) => {
@@ -708,7 +712,7 @@ export class EntityExtractor {
   private deduplicate(entities: ExtractedEntity[]): ExtractedEntity[] {
     const seen = new Map<string, ExtractedEntity>();
     for (const e of entities) {
-      const key = `${e.entityType}:${e.name}`;
+      const key = `${e.entityType}:${normalizeEntityName(e.name)}`;
       if (!seen.has(key)) {
         seen.set(key, e);
       }
