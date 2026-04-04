@@ -14,6 +14,8 @@ import {
   checkGhVersion,
   parseGitHubSourceUri,
   fetchRepoMeta,
+  createRepositoryNotFoundError,
+  isRepositoryNotFoundError,
   parsePRList,
   parseIssueList,
   prToNormalizedEvent,
@@ -78,7 +80,11 @@ export class GitHubPlugin implements IngestPlugin {
     let repoMeta: RepoMeta | undefined;
     try {
       repoMeta = await fetchRepoMeta(owner, repo);
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (isRepositoryNotFoundError(error) || /\bnot found\b/i.test(message)) {
+        throw createRepositoryNotFoundError(owner, repo, error);
+      }
       // 事前チェック失敗は通常フローにフォールバック
     }
     if (repoMeta?.has_issues === false) {
@@ -293,7 +299,11 @@ export class GitHubPlugin implements IngestPlugin {
     let repoMeta: RepoMeta | undefined;
     try {
       repoMeta = await fetchRepoMeta(owner, repo);
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (isRepositoryNotFoundError(error) || /\bnot found\b/i.test(message)) {
+        throw createRepositoryNotFoundError(owner, repo, error);
+      }
       // 事前チェック失敗は通常フローにフォールバック
     }
     if (repoMeta?.has_issues === false) {

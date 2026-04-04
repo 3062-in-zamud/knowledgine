@@ -50,6 +50,12 @@ export interface RepoMeta {
   default_branch: string;
 }
 
+const REPOSITORY_NOT_FOUND_CODE = "GITHUB_REPOSITORY_NOT_FOUND";
+const REPOSITORY_NOT_FOUND_PATTERNS = [
+  /could not resolve to a repository/i,
+  /repository not found/i,
+];
+
 const DEFAULT_REPO_META: RepoMeta = {
   has_issues: true,
   has_wiki: true,
@@ -68,6 +74,42 @@ export async function fetchRepoMeta(owner: string, repo: string): Promise<RepoMe
 }
 
 export { DEFAULT_REPO_META };
+
+export function createRepositoryNotFoundError(owner: string, repo: string, cause?: unknown): Error {
+  const repository = `${owner}/${repo}`;
+  const error = new Error(`Repository '${repository}' not found.`) as Error & {
+    code?: string;
+    repository?: string;
+    cause?: unknown;
+  };
+  error.name = "RepositoryNotFoundError";
+  error.code = REPOSITORY_NOT_FOUND_CODE;
+  error.repository = repository;
+  if (cause !== undefined) {
+    error.cause = cause;
+  }
+  return error;
+}
+
+export function isRepositoryNotFoundError(error: unknown): boolean {
+  if (typeof error === "object" && error !== null) {
+    const candidate = error as { code?: unknown; name?: unknown; message?: unknown };
+    if (
+      candidate.code === REPOSITORY_NOT_FOUND_CODE ||
+      candidate.name === "RepositoryNotFoundError"
+    ) {
+      return true;
+    }
+    if (typeof candidate.message === "string") {
+      const message = candidate.message;
+      return REPOSITORY_NOT_FOUND_PATTERNS.some((pattern) => pattern.test(message));
+    }
+    return false;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return REPOSITORY_NOT_FOUND_PATTERNS.some((pattern) => pattern.test(message));
+}
 
 export function parseGitHubSourceUri(uri: string): { owner: string; repo: string } {
   // "github://owner/repo" → { owner, repo }
