@@ -643,21 +643,20 @@ async function embedMissingCommand(options: IngestOptions): Promise<void> {
           .filter((n): n is NonNullable<typeof n> => n != null);
         if (orderedNotes.length === 0) continue;
 
-        let batchSucceeded = false;
         for (let attempt = 0; attempt <= MAX_EMBED_RETRIES; attempt++) {
           try {
             const embeddings = await embeddingProvider.embedBatch(
               orderedNotes.map((n) => n.content),
             );
-            repository.saveEmbeddingBatch(
+            const result = repository.saveEmbeddingBatch(
               orderedNotes.map((n, j) => ({
                 noteId: n.id,
                 embedding: embeddings[j],
                 modelName,
               })),
             );
-            generated += orderedNotes.length;
-            batchSucceeded = true;
+            generated += result.saved;
+            failed += result.failed;
             break;
           } catch {
             if (attempt === MAX_EMBED_RETRIES) {
@@ -668,11 +667,9 @@ async function embedMissingCommand(options: IngestOptions): Promise<void> {
           }
         }
 
-        if (batchSucceeded) {
-          const done = generated + failed;
-          const pct = Math.round((done / total) * 100);
-          process.stderr.write(`\r  ${symbols.info} Embeddings: ${done}/${total} (${pct}%)`);
-        }
+        const done = generated + failed;
+        const pct = Math.round((done / total) * 100);
+        process.stderr.write(`\r  ${symbols.info} Embeddings: ${done}/${total} (${pct}%)`);
       }
     } finally {
       await embeddingProvider.close();
