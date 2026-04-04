@@ -8,13 +8,15 @@ vi.mock("../../../src/plugins/github/gh-parser.js", async (importOriginal) => {
     execGh: vi.fn(),
     checkGhAuth: vi.fn().mockResolvedValue(true),
     checkGhVersion: vi.fn().mockResolvedValue({ ok: true }),
+    fetchRepoMeta: vi.fn(),
   };
 });
 
 import { GitHubPlugin } from "../../../src/plugins/github/index.js";
-import { execGh } from "../../../src/plugins/github/gh-parser.js";
+import { execGh, fetchRepoMeta } from "../../../src/plugins/github/gh-parser.js";
 
 const mockedExecGh = vi.mocked(execGh);
+const mockedFetchRepoMeta = vi.mocked(fetchRepoMeta);
 
 function makePRs(count: number, startNumber = 1): string {
   const prs = Array.from({ length: count }, (_, i) => ({
@@ -56,6 +58,12 @@ describe("GitHub --limit flag", () => {
   beforeEach(() => {
     plugin = new GitHubPlugin();
     vi.clearAllMocks();
+    mockedFetchRepoMeta.mockResolvedValue({
+      has_issues: true,
+      has_wiki: true,
+      is_archived: false,
+      default_branch: "main",
+    });
   });
 
   it("should accept limit via initialize config", async () => {

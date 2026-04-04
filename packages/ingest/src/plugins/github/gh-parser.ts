@@ -43,6 +43,32 @@ export async function checkGhVersion(): Promise<{ ok: boolean; version?: string;
   }
 }
 
+export interface RepoMeta {
+  has_issues: boolean;
+  has_wiki: boolean;
+  is_archived: boolean;
+  default_branch: string;
+}
+
+const DEFAULT_REPO_META: RepoMeta = {
+  has_issues: true,
+  has_wiki: true,
+  is_archived: false,
+  default_branch: "main",
+};
+
+export async function fetchRepoMeta(owner: string, repo: string): Promise<RepoMeta> {
+  const json = await execGh([
+    "api",
+    `repos/${owner}/${repo}`,
+    "--jq",
+    "{has_issues,has_wiki,is_archived,default_branch}",
+  ]);
+  return JSON.parse(json) as RepoMeta;
+}
+
+export { DEFAULT_REPO_META };
+
 export function parseGitHubSourceUri(uri: string): { owner: string; repo: string } {
   // "github://owner/repo" → { owner, repo }
   const match = uri.match(/^github:\/\/([^/]+)\/([^/]+)/);
