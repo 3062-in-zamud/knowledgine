@@ -497,7 +497,6 @@ export async function initCommand(options: InitOptions): Promise<void> {
           const noteMap = new Map(noteRows.map((n) => [n.id, n]));
           const orderedNotes = batchIds.map((id) => noteMap.get(id)).filter((n) => n != null);
 
-          let batchFailed = false;
           for (let attempt = 0; attempt <= MAX_EMBED_RETRIES; attempt++) {
             try {
               const embeddings = await embeddingProvider.embedBatch(
@@ -512,19 +511,15 @@ export async function initCommand(options: InitOptions): Promise<void> {
               );
               generated += result.saved;
               failed += result.failed;
-              batchFailed = false;
               break;
             } catch {
               if (attempt === MAX_EMBED_RETRIES) {
-                batchFailed = true;
                 failed += orderedNotes.length;
               } else {
                 await new Promise<void>((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
               }
             }
           }
-
-          void batchFailed; // suppress unused-variable warning
           embProgress.update(
             generated + failed > noteIds.length ? noteIds.length : generated + failed,
           );
