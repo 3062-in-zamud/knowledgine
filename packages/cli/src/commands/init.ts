@@ -32,6 +32,7 @@ export interface InitOptions {
   force?: boolean;
   yes?: boolean;
   saveConfig?: boolean;
+  verbose?: boolean;
 }
 
 /**
@@ -99,6 +100,16 @@ async function getFreeDiskBytes(targetPath: string): Promise<number> {
  */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatSkipReason(reason: string): string {
+  const labels: Record<string, string> = {
+    empty_content: "empty",
+    too_large: "too large",
+    excluded_pattern: "excluded",
+    read_error: "read error",
+  };
+  return labels[reason] ?? reason;
 }
 
 export async function initCommand(options: InitOptions): Promise<void> {
@@ -243,7 +254,10 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const engine = new IngestEngine(registry, db, repository);
   let ingestSummary;
   try {
-    ingestSummary = await engine.ingest("markdown", rootPath, { full: true });
+    ingestSummary = await engine.ingest("markdown", rootPath, {
+      full: true,
+      verbose: options.verbose,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (
@@ -302,6 +316,27 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
   if (ingestSummary.errors > 0) {
     stepProgress.warn(`${ingestSummary.errors} file(s) could not be indexed`);
+    if (ingestSummary.errorDetails && ingestSummary.errorDetails.length > 0) {
+      const displayCount = options.verbose
+        ? ingestSummary.errorDetails.length
+        : Math.min(5, ingestSummary.errorDetails.length);
+      for (let i = 0; i < displayCount; i++) {
+        const e = ingestSummary.errorDetails[i];
+        console.error(`    [${e.category}] ${e.sourceUri} — ${e.message}`);
+      }
+      if (!options.verbose && ingestSummary.errorDetails.length > 5) {
+        console.error(
+          `    ... and ${ingestSummary.errorDetails.length - 5} more (use --verbose to see all)`,
+        );
+      }
+    }
+  }
+
+  if (options.verbose && ingestSummary.skipDetails && ingestSummary.skipDetails.length > 0) {
+    console.error(`  Skipped files:`);
+    for (const detail of ingestSummary.skipDetails) {
+      console.error(`    [${formatSkipReason(detail.reason)}] ${detail.path}`);
+    }
   }
 
   stepProgress.completeStep("Indexing markdown files");
@@ -453,27 +488,37 @@ export async function initCommand(options: InitOptions): Promise<void> {
         let generated = 0;
         let failed = 0;
 
+        const MAX_EMBED_RETRIES = 2;
+
         for (let i = 0; i < noteIds.length; i += BATCH_SIZE) {
           const batchIds = noteIds.slice(i, i + BATCH_SIZE);
           const noteRows = repository.getNotesByIds(batchIds);
           // getNotesByIds の返り順は不定なので id→note Map で安全にマッピング
           const noteMap = new Map(noteRows.map((n) => [n.id, n]));
           const orderedNotes = batchIds.map((id) => noteMap.get(id)).filter((n) => n != null);
-          try {
-            const embeddings = await embeddingProvider.embedBatch(
-              orderedNotes.map((n) => n.content),
-            );
-            const result = repository.saveEmbeddingBatch(
-              orderedNotes.map((n, j) => ({
-                noteId: n.id,
-                embedding: embeddings[j],
-                modelName: config.embedding.modelName,
-              })),
-            );
-            generated += result.saved;
-            failed += result.failed;
-          } catch {
-            failed += orderedNotes.length;
+
+          for (let attempt = 0; attempt <= MAX_EMBED_RETRIES; attempt++) {
+            try {
+              const embeddings = await embeddingProvider.embedBatch(
+                orderedNotes.map((n) => n.content),
+              );
+              const result = repository.saveEmbeddingBatch(
+                orderedNotes.map((n, j) => ({
+                  noteId: n.id,
+                  embedding: embeddings[j],
+                  modelName: config.embedding.modelName,
+                })),
+              );
+              generated += result.saved;
+              failed += result.failed;
+              break;
+            } catch {
+              if (attempt === MAX_EMBED_RETRIES) {
+                failed += orderedNotes.length;
+              } else {
+                await new Promise<void>((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+              }
+            }
           }
           embProgress.update(
             generated + failed > noteIds.length ? noteIds.length : generated + failed,
@@ -525,20 +570,42 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const embeddingsGenerated = stats.totalNotes - notesWithoutEmb;
 
   const elapsed = formatDuration(Date.now() - initStartTime);
+  let skippedValue: string | undefined;
+  if (ingestSummary.skipped > 0) {
+    if (ingestSummary.skippedByReason && Object.keys(ingestSummary.skippedByReason).length > 0) {
+      const parts = Object.entries(ingestSummary.skippedByReason)
+        .filter(([, count]) => count && count > 0)
+        .map(([reason, count]) => `${count} ${formatSkipReason(reason)}`);
+      skippedValue = `${ingestSummary.skipped} files (${parts.join(", ")})`;
+    } else {
+      skippedValue = `${ingestSummary.skipped} files`;
+    }
+  }
+
   const summaryEntries = [
     { label: "Notes:", value: `${stats.totalNotes} indexed` },
-    ...(ingestSummary.skipped > 0
-      ? [{ label: "Skipped:", value: `${ingestSummary.skipped} files (empty)` }]
-      : []),
+    ...(skippedValue !== undefined ? [{ label: "Skipped:", value: skippedValue }] : []),
     { label: "Patterns:", value: `${stats.totalPatterns} extracted` },
     { label: "Entities:", value: `${postSummary.totalEntities} extracted` },
     ...(enableSemantic && config.embedding.enabled
-      ? [
-          {
-            label: "Embeddings:",
-            value: embeddingsGenerated > 0 ? `${embeddingsGenerated} generated` : "none",
-          },
-        ]
+      ? (() => {
+          const coveragePct =
+            stats.totalNotes > 0 ? Math.round((embeddingsGenerated / stats.totalNotes) * 100) : 100;
+          return [
+            {
+              label: "Embeddings:",
+              value: embeddingsGenerated > 0 ? `${embeddingsGenerated} generated` : "none",
+            },
+            ...(coveragePct < 95 && stats.totalNotes > 0
+              ? [
+                  {
+                    label: "Hint:",
+                    value: `Run 'knowledgine ingest --embed-missing' to complete embedding generation`,
+                  },
+                ]
+              : []),
+          ];
+        })()
       : [
           { label: "Search:", value: "FTS5 full-text search (default)" },
           {

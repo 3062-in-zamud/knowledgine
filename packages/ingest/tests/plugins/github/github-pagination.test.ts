@@ -9,13 +9,15 @@ vi.mock("../../../src/plugins/github/gh-parser.js", async (importOriginal) => {
     execGh: vi.fn(),
     checkGhAuth: vi.fn(),
     checkGhVersion: vi.fn(),
+    fetchRepoMeta: vi.fn(),
   };
 });
 
 import { GitHubPlugin } from "../../../src/plugins/github/index.js";
-import { execGh } from "../../../src/plugins/github/gh-parser.js";
+import { execGh, fetchRepoMeta } from "../../../src/plugins/github/gh-parser.js";
 
 const mockedExecGh = vi.mocked(execGh);
+const mockedFetchRepoMeta = vi.mocked(fetchRepoMeta);
 
 /** N 件の PR フィクスチャ JSON を生成する */
 function makePRs(count: number, startNumber = 1): string {
@@ -59,6 +61,12 @@ describe("GitHub pagination", () => {
   beforeEach(() => {
     plugin = new GitHubPlugin();
     vi.clearAllMocks();
+    mockedFetchRepoMeta.mockResolvedValue({
+      has_issues: true,
+      has_wiki: true,
+      is_archived: false,
+      default_branch: "main",
+    });
   });
 
   it("1回の取得が --limit 100 であること", async () => {

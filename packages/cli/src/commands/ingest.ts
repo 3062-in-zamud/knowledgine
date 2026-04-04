@@ -82,11 +82,18 @@ export interface IngestOptions {
   observe?: boolean;
   observeLimit?: number;
   noEmbeddings?: boolean;
+  embedMissing?: boolean;
 }
 
 export async function ingestCommand(options: IngestOptions): Promise<void> {
   // --force is an alias for --full
   if (options.force) options.full = true;
+
+  // --embed-missing: generate embeddings for notes that are missing them (no normal ingest)
+  if (options.embedMissing) {
+    await embedMissingCommand(options);
+    return;
+  }
 
   // Validate mutually exclusive options
   if (options.source && options.all) {
@@ -310,6 +317,36 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       const report = createSummaryReport("knowledgine ingest", entries);
       console.error("\n" + report);
 
+      // Show error details when errors occurred
+      if (summary.errors > 0 && summary.errorDetails && summary.errorDetails.length > 0) {
+        const displayCount = options.verbose
+          ? summary.errorDetails.length
+          : Math.min(5, summary.errorDetails.length);
+        console.error(
+          `\n  ${symbols.warning} ${colors.warning(`${summary.errors} error(s) during ingest:`)}`,
+        );
+        for (let i = 0; i < displayCount; i++) {
+          const e = summary.errorDetails[i];
+          console.error(`    [${e.category}] ${e.sourceUri} — ${e.message}`);
+        }
+        if (!options.verbose && summary.errorDetails.length > 5) {
+          console.error(
+            `    ... and ${summary.errorDetails.length - 5} more (use --verbose to see all)`,
+          );
+        }
+        if (options.verbose) {
+          // category breakdown
+          const counts: Record<string, number> = {};
+          for (const e of summary.errorDetails) {
+            counts[e.category] = (counts[e.category] ?? 0) + 1;
+          }
+          const breakdown = Object.entries(counts)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(", ");
+          console.error(`    Categories: ${breakdown}`);
+        }
+      }
+
       // Show skip reason when 0 events processed
       if (summary.processed === 0 && summary.skipReason) {
         const reasons: Record<string, string> = {
@@ -517,6 +554,148 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
   } catch (error) {
     console.error(
       colors.error(`Ingest failed: ${error instanceof Error ? error.message : String(error)}`),
+    );
+    process.exitCode = 1;
+  } finally {
+    db.close();
+  }
+}
+
+/** Maximum number of retry attempts for a failed embedding batch. */
+const MAX_EMBED_RETRIES = 2;
+
+/**
+ * Standalone flow for `knowledgine ingest --embed-missing`.
+ * Generates embeddings only for notes that currently have none — no ingest is performed.
+ */
+async function embedMissingCommand(options: IngestOptions): Promise<void> {
+  const rootPath = resolveDefaultPath(options.path);
+
+  // Initialise DB (same pattern as the normal ingest flow)
+  const knowledgineDir = resolve(rootPath, ".knowledgine");
+  mkdirSync(knowledgineDir, { recursive: true });
+  const config = defineConfig({ rootPath });
+  const db = createDatabase(config.dbPath);
+  new Migrator(db, ALL_MIGRATIONS).migrate();
+  const repository = new KnowledgeRepository(db);
+
+  try {
+    const rcConfig = loadRcFile(rootPath);
+    const embeddingConfig = rcConfig?.embedding as
+      | { enabled?: boolean; modelName?: string }
+      | undefined;
+    const embeddingEnabled = embeddingConfig?.enabled ?? rcConfig?.semantic ?? false;
+
+    if (!embeddingEnabled) {
+      console.error(
+        `  ${symbols.warning} ${colors.warning("Semantic search is not enabled. Run 'knowledgine upgrade --semantic' first.")}`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    const modelManager = new ModelManager();
+    const modelName = embeddingConfig?.modelName ?? DEFAULT_MODEL_NAME;
+
+    if (!modelManager.isModelAvailable(modelName)) {
+      console.error(
+        `  ${symbols.warning} ${colors.warning("Embedding model not available. Run 'knowledgine upgrade --semantic' to download.")}`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    const vecLoaded = await loadSqliteVecExtension(db);
+    if (!vecLoaded) {
+      console.error(
+        `  ${symbols.warning} ${colors.warning("sqlite-vec extension could not be loaded. Embedding generation is unavailable.")}`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+
+    const noteIdsNeedingEmbeddings = repository.getNotesWithoutEmbeddingIds();
+    const totalNotes = repository.getStats().totalNotes;
+
+    if (noteIdsNeedingEmbeddings.length === 0) {
+      const coverage = totalNotes > 0 ? 100 : 0;
+      console.error(
+        `  ${symbols.success} ${colors.success(`All notes have embeddings (coverage: ${coverage}%)`)}`,
+      );
+      return;
+    }
+
+    const embeddingProvider = new OnnxEmbeddingProvider(modelName, modelManager);
+    const BATCH_SIZE = 20;
+    const total = noteIdsNeedingEmbeddings.length;
+    console.error(`\n  ${symbols.info} Generating embeddings for ${total} notes...`);
+
+    let generated = 0;
+    let failed = 0;
+
+    try {
+      for (let i = 0; i < noteIdsNeedingEmbeddings.length; i += BATCH_SIZE) {
+        const batchIds = noteIdsNeedingEmbeddings.slice(i, i + BATCH_SIZE);
+        const noteRows = repository.getNotesByIds(batchIds);
+        const noteMap = new Map(noteRows.map((n) => [n.id, n]));
+        const orderedNotes = batchIds
+          .map((id) => noteMap.get(id))
+          .filter((n): n is NonNullable<typeof n> => n != null);
+        if (orderedNotes.length === 0) continue;
+
+        for (let attempt = 0; attempt <= MAX_EMBED_RETRIES; attempt++) {
+          try {
+            const embeddings = await embeddingProvider.embedBatch(
+              orderedNotes.map((n) => n.content),
+            );
+            const result = repository.saveEmbeddingBatch(
+              orderedNotes.map((n, j) => ({
+                noteId: n.id,
+                embedding: embeddings[j],
+                modelName,
+              })),
+            );
+            generated += result.saved;
+            failed += result.failed;
+            break;
+          } catch {
+            if (attempt === MAX_EMBED_RETRIES) {
+              failed += orderedNotes.length;
+            } else {
+              await new Promise<void>((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+            }
+          }
+        }
+
+        const done = generated + failed;
+        const pct = Math.round((done / total) * 100);
+        process.stderr.write(`\r  ${symbols.info} Embeddings: ${done}/${total} (${pct}%)`);
+      }
+    } finally {
+      await embeddingProvider.close();
+    }
+
+    process.stderr.write("\n");
+
+    // Calculate final coverage
+    const notesTotal = totalNotes > 0 ? totalNotes : total + generated;
+    const nowWithEmbeddings = notesTotal - repository.getNotesWithoutEmbeddingIds().length;
+    const coveragePct = notesTotal > 0 ? Math.round((nowWithEmbeddings / notesTotal) * 100) : 100;
+
+    if (failed > 0) {
+      console.error(
+        `  ${symbols.warning} ${colors.warning(`Embeddings: ${generated} generated, ${failed} failed (coverage: ${coveragePct}%)`)}`,
+      );
+    } else {
+      console.error(
+        `  ${symbols.success} ${colors.success(`Embeddings: ${generated} generated, 0 failed (coverage: ${coveragePct}%)`)}`,
+      );
+    }
+  } catch (error) {
+    console.error(
+      colors.error(
+        `Embed-missing failed: ${error instanceof Error ? error.message : String(error)}`,
+      ),
     );
     process.exitCode = 1;
   } finally {

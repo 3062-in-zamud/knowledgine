@@ -197,6 +197,63 @@ Body content here.
     });
   });
 
+  describe("skip reasons", () => {
+    it("should not set skippedReason for normal readable files", async () => {
+      await writeFile(join(testDir, "normal.md"), "# Normal File\nsome content");
+
+      const events: import("../../../src/types.js").NormalizedEvent[] = [];
+      for await (const event of plugin.ingestAll(testDir)) {
+        events.push(event);
+      }
+      expect(events).toHaveLength(1);
+      expect(events[0].content).not.toBe("");
+      expect(events[0].metadata.skippedReason).toBeUndefined();
+    });
+
+    it("should yield event with skippedReason=too_large for files exceeding 10 MB", async () => {
+      // Create a file larger than 10 MB
+      const largeContent = "x".repeat(11 * 1024 * 1024);
+      await writeFile(join(testDir, "large.md"), largeContent);
+
+      const events: import("../../../src/types.js").NormalizedEvent[] = [];
+      for await (const event of plugin.ingestAll(testDir)) {
+        events.push(event);
+      }
+      expect(events).toHaveLength(1);
+      expect(events[0].content).toBe("");
+      expect(events[0].metadata.skippedReason).toBe("too_large");
+    });
+
+    it("should yield event with skippedReason=read_error when file cannot be processed", async () => {
+      // Use an empty path that passes walkDir but fails processFile by using
+      // a directory path as if it were a file (FileProcessor will throw on it)
+      // The simplest way: write a file that becomes unreadable between walk and process
+      // by writing to a sub-directory named with .md suffix (which is found by walkDir
+      // as a file entry).
+      // Actually: write a valid .md, then chmod 000 to make it unreadable.
+      const { chmod } = await import("fs/promises");
+      const filePath = join(testDir, "unreadable.md");
+      await writeFile(filePath, "# Unreadable");
+      await chmod(filePath, 0o000);
+
+      try {
+        const events: import("../../../src/types.js").NormalizedEvent[] = [];
+        for await (const event of plugin.ingestAll(testDir)) {
+          events.push(event);
+        }
+        // If running as root, permission errors won't occur — skip assertion
+        if (process.getuid && process.getuid() !== 0) {
+          expect(events).toHaveLength(1);
+          expect(events[0].content).toBe("");
+          expect(events[0].metadata.skippedReason).toBe("read_error");
+        }
+      } finally {
+        // Restore permissions so cleanup can succeed
+        await chmod(filePath, 0o644);
+      }
+    });
+  });
+
   describe("ingestIncremental", () => {
     it("should only yield files modified after checkpoint", async () => {
       // 過去の時刻をチェックポイントとして設定

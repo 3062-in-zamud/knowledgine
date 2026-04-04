@@ -1,7 +1,15 @@
 import type Database from "better-sqlite3";
 import type { KnowledgeRepository, GraphRepository } from "@knowledgine/core";
 import { IncrementalExtractor } from "@knowledgine/core";
-import type { IngestSummary, ExtractionSummary, NormalizedEvent, SkipReason } from "./types.js";
+import type {
+  IngestSummary,
+  ExtractionSummary,
+  NormalizedEvent,
+  SkipReason,
+  IngestError,
+  ErrorCategory,
+  FileSkipReason,
+} from "./types.js";
 import type { PluginRegistry } from "./plugin-registry.js";
 import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
@@ -71,6 +79,9 @@ export class IngestEngine {
         ? picomatch(options.excludePatterns)
         : null;
 
+    const errorDetails: IngestError[] = [];
+    const skippedByReason: Partial<Record<FileSkipReason, number>> = {};
+    const skipDetailsList: Array<{ path: string; reason: FileSkipReason }> = [];
     const processedPaths = new Set<string>();
     let batch: NormalizedEvent[] = [];
     let heapWarned = false;
@@ -86,16 +97,47 @@ export class IngestEngine {
       ) {
         skipped++;
         event.metadata.skippedReason = "exclude-pattern";
+        skippedByReason["excluded_pattern"] = (skippedByReason["excluded_pattern"] ?? 0) + 1;
         if (options?.verbose) {
           process.stderr.write(`  [skip] exclude-pattern match: ${event.sourceUri}\n`);
+          skipDetailsList.push({ path: event.sourceUri, reason: "excluded_pattern" });
+        }
+        continue;
+      }
+
+      if (event.metadata.skippedReason === "api_error") {
+        const extra = event.metadata.extra as
+          | { errorCategory?: string; errorMessage?: string }
+          | undefined;
+        errorDetails.push({
+          sourceUri: event.sourceUri,
+          category: (extra?.errorCategory ?? "unknown") as ErrorCategory,
+          message: extra?.errorMessage ?? "Unknown error",
+        });
+        errors++;
+        if (options?.verbose) {
+          process.stderr.write(
+            `  [error] [${extra?.errorCategory ?? "unknown"}] ${event.sourceUri} — ${extra?.errorMessage ?? "Unknown error"}\n`,
+          );
         }
         continue;
       }
 
       if (!event.content || event.content.trim() === "") {
         skipped++;
+        const rawReason = event.metadata.skippedReason;
+        const fileSkipReason: FileSkipReason =
+          rawReason === "too_large" || rawReason === "read_error" ? rawReason : "empty_content";
+        skippedByReason[fileSkipReason] = (skippedByReason[fileSkipReason] ?? 0) + 1;
         if (options?.verbose) {
-          process.stderr.write(`  [skip] empty content: ${event.sourceUri}\n`);
+          const label =
+            fileSkipReason === "too_large"
+              ? "too large"
+              : fileSkipReason === "read_error"
+                ? "read error"
+                : "empty content";
+          process.stderr.write(`  [skip] ${label}: ${event.sourceUri}\n`);
+          skipDetailsList.push({ path: event.sourceUri, reason: fileSkipReason });
         }
         continue;
       }
@@ -184,6 +226,9 @@ export class IngestEngine {
       elapsedMs: Date.now() - start,
       noteIds: allNoteIds,
       ...(extractionSummary ? { extractionSummary } : {}),
+      ...(errorDetails.length > 0 ? { errorDetails } : {}),
+      ...(Object.keys(skippedByReason).length > 0 ? { skippedByReason } : {}),
+      ...(skipDetailsList.length > 0 ? { skipDetails: skipDetailsList } : {}),
     };
   }
 

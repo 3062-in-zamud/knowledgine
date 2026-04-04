@@ -53,6 +53,15 @@ vi.mock("@knowledgine/core", async (importOriginal) => {
       setIngestCursor: vi.fn(),
       deleteStaleNotes: vi.fn().mockReturnValue(0),
       count: vi.fn().mockReturnValue(0),
+      getStats: vi.fn().mockReturnValue({
+        totalNotes: 0,
+        totalPatterns: 0,
+        totalLinks: 0,
+        totalPairs: 0,
+        patternsByType: {},
+        notesBySource: {},
+      }),
+      getTopEntities: vi.fn().mockReturnValue([]),
     })),
     GraphRepository: vi.fn().mockImplementation(() => ({
       saveRelationship: vi.fn(),
@@ -268,6 +277,141 @@ describe("embedding generation after ingest", () => {
     await ingestCommand({ source: "markdown", path: testDir });
 
     expect(OnnxEmbeddingProvider).toHaveBeenCalledWith("all-MiniLM-L6-v2", expect.anything());
+
+    errorSpy.mockRestore();
+    stderrSpy.mockRestore();
+  });
+});
+
+describe("--embed-missing flow", () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = mkdtempSync(join(tmpdir(), "knowledgine-embed-missing-test-"));
+    execFileSync("git", ["init"], { cwd: testDir });
+    mkdirSync(join(testDir, ".knowledgine"), { recursive: true });
+    writeFileSync(join(testDir, "test.md"), "# Test\n\nContent for embed-missing testing");
+
+    vi.clearAllMocks();
+    vi.mocked(loadRcFile).mockReturnValue({ semantic: true });
+    mockIsModelAvailable.mockReturnValue(true);
+    mockLoadSqliteVecExtension.mockResolvedValue(true);
+    mockEmbedBatch.mockResolvedValue([new Float32Array(384)]);
+    mockClose.mockResolvedValue(undefined);
+    mockGetNotesWithoutEmbeddingIds.mockReturnValue([]);
+    mockGetNotesByIds.mockReturnValue([]);
+    mockSaveEmbeddingBatch.mockReturnValue({ saved: 0, failed: 0 });
+    // IngestEngine.ingest should NOT be called for --embed-missing
+    mockIngestEngineIngest.mockResolvedValue({
+      processed: 0,
+      errors: 0,
+      deleted: 0,
+      skipped: 0,
+      elapsedMs: 0,
+      noteIds: [],
+    });
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+    process.exitCode = undefined;
+  });
+
+  it("should not run ingest engine when --embed-missing is specified", async () => {
+    mockGetNotesWithoutEmbeddingIds.mockReturnValue([]);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await ingestCommand({ embedMissing: true, path: testDir });
+
+    expect(mockIngestEngineIngest).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("should report 'All notes have embeddings' when no notes are missing embeddings", async () => {
+    mockGetNotesWithoutEmbeddingIds.mockReturnValue([]);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await ingestCommand({ embedMissing: true, path: testDir });
+
+    expect(process.exitCode).toBeUndefined();
+    const messages = errorSpy.mock.calls.map((c) => c.join(" "));
+    expect(messages.some((m) => m.includes("All notes have embeddings"))).toBe(true);
+    errorSpy.mockRestore();
+  });
+
+  it("should generate embeddings for missing notes and report summary", async () => {
+    mockGetNotesWithoutEmbeddingIds
+      .mockReturnValueOnce([1, 2]) // initial call for "notes needing embeddings"
+      .mockReturnValueOnce([]); // second call for final coverage calculation
+    mockGetNotesByIds.mockReturnValue([
+      { id: 1, content: "Note 1", title: "N1", source: "markdown", createdAt: 0, updatedAt: 0 },
+      { id: 2, content: "Note 2", title: "N2", source: "markdown", createdAt: 0, updatedAt: 0 },
+    ]);
+    mockEmbedBatch.mockResolvedValue([new Float32Array(384), new Float32Array(384)]);
+    mockSaveEmbeddingBatch.mockReturnValue({ saved: 2, failed: 0 });
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await ingestCommand({ embedMissing: true, path: testDir });
+
+    expect(process.exitCode).toBeUndefined();
+    expect(OnnxEmbeddingProvider).toHaveBeenCalled();
+    expect(mockEmbedBatch).toHaveBeenCalled();
+    expect(mockSaveEmbeddingBatch).toHaveBeenCalled();
+    expect(mockClose).toHaveBeenCalled();
+
+    const messages = errorSpy.mock.calls.map((c) => c.join(" "));
+    expect(messages.some((m) => m.includes("generated"))).toBe(true);
+
+    errorSpy.mockRestore();
+    stderrSpy.mockRestore();
+  });
+
+  it("should warn when semantic search is not enabled", async () => {
+    vi.mocked(loadRcFile).mockReturnValue(null);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await ingestCommand({ embedMissing: true, path: testDir });
+
+    expect(process.exitCode).toBe(1);
+    const messages = errorSpy.mock.calls.map((c) => c.join(" "));
+    expect(messages.some((m) => m.includes("Semantic search is not enabled"))).toBe(true);
+    errorSpy.mockRestore();
+  });
+
+  it("should warn when model is not downloaded", async () => {
+    mockIsModelAvailable.mockReturnValue(false);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await ingestCommand({ embedMissing: true, path: testDir });
+
+    expect(process.exitCode).toBe(1);
+    const messages = errorSpy.mock.calls.map((c) => c.join(" "));
+    expect(messages.some((m) => m.includes("Embedding model not available"))).toBe(true);
+    errorSpy.mockRestore();
+  });
+
+  it("should retry failed batches up to MAX_EMBED_RETRIES times", async () => {
+    mockGetNotesWithoutEmbeddingIds.mockReturnValueOnce([1]).mockReturnValueOnce([]); // final coverage call
+    mockGetNotesByIds.mockReturnValue([
+      { id: 1, content: "Note 1", title: "N1", source: "markdown", createdAt: 0, updatedAt: 0 },
+    ]);
+
+    // Fail twice, succeed on third attempt
+    mockEmbedBatch
+      .mockRejectedValueOnce(new Error("transient error"))
+      .mockRejectedValueOnce(new Error("transient error"))
+      .mockResolvedValueOnce([new Float32Array(384)]);
+    mockSaveEmbeddingBatch.mockReturnValue({ saved: 1, failed: 0 });
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await ingestCommand({ embedMissing: true, path: testDir });
+
+    expect(process.exitCode).toBeUndefined();
+    expect(mockEmbedBatch).toHaveBeenCalledTimes(3);
 
     errorSpy.mockRestore();
     stderrSpy.mockRestore();
