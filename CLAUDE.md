@@ -18,6 +18,32 @@ mcp-memory-protocol -> core -> ingest -> mcp-server -> cli
 - PRs target `develop`, not `main`. Main is releases only.
 - See CONTRIBUTING.md for full coding standards.
 
+## SDD (Spec-Driven Development)
+
+Features are specified in `specs/KNOW-{NNN}-description/` with three files:
+
+- `requirements.md` — What to build (acceptance criteria)
+- `design.md` — How to build it (architecture, interfaces)
+- `tasks.md` — Implementation steps (ordered, checkable)
+
+Before implementing: check `specs/` for existing spec. Follow it strictly.
+See `docs/workflows/sdd-overview.md` for the full SDD workflow.
+See `AGENTS.md` for review checklist and code standards.
+
+### Harness Integration
+
+When `/work` loads a task with a `Spec: specs/KNOW-XXX/` reference:
+
+1. Read the referenced spec (requirements.md, design.md)
+2. Implement according to the spec
+3. After task completion, update tasks.md checkbox
+4. If implementation deviates from spec, update spec first
+
+### Agent Configuration
+
+Skills and rules are managed in `.ai-agents/` (SSOT). See `.ai-agents/README.md`.
+Symlinks: `.claude/skills/sdd-*` → `.ai-agents/skills/sdd-*`
+
 ## Gotchas
 
 - `better-sqlite3` requires C++ build tools (xcode-select --install on macOS)
