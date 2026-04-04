@@ -9,6 +9,7 @@ import type {
   EntityWithGraph,
 } from "../types.js";
 import { DatabaseError, ValidationError } from "../errors.js";
+import { normalizeEntityName } from "./entity-utils.js";
 
 interface EntityRow {
   id: number;
@@ -103,12 +104,14 @@ export class GraphRepository {
     }
     try {
       const now = new Date().toISOString();
+      const nameLower = entity.name.toLowerCase();
       const stmt = this.db.prepare(`
-        INSERT INTO entities (name, entity_type, description, created_at, updated_at, metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO entities (name, normalized_name, entity_type, description, created_at, updated_at, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `);
       const info = stmt.run(
-        entity.name.toLowerCase(),
+        nameLower,
+        normalizeEntityName(nameLower),
         entity.entityType,
         entity.description ?? null,
         entity.createdAt || now,
@@ -130,25 +133,27 @@ export class GraphRepository {
       throw new ValidationError("name", entity.name, "Entity name is required");
     }
     try {
-      const normalizedName = entity.name.toLowerCase();
+      const nameLower = entity.name.toLowerCase();
+      const normalized = normalizeEntityName(nameLower);
       const now = new Date().toISOString();
       const stmt = this.db.prepare(`
-        INSERT INTO entities (name, entity_type, description, created_at, updated_at, metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(name, entity_type) DO UPDATE SET
+        INSERT INTO entities (name, normalized_name, entity_type, description, created_at, updated_at, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(normalized_name, entity_type) DO UPDATE SET
           description = COALESCE(excluded.description, description),
           updated_at = excluded.updated_at,
           metadata_json = COALESCE(excluded.metadata_json, metadata_json)
       `);
       stmt.run(
-        normalizedName,
+        nameLower,
+        normalized,
         entity.entityType,
         entity.description ?? null,
         entity.createdAt || now,
         now,
         entity.metadata ? JSON.stringify(entity.metadata) : null,
       );
-      const existing = this.getEntityByName(normalizedName, entity.entityType);
+      const existing = this.getEntityByName(nameLower, entity.entityType);
       return existing!.id!;
     } catch (error) {
       if (error instanceof ValidationError) throw error;
@@ -164,16 +169,16 @@ export class GraphRepository {
   }
 
   getEntityByName(name: string, entityType?: EntityType): (Entity & { id: number }) | undefined {
-    const normalizedName = name.toLowerCase();
+    const normalized = normalizeEntityName(name.toLowerCase());
     if (entityType) {
       const row = this.db
-        .prepare("SELECT * FROM entities WHERE name = ? AND entity_type = ?")
-        .get(normalizedName, entityType) as EntityRow | undefined;
+        .prepare("SELECT * FROM entities WHERE normalized_name = ? AND entity_type = ?")
+        .get(normalized, entityType) as EntityRow | undefined;
       return row ? rowToEntity(row) : undefined;
     }
     const row = this.db
-      .prepare("SELECT * FROM entities WHERE name = ? LIMIT 1")
-      .get(normalizedName) as EntityRow | undefined;
+      .prepare("SELECT * FROM entities WHERE normalized_name = ? LIMIT 1")
+      .get(normalized) as EntityRow | undefined;
     return row ? rowToEntity(row) : undefined;
   }
 

@@ -367,6 +367,37 @@ main/examples is just a directory listing
     });
   });
 
+  describe("conservative entity classification (KNOW-362)", () => {
+    it("does not extract generic words from markdown links as technology", () => {
+      const content = "See [data](https://example.com) for more info";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "data")).toBeUndefined();
+    });
+
+    it("extracts known tech names from markdown links as technology", () => {
+      const content = "We use [React](https://reactjs.org) for the frontend";
+      const entities = extractor.extract(content);
+      const react = entities.find((e) => e.name === "react");
+      expect(react).toBeDefined();
+      expect(react?.entityType).toBe("technology");
+    });
+
+    it("extracts PostgreSQL from markdown links as technology", () => {
+      const content = "Backed by [PostgreSQL](https://postgresql.org)";
+      const entities = extractor.extract(content);
+      const pg = entities.find((e) => e.name === "postgresql");
+      expect(pg).toBeDefined();
+      expect(pg?.entityType).toBe("technology");
+    });
+
+    it("markdown links are extracted before stripMarkdownSyntax removes them", () => {
+      const content = "Using [Docker](https://docker.com) and [Kubernetes](https://kubernetes.io)";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "docker")).toBeDefined();
+      expect(entities.find((e) => e.name === "kubernetes")).toBeDefined();
+    });
+  });
+
   describe("extractOrgRepos sourceType", () => {
     it("should have sourceType 'code' for org/repo entities", () => {
       const content = "Check out facebook/react for more details";

@@ -19,6 +19,7 @@ import {
   DEFAULT_MODEL_NAME,
   loadSqliteVecExtension,
   OnnxEmbeddingProvider,
+  buildEmbeddingInput,
 } from "@knowledgine/core";
 import { IngestEngine } from "@knowledgine/ingest";
 import { createDefaultRegistry, initializePlugins } from "../lib/plugin-loader.js";
@@ -503,7 +504,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
                     if (orderedNotes.length === 0) continue;
 
                     const embeddings = await embeddingProvider.embedBatch(
-                      orderedNotes.map((n) => n.content),
+                      orderedNotes.map((n) => buildEmbeddingInput(n)),
                     );
 
                     repository.saveEmbeddingBatch(
@@ -646,7 +647,7 @@ async function embedMissingCommand(options: IngestOptions): Promise<void> {
         for (let attempt = 0; attempt <= MAX_EMBED_RETRIES; attempt++) {
           try {
             const embeddings = await embeddingProvider.embedBatch(
-              orderedNotes.map((n) => n.content),
+              orderedNotes.map((n) => buildEmbeddingInput(n)),
             );
             const result = repository.saveEmbeddingBatch(
               orderedNotes.map((n, j) => ({
