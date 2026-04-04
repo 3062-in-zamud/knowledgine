@@ -35,34 +35,49 @@ function loadFixture(name: string): string {
 }
 
 describe("fetchRepoMeta (unit)", () => {
-  // fetchRepoMeta 自体は gh-parser.ts に実装されており、execGh を内部で使用。
-  // ここでは実際の関数を使うため、モックを解除して直接テストする。
-  it("should return RepoMeta shape when execGh succeeds", async () => {
-    // 実装ファイルを直接インポートしてテスト（モックなし）
-    const { fetchRepoMeta: actualFetchRepoMeta, execGh: actualExecGh } = await vi.importActual<
-      typeof import("../../../src/plugins/github/gh-parser.js")
-    >("../../../src/plugins/github/gh-parser.js");
-
-    // execGh 自体は CI で gh が入っていないと失敗するので、
-    // 返り値の型チェックのみ（統合テストは別途）
-    expect(typeof actualFetchRepoMeta).toBe("function");
-    expect(typeof actualExecGh).toBe("function");
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset fetchRepoMeta to call through to the mocked execGh
+    mockedFetchRepoMeta.mockImplementation(async (owner: string, repo: string) => {
+      const json = await mockedExecGh([
+        "api",
+        `repos/${owner}/${repo}`,
+        "--jq",
+        "{has_issues,has_wiki,is_archived,default_branch}",
+      ]);
+      return JSON.parse(json);
+    });
   });
 
-  it("fetchRepoMeta should throw when execGh throws (caller should catch)", async () => {
-    const { fetchRepoMeta: actualFetchRepoMeta } = await vi.importActual<
-      typeof import("../../../src/plugins/github/gh-parser.js")
-    >("../../../src/plugins/github/gh-parser.js");
+  it("should call execGh with correct api args and return parsed RepoMeta", async () => {
+    const repoMetaJson = JSON.stringify({
+      has_issues: true,
+      has_wiki: true,
+      is_archived: false,
+      default_branch: "main",
+    });
+    mockedExecGh.mockResolvedValue(repoMetaJson);
 
-    // gh CLI が存在しない / 認証されていない環境でも throw される
-    // ingestAll の呼び出し側が catch するので、throw 自体は正しい挙動
-    // CI では gh が入っていない可能性があるため実行を試みる
-    try {
-      await actualFetchRepoMeta("nonexistent-owner-xyz", "nonexistent-repo-xyz");
-      // gh CLI が動いていたとしても 404 になるはずなので通常はここに到達しない
-    } catch (err) {
-      expect(err).toBeDefined();
-    }
+    const result = await fetchRepoMeta("octocat", "hello-world");
+
+    expect(mockedExecGh).toHaveBeenCalledWith([
+      "api",
+      "repos/octocat/hello-world",
+      "--jq",
+      "{has_issues,has_wiki,is_archived,default_branch}",
+    ]);
+    expect(result).toEqual({
+      has_issues: true,
+      has_wiki: true,
+      is_archived: false,
+      default_branch: "main",
+    });
+  });
+
+  it("should propagate execGh errors to the caller", async () => {
+    mockedExecGh.mockRejectedValue(new Error("gh failed"));
+
+    await expect(fetchRepoMeta("octocat", "hello-world")).rejects.toThrow("gh failed");
   });
 });
 
