@@ -51,6 +51,7 @@ export interface VectorIndexStats {
 export class KnowledgeRepository {
   private _stmtCache = new Map<string, Database.Statement>();
   private _resultCache = new Map<string, { data: unknown; timestamp: number }>();
+  private _vecTableState: boolean | undefined;
   private static readonly CACHE_MAX_SIZE = 256;
   private static readonly CACHE_TTL_MS = 5000; // 5 seconds
 
@@ -1325,6 +1326,7 @@ export class KnowledgeRepository {
   }
 
   private ensureVectorIndexTable(): boolean {
+    if (this._vecTableState !== undefined) return this._vecTableState;
     try {
       this.db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS note_embeddings_vec USING vec0(
@@ -1335,8 +1337,10 @@ export class KnowledgeRepository {
           DELETE FROM note_embeddings_vec WHERE note_id = old.note_id;
         END;
       `);
+      this._vecTableState = true;
       return true;
     } catch {
+      this._vecTableState = false;
       return false;
     }
   }
