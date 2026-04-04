@@ -91,6 +91,7 @@ export { migration011 } from "./storage/migrations/011_fts_unicode61.js";
 export { migration012 } from "./storage/migrations/012_fts_trigram_cjk.js";
 export { migration013 } from "./storage/migrations/013_unknown_entity_type.js";
 export { migration014 } from "./storage/migrations/014_entity_normalization.js";
+export { migration015 } from "./storage/migrations/015_embedding_format_version.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -118,6 +119,7 @@ import { migration011 } from "./storage/migrations/011_fts_unicode61.js";
 import { migration012 } from "./storage/migrations/012_fts_trigram_cjk.js";
 import { migration013 } from "./storage/migrations/013_unknown_entity_type.js";
 import { migration014 } from "./storage/migrations/014_entity_normalization.js";
+import { migration015 } from "./storage/migrations/015_embedding_format_version.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -136,6 +138,7 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration012,
   migration013,
   migration014,
+  migration015,
 ];
 
 // Provenance
@@ -151,6 +154,7 @@ export type {
 export { GraphRepository } from "./graph/graph-repository.js";
 export { EntityExtractor } from "./graph/entity-extractor.js";
 export { normalizeEntityName } from "./graph/entity-utils.js";
+export { buildEmbeddingInput } from "./embedding/embedding-utils.js";
 export type { ExtractedEntity } from "./graph/entity-extractor.js";
 export { RelationInferrer } from "./graph/relation-inferrer.js";
 export type { InferredRelation } from "./graph/relation-inferrer.js";

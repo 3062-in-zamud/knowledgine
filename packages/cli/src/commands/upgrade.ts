@@ -13,6 +13,7 @@ import {
   ModelManager,
   DEFAULT_MODEL_NAME,
   downloadModel,
+  buildEmbeddingInput,
 } from "@knowledgine/core";
 import { createProgress } from "../lib/progress.js";
 import { colors, symbols, createBox } from "../lib/ui/index.js";
@@ -181,7 +182,9 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
       const noteMap = new Map(noteRows.map((n) => [n.id, n]));
       const orderedNotes = batchIds.map((id) => noteMap.get(id)).filter((n) => n != null);
       try {
-        const embeddings = await embeddingProvider.embedBatch(orderedNotes.map((n) => n.content));
+        const embeddings = await embeddingProvider.embedBatch(
+          orderedNotes.map((n) => buildEmbeddingInput(n)),
+        );
         const result = repository.saveEmbeddingBatch(
           orderedNotes.map((n, j) => ({
             noteId: n.id,
@@ -295,7 +298,9 @@ async function reindexCommand(rootPath: string): Promise<void> {
     const noteMap = new Map(noteRows.map((n) => [n.id, n]));
     const orderedNotes = batchIds.map((id) => noteMap.get(id)).filter((n) => n != null);
     try {
-      const embeddings = await embeddingProvider.embedBatch(orderedNotes.map((n) => n.content));
+      const embeddings = await embeddingProvider.embedBatch(
+        orderedNotes.map((n) => buildEmbeddingInput(n)),
+      );
       const result = repository.saveEmbeddingBatch(
         orderedNotes.map((n, j) => ({
           noteId: n.id,
