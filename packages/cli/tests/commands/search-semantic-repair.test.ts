@@ -8,10 +8,7 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-const {
-  mockSearch,
-  mockOnnxEmbeddingProvider,
-} = vi.hoisted(() => ({
+const { mockSearch, mockOnnxEmbeddingProvider } = vi.hoisted(() => ({
   mockSearch: vi.fn(),
   mockOnnxEmbeddingProvider: vi.fn(),
 }));

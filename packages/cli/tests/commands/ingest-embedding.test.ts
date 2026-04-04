@@ -414,9 +414,7 @@ describe("--embed-missing flow", () => {
   });
 
   it("should generate embeddings for missing notes and report summary", async () => {
-    mockGetNotesWithoutEmbeddingIds
-      .mockReturnValueOnce([1, 2])
-      .mockReturnValueOnce([]);
+    mockGetNotesWithoutEmbeddingIds.mockReturnValueOnce([1, 2]).mockReturnValueOnce([]);
     mockGetVectorIndexStats
       .mockReturnValueOnce({
         vecAvailable: true,

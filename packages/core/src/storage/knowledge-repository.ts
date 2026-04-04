@@ -675,9 +675,9 @@ export class KnowledgeRepository {
       return 0;
     }
 
-    const iter = this.db
-      .prepare(
-        `
+    const CHUNK_SIZE = 500;
+    const selectChunk = this.db.prepare(
+      `
         SELECT e.note_id, e.embedding
         FROM note_embeddings e
         WHERE NOT EXISTS (
@@ -685,25 +685,35 @@ export class KnowledgeRepository {
           FROM note_embeddings_vec v
           WHERE v.note_id = e.note_id
         )
+        LIMIT ?
       `,
-      )
-      .iterate() as IterableIterator<{ note_id: number; embedding: Buffer }>;
-
+    );
     const insert = this.db.prepare(
       "INSERT INTO note_embeddings_vec (note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
     );
     let synced = 0;
-    const tx = this.db.transaction(() => {
-      for (const row of iter) {
-        try {
-          insert.run(row.note_id, row.embedding);
-          synced++;
-        } catch {
-          // Skip rows with invalid embedding data rather than aborting the entire backfill
+
+    // Process in chunks to avoid loading all BLOBs into memory at once
+
+    while (true) {
+      const chunk = selectChunk.all(CHUNK_SIZE) as Array<{
+        note_id: number;
+        embedding: Buffer;
+      }>;
+      if (chunk.length === 0) break;
+
+      const tx = this.db.transaction(() => {
+        for (const row of chunk) {
+          try {
+            insert.run(row.note_id, row.embedding);
+            synced++;
+          } catch {
+            // Skip rows with invalid embedding data rather than aborting the entire backfill
+          }
         }
-      }
-    });
-    tx();
+      });
+      tx();
+    }
 
     return synced;
   }
@@ -1326,7 +1336,7 @@ export class KnowledgeRepository {
   }
 
   private ensureVectorIndexTable(): boolean {
-    if (this._vecTableState !== undefined) return this._vecTableState;
+    if (this._vecTableState === true) return true;
     try {
       this.db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS note_embeddings_vec USING vec0(
@@ -1340,7 +1350,7 @@ export class KnowledgeRepository {
       this._vecTableState = true;
       return true;
     } catch {
-      this._vecTableState = false;
+      // Don't cache false — the vec extension may be loaded later
       return false;
     }
   }
