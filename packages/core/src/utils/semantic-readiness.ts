@@ -21,7 +21,7 @@ export function checkSemanticReadiness(
   const totalNotes = stats.totalNotes;
   const vectorStats = repository.getVectorIndexStats();
   const embeddingsCount = vectorStats.vectorRows;
-  const modelAvailable = modelManager.isModelAvailable();
+  const modelAvailable = modelManager.isModelAvailable(config.embedding.modelName);
   const configEnabled = config.embedding.enabled;
 
   const embeddingCoverage = totalNotes > 0 ? Math.round((embeddingsCount / totalNotes) * 100) : 0;
