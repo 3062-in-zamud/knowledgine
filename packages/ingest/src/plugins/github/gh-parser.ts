@@ -108,7 +108,7 @@ export function isRepositoryNotFoundError(error: unknown): boolean {
     return false;
   }
 
-  const message = error instanceof Error ? error.message : String(error);
+  const message = String(error);
   return REPOSITORY_NOT_FOUND_PATTERNS.some((pattern) => pattern.test(message));
 }
 
