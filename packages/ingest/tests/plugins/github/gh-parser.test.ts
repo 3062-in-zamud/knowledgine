@@ -221,6 +221,12 @@ describe("repository not found helpers", () => {
     expect(isRepositoryNotFoundError(error)).toBe(true);
   });
 
+  it("should classify gh REST 404 responses as repository not found", () => {
+    const error = new Error("gh: Not Found (HTTP 404)");
+
+    expect(isRepositoryNotFoundError(error)).toBe(true);
+  });
+
   it("should not classify unrelated network errors as repository not found", () => {
     const error = new Error("socket hang up");
 

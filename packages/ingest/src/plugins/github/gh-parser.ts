@@ -54,6 +54,7 @@ const REPOSITORY_NOT_FOUND_CODE = "GITHUB_REPOSITORY_NOT_FOUND";
 const REPOSITORY_NOT_FOUND_PATTERNS = [
   /could not resolve to a repository/i,
   /repository not found/i,
+  /\bnot found\b.*\bhttp 404\b|\bhttp 404\b.*\bnot found\b/i,
 ];
 
 const DEFAULT_REPO_META: RepoMeta = {
