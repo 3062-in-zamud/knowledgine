@@ -81,8 +81,7 @@ export class GitHubPlugin implements IngestPlugin {
     try {
       repoMeta = await fetchRepoMeta(owner, repo);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (isRepositoryNotFoundError(error) || /\bnot found\b/i.test(message)) {
+      if (isRepositoryNotFoundError(error)) {
         throw createRepositoryNotFoundError(owner, repo, error);
       }
       // 事前チェック失敗は通常フローにフォールバック
@@ -300,8 +299,7 @@ export class GitHubPlugin implements IngestPlugin {
     try {
       repoMeta = await fetchRepoMeta(owner, repo);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (isRepositoryNotFoundError(error) || /\bnot found\b/i.test(message)) {
+      if (isRepositoryNotFoundError(error)) {
         throw createRepositoryNotFoundError(owner, repo, error);
       }
       // 事前チェック失敗は通常フローにフォールバック

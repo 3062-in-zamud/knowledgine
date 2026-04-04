@@ -92,7 +92,7 @@ describe("ingest command github errors", () => {
     expect(output).toContain(
       "Error: Repository 'nonexistent-user-xxx/nonexistent-repo-yyy' not found.",
     );
-    expect(output).toContain("Check the repository name and ensure it exists on GitHub.");
+    expect(output).toContain("Check the repository name and ensure you have access to it on GitHub.");
     expect(output).toContain("Usage: knowledgine ingest --source github --repo owner/repo");
     expect(output).not.toContain("Could not resolve to a Repository");
     expect(output).not.toContain("Ingest failed:");

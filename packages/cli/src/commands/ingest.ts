@@ -554,7 +554,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
   } catch (error) {
     if (options.source === "github" && options.repo && isRepositoryNotFoundError(error)) {
       console.error(colors.error(`Error: Repository '${options.repo}' not found.`));
-      console.error("  Check the repository name and ensure it exists on GitHub.");
+      console.error("  Check the repository name and ensure you have access to it on GitHub.");
       console.error("  Usage: knowledgine ingest --source github --repo owner/repo");
       process.exitCode = 1;
       return;
