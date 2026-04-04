@@ -37,7 +37,11 @@ export class MarkdownPlugin implements IngestPlugin {
   async *ingestAll(sourcePath: SourceURI): AsyncGenerator<NormalizedEvent> {
     const mdFiles = await this.findMarkdownFiles(sourcePath);
     for (const filePath of mdFiles) {
-      if (await this.isOversized(filePath, sourcePath)) continue;
+      const oversizedEvent = await this.makeOversizedEvent(filePath, sourcePath);
+      if (oversizedEvent) {
+        yield oversizedEvent;
+        continue;
+      }
       const event = await this.processFile(filePath, sourcePath);
       if (event) yield event;
     }
@@ -52,7 +56,11 @@ export class MarkdownPlugin implements IngestPlugin {
     for (const filePath of mdFiles) {
       const fileStat = await stat(filePath);
       if (fileStat.mtimeMs > sinceDate.getTime()) {
-        if (await this.isOversized(filePath, sourcePath)) continue;
+        const oversizedEvent = await this.makeOversizedEvent(filePath, sourcePath);
+        if (oversizedEvent) {
+          yield oversizedEvent;
+          continue;
+        }
         const event = await this.processFile(filePath, sourcePath);
         if (event) yield event;
       }
@@ -67,11 +75,11 @@ export class MarkdownPlugin implements IngestPlugin {
     // no-op
   }
 
-  private async processFile(filePath: string, basePath: string): Promise<NormalizedEvent | null> {
+  private async processFile(filePath: string, basePath: string): Promise<NormalizedEvent> {
+    const relativePath = relative(basePath, filePath);
     try {
       const processed = await this.fileProcessor.processFile(filePath);
       const title = this.fileProcessor.extractTitle(processed.content, filePath);
-      const relativePath = relative(basePath, filePath);
       const fileStat = await stat(filePath);
 
       return {
@@ -90,9 +98,54 @@ export class MarkdownPlugin implements IngestPlugin {
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`  ⚠ Skipped (read error): ${relative(basePath, filePath)}: ${msg}\n`);
+      process.stderr.write(`  ⚠ Skipped (read error): ${relativePath}: ${msg}\n`);
+      return {
+        sourceUri: relativePath,
+        eventType: "document",
+        title: relativePath,
+        content: "",
+        timestamp: new Date(),
+        metadata: {
+          sourcePlugin: "markdown",
+          sourceId: relativePath,
+          skippedReason: "read_error",
+        },
+        relatedPaths: [relativePath],
+      };
+    }
+  }
+
+  /**
+   * Returns a skip event if the file exceeds the size limit, otherwise null.
+   */
+  private async makeOversizedEvent(
+    filePath: string,
+    basePath: string,
+  ): Promise<NormalizedEvent | null> {
+    try {
+      const fileStat = await stat(filePath);
+      if (fileStat.size > MAX_FILE_SIZE_BYTES) {
+        const rel = relative(basePath, filePath);
+        const sizeMB = (fileStat.size / (1024 * 1024)).toFixed(1);
+        process.stderr.write(`  ⚠ Skipped (too large: ${sizeMB} MB): ${rel}\n`);
+        return {
+          sourceUri: rel,
+          eventType: "document",
+          title: rel,
+          content: "",
+          timestamp: fileStat.mtime,
+          metadata: {
+            sourcePlugin: "markdown",
+            sourceId: rel,
+            skippedReason: "too_large",
+          },
+          relatedPaths: [rel],
+        };
+      }
+    } catch {
       return null;
     }
+    return null;
   }
 
   private extractTags(frontmatter: Record<string, unknown>): string[] {
@@ -107,21 +160,6 @@ export class MarkdownPlugin implements IngestPlugin {
     const results: string[] = [];
     await this.walkDir(dir, results);
     return results;
-  }
-
-  private async isOversized(filePath: string, basePath: string): Promise<boolean> {
-    try {
-      const fileStat = await stat(filePath);
-      if (fileStat.size > MAX_FILE_SIZE_BYTES) {
-        const rel = relative(basePath, filePath);
-        const sizeMB = (fileStat.size / (1024 * 1024)).toFixed(1);
-        process.stderr.write(`  ⚠ Skipped (too large: ${sizeMB} MB): ${rel}\n`);
-        return true;
-      }
-    } catch {
-      return false;
-    }
-    return false;
   }
 
   private async walkDir(dir: string, results: string[]): Promise<void> {

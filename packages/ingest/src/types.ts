@@ -113,6 +113,8 @@ export interface IngestCursorData {
 
 export type SkipReason = "already_indexed" | "no_source_data" | "all_filtered";
 
+export type FileSkipReason = "empty_content" | "too_large" | "excluded_pattern" | "read_error";
+
 export type { ExtractionSummary } from "@knowledgine/core";
 import type { ExtractionSummary } from "@knowledgine/core";
 
@@ -141,4 +143,8 @@ export interface IngestSummary {
   extractionSummary?: ExtractionSummary;
   /** Details of individual errors encountered during ingest */
   errorDetails?: IngestError[];
+  /** Breakdown of skip reasons with counts */
+  skippedByReason?: Partial<Record<FileSkipReason, number>>;
+  /** Paths of skipped files with reasons (populated when verbose) */
+  skipDetails?: Array<{ path: string; reason: FileSkipReason }>;
 }
