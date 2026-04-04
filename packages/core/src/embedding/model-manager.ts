@@ -1,4 +1,5 @@
 import { existsSync } from "fs";
+import { homedir } from "os";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -53,12 +54,33 @@ export class ModelManager {
     if (modelsDir) {
       this.modelsDir = modelsDir;
     } else {
-      // Resolve models/ relative to the package root (one level above src/embedding/)
-      const currentDir = dirname(fileURLToPath(import.meta.url));
-      // In dist: dist/embedding/ -> package root
-      // In src: src/embedding/ -> package root
-      this.modelsDir = join(currentDir, "..", "..", "models");
+      this.modelsDir = ModelManager.resolveDefaultModelsDir();
     }
+  }
+
+  /**
+   * Resolve the default models directory with fallback chain:
+   * 1. KNOWLEDGINE_MODELS_DIR env var (highest priority)
+   * 2. Package-relative path if model files already exist there
+   * 3. ~/.knowledgine/models/ (fallback for global installs)
+   */
+  static resolveDefaultModelsDir(): string {
+    // 1. Environment variable override
+    const envDir = process.env.KNOWLEDGINE_MODELS_DIR;
+    if (envDir) {
+      return envDir;
+    }
+
+    // 2. Package-relative path (works for local/dev installs)
+    const currentDir = dirname(fileURLToPath(import.meta.url));
+    const pkgRelativeDir = join(currentDir, "..", "..", "models");
+    const probeModel = join(pkgRelativeDir, DEFAULT_MODEL_NAME, "model.onnx");
+    if (existsSync(probeModel)) {
+      return pkgRelativeDir;
+    }
+
+    // 3. Fallback: ~/.knowledgine/models/ (global install)
+    return join(homedir(), ".knowledgine", "models");
   }
 
   getModelDir(modelName: string = DEFAULT_MODEL_NAME): string {
