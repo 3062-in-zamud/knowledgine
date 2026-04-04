@@ -674,7 +674,7 @@ export class KnowledgeRepository {
       return 0;
     }
 
-    const missing = this.db
+    const iter = this.db
       .prepare(
         `
         SELECT e.note_id, e.embedding
@@ -686,23 +686,25 @@ export class KnowledgeRepository {
         )
       `,
       )
-      .all() as Array<{ note_id: number; embedding: Buffer }>;
-
-    if (missing.length === 0) {
-      return 0;
-    }
+      .iterate() as IterableIterator<{ note_id: number; embedding: Buffer }>;
 
     const insert = this.db.prepare(
       "INSERT INTO note_embeddings_vec (note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
     );
+    let synced = 0;
     const tx = this.db.transaction(() => {
-      for (const row of missing) {
-        insert.run(row.note_id, row.embedding);
+      for (const row of iter) {
+        try {
+          insert.run(row.note_id, row.embedding);
+          synced++;
+        } catch {
+          // Skip rows with invalid embedding data rather than aborting the entire backfill
+        }
       }
     });
     tx();
 
-    return missing.length;
+    return synced;
   }
 
   /**
