@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { loadSqliteVecExtension } from "../../src/storage/database.js";
 import { createTestDb } from "../helpers/test-db.js";
 import type { TestContext } from "../helpers/test-db.js";
 
@@ -100,5 +101,34 @@ describe("migration003: vector_embeddings", () => {
     const notes = ctx.repository.getNotesWithoutEmbeddings();
     expect(notes.length).toBeGreaterThan(0);
     expect(notes.some((n) => n.file_path === "no-emb.md")).toBe(true);
+  });
+
+  it("should report and backfill missing vector rows after sqlite-vec becomes available", async () => {
+    const noteId = ctx.repository.saveNote({
+      filePath: "vector-gap.md",
+      title: "Vector Gap",
+      content: "content",
+      frontmatter: {},
+      createdAt: new Date().toISOString(),
+    });
+
+    ctx.repository.saveEmbedding(noteId, new Float32Array(384).fill(0.5), "test-model");
+
+    const before = ctx.repository.getVectorIndexStats();
+    expect(before.vecAvailable).toBe(false);
+    expect(before.embeddingRows).toBe(1);
+    expect(before.vectorRows).toBe(0);
+    expect(before.missingVectorRows).toBe(1);
+
+    await loadSqliteVecExtension(ctx.db);
+
+    const synced = ctx.repository.syncMissingVectorsFromEmbeddings();
+    expect(synced).toBe(1);
+
+    const after = ctx.repository.getVectorIndexStats();
+    expect(after.vecAvailable).toBe(true);
+    expect(after.embeddingRows).toBe(1);
+    expect(after.vectorRows).toBe(1);
+    expect(after.missingVectorRows).toBe(0);
   });
 });

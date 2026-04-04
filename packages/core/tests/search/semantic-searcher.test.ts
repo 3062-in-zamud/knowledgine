@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { loadSqliteVecExtension } from "../../src/storage/database.js";
 import { SemanticSearcher } from "../../src/search/semantic-searcher.js";
 import { createTestDb, seedTestData } from "../helpers/test-db.js";
 import { MockEmbeddingProvider } from "../helpers/mock-embedding-provider.js";
@@ -39,5 +40,22 @@ describe("SemanticSearcher", () => {
     // This test validates graceful degradation
     const results = await searcher.search("TypeScript");
     expect(Array.isArray(results)).toBe(true);
+  });
+
+  it("should rebuild missing vector index entries before semantic search", async () => {
+    const notes = ctx.repository.getNotesWithoutEmbeddings();
+    for (const note of notes) {
+      const emb = await provider.embed(note.content);
+      ctx.repository.saveEmbedding(note.id, emb, "mock");
+    }
+
+    await loadSqliteVecExtension(ctx.db);
+
+    const results = await searcher.search("TypeScript");
+
+    expect(results.length).toBeGreaterThan(0);
+    const vectorStats = ctx.repository.getVectorIndexStats();
+    expect(vectorStats.vecAvailable).toBe(true);
+    expect(vectorStats.missingVectorRows).toBe(0);
   });
 });

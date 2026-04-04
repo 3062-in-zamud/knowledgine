@@ -18,6 +18,11 @@ export class SemanticSearcher {
   ) {}
 
   async search(query: string, limit: number = 20): Promise<SemanticSearchResult[]> {
+    const vectorStats = this.repository.getVectorIndexStats();
+    if (vectorStats.missingVectorRows > 0) {
+      this.repository.syncMissingVectorsFromEmbeddings();
+    }
+
     const queryEmbedding = await this.embeddingProvider.embedQuery(query);
     const vecResults = this.repository.searchByVector(queryEmbedding, limit);
 

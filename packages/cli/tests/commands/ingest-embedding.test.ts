@@ -12,6 +12,8 @@ const {
   mockGetNotesWithoutEmbeddingIds,
   mockGetNotesByIds,
   mockSaveEmbeddingBatch,
+  mockGetVectorIndexStats,
+  mockSyncMissingVectorsFromEmbeddings,
   mockLoadSqliteVecExtension,
   mockIngestEngineIngest,
 } = vi.hoisted(() => ({
@@ -21,6 +23,8 @@ const {
   mockGetNotesWithoutEmbeddingIds: vi.fn(),
   mockGetNotesByIds: vi.fn(),
   mockSaveEmbeddingBatch: vi.fn(),
+  mockGetVectorIndexStats: vi.fn(),
+  mockSyncMissingVectorsFromEmbeddings: vi.fn(),
   mockLoadSqliteVecExtension: vi.fn(),
   mockIngestEngineIngest: vi.fn(),
 }));
@@ -46,6 +50,8 @@ vi.mock("@knowledgine/core", async (importOriginal) => {
       getNotesWithoutEmbeddingIds: mockGetNotesWithoutEmbeddingIds,
       getNotesByIds: mockGetNotesByIds,
       saveEmbeddingBatch: mockSaveEmbeddingBatch,
+      getVectorIndexStats: mockGetVectorIndexStats,
+      syncMissingVectorsFromEmbeddings: mockSyncMissingVectorsFromEmbeddings,
       getNoteById: vi.fn().mockReturnValue(null),
       saveNote: vi.fn().mockReturnValue(1),
       findBySource: vi.fn().mockReturnValue([]),
@@ -104,6 +110,16 @@ describe("embedding generation after ingest", () => {
 
     // Reset mocks to safe defaults
     vi.clearAllMocks();
+    mockEmbedBatch.mockReset();
+    mockClose.mockReset();
+    mockIsModelAvailable.mockReset();
+    mockGetNotesWithoutEmbeddingIds.mockReset();
+    mockGetNotesByIds.mockReset();
+    mockSaveEmbeddingBatch.mockReset();
+    mockGetVectorIndexStats.mockReset();
+    mockSyncMissingVectorsFromEmbeddings.mockReset();
+    mockLoadSqliteVecExtension.mockReset();
+    mockIngestEngineIngest.mockReset();
     vi.mocked(loadRcFile).mockReturnValue(null);
     mockIsModelAvailable.mockReturnValue(true);
     mockLoadSqliteVecExtension.mockResolvedValue(true);
@@ -112,6 +128,13 @@ describe("embedding generation after ingest", () => {
     mockGetNotesWithoutEmbeddingIds.mockReturnValue([]);
     mockGetNotesByIds.mockReturnValue([]);
     mockSaveEmbeddingBatch.mockReturnValue({ saved: 0, failed: 0 });
+    mockGetVectorIndexStats.mockReturnValue({
+      vecAvailable: true,
+      embeddingRows: 0,
+      vectorRows: 0,
+      missingVectorRows: 0,
+    });
+    mockSyncMissingVectorsFromEmbeddings.mockReturnValue(0);
     // Restore ingest mock after clearAllMocks
     mockIngestEngineIngest.mockResolvedValue({
       processed: 1,
@@ -293,6 +316,16 @@ describe("--embed-missing flow", () => {
     writeFileSync(join(testDir, "test.md"), "# Test\n\nContent for embed-missing testing");
 
     vi.clearAllMocks();
+    mockEmbedBatch.mockReset();
+    mockClose.mockReset();
+    mockIsModelAvailable.mockReset();
+    mockGetNotesWithoutEmbeddingIds.mockReset();
+    mockGetNotesByIds.mockReset();
+    mockSaveEmbeddingBatch.mockReset();
+    mockGetVectorIndexStats.mockReset();
+    mockSyncMissingVectorsFromEmbeddings.mockReset();
+    mockLoadSqliteVecExtension.mockReset();
+    mockIngestEngineIngest.mockReset();
     vi.mocked(loadRcFile).mockReturnValue({ semantic: true });
     mockIsModelAvailable.mockReturnValue(true);
     mockLoadSqliteVecExtension.mockResolvedValue(true);
@@ -301,6 +334,13 @@ describe("--embed-missing flow", () => {
     mockGetNotesWithoutEmbeddingIds.mockReturnValue([]);
     mockGetNotesByIds.mockReturnValue([]);
     mockSaveEmbeddingBatch.mockReturnValue({ saved: 0, failed: 0 });
+    mockGetVectorIndexStats.mockReturnValue({
+      vecAvailable: true,
+      embeddingRows: 0,
+      vectorRows: 0,
+      missingVectorRows: 0,
+    });
+    mockSyncMissingVectorsFromEmbeddings.mockReturnValue(0);
     // IngestEngine.ingest should NOT be called for --embed-missing
     mockIngestEngineIngest.mockResolvedValue({
       processed: 0,
@@ -329,6 +369,12 @@ describe("--embed-missing flow", () => {
 
   it("should report 'All notes have embeddings' when no notes are missing embeddings", async () => {
     mockGetNotesWithoutEmbeddingIds.mockReturnValue([]);
+    mockGetVectorIndexStats.mockReturnValue({
+      vecAvailable: true,
+      embeddingRows: 3,
+      vectorRows: 3,
+      missingVectorRows: 0,
+    });
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await ingestCommand({ embedMissing: true, path: testDir });
@@ -339,10 +385,51 @@ describe("--embed-missing flow", () => {
     errorSpy.mockRestore();
   });
 
+  it("should repair vector index when embeddings exist but vector rows are missing", async () => {
+    mockGetNotesWithoutEmbeddingIds.mockReturnValue([]);
+    mockGetVectorIndexStats
+      .mockReturnValueOnce({
+        vecAvailable: true,
+        embeddingRows: 4,
+        vectorRows: 1,
+        missingVectorRows: 3,
+      })
+      .mockReturnValueOnce({
+        vecAvailable: true,
+        embeddingRows: 4,
+        vectorRows: 4,
+        missingVectorRows: 0,
+      });
+    mockSyncMissingVectorsFromEmbeddings.mockReturnValue(3);
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await ingestCommand({ embedMissing: true, path: testDir });
+
+    expect(process.exitCode).toBeUndefined();
+    expect(mockSyncMissingVectorsFromEmbeddings).toHaveBeenCalled();
+    const messages = errorSpy.mock.calls.map((c) => c.join(" "));
+    expect(messages.some((m) => m.includes("Vector index repaired"))).toBe(true);
+    errorSpy.mockRestore();
+  });
+
   it("should generate embeddings for missing notes and report summary", async () => {
     mockGetNotesWithoutEmbeddingIds
-      .mockReturnValueOnce([1, 2]) // initial call for "notes needing embeddings"
-      .mockReturnValueOnce([]); // second call for final coverage calculation
+      .mockReturnValueOnce([1, 2])
+      .mockReturnValueOnce([]);
+    mockGetVectorIndexStats
+      .mockReturnValueOnce({
+        vecAvailable: true,
+        embeddingRows: 0,
+        vectorRows: 0,
+        missingVectorRows: 0,
+      })
+      .mockReturnValueOnce({
+        vecAvailable: true,
+        embeddingRows: 2,
+        vectorRows: 2,
+        missingVectorRows: 0,
+      });
     mockGetNotesByIds.mockReturnValue([
       { id: 1, content: "Note 1", title: "N1", source: "markdown", createdAt: 0, updatedAt: 0 },
       { id: 2, content: "Note 2", title: "N2", source: "markdown", createdAt: 0, updatedAt: 0 },
@@ -393,7 +480,20 @@ describe("--embed-missing flow", () => {
   });
 
   it("should retry failed batches up to MAX_EMBED_RETRIES times", async () => {
-    mockGetNotesWithoutEmbeddingIds.mockReturnValueOnce([1]).mockReturnValueOnce([]); // final coverage call
+    mockGetNotesWithoutEmbeddingIds.mockReturnValue([1]);
+    mockGetVectorIndexStats
+      .mockReturnValueOnce({
+        vecAvailable: true,
+        embeddingRows: 0,
+        vectorRows: 0,
+        missingVectorRows: 0,
+      })
+      .mockReturnValueOnce({
+        vecAvailable: true,
+        embeddingRows: 1,
+        vectorRows: 1,
+        missingVectorRows: 0,
+      });
     mockGetNotesByIds.mockReturnValue([
       { id: 1, content: "Note 1", title: "N1", source: "markdown", createdAt: 0, updatedAt: 0 },
     ]);

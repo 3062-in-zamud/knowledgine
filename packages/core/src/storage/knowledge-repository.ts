@@ -41,6 +41,13 @@ export interface ExtractedPatternRow {
   created_at: string;
 }
 
+export interface VectorIndexStats {
+  vecAvailable: boolean;
+  embeddingRows: number;
+  vectorRows: number;
+  missingVectorRows: number;
+}
+
 export class KnowledgeRepository {
   private _stmtCache = new Map<string, Database.Statement>();
   private _resultCache = new Map<string, { data: unknown; timestamp: number }>();
@@ -499,6 +506,7 @@ export class KnowledgeRepository {
     try {
       const now = new Date().toISOString();
       const embBuf = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
+      const vec0Available = this.ensureVectorIndexTable();
 
       const saveEmbeddingTransaction = this.db.transaction(() => {
         // note_embeddings テーブルに upsert
@@ -516,15 +524,13 @@ export class KnowledgeRepository {
 
         // note_embeddings_vec (vec0) が存在する場合は手動で同期
         // vec0 は ON CONFLICT をサポートしないため DELETE + INSERT を使う
-        try {
+        if (vec0Available) {
           this.stmt("DELETE FROM note_embeddings_vec WHERE note_id = CAST(? AS INTEGER)").run(
             noteId,
           );
           this.stmt(
             "INSERT INTO note_embeddings_vec(note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
           ).run(noteId, embBuf);
-        } catch {
-          // note_embeddings_vec が存在しない場合は無視（graceful degradation）
         }
       });
       saveEmbeddingTransaction();
@@ -543,13 +549,7 @@ export class KnowledgeRepository {
   ): { saved: number; failed: number } {
     if (items.length === 0) return { saved: 0, failed: 0 };
 
-    // vec0 利用可否を事前に1回だけチェック
-    let vec0Available = true;
-    try {
-      this.db.prepare("SELECT COUNT(*) FROM note_embeddings_vec").get();
-    } catch {
-      vec0Available = false;
-    }
+    const vec0Available = this.ensureVectorIndexTable();
 
     const CHUNK_SIZE = 100;
     let saved = 0;
@@ -622,6 +622,84 @@ export class KnowledgeRepository {
     }
 
     return { saved, failed };
+  }
+
+  getVectorIndexStats(): VectorIndexStats {
+    const embeddingRows = (
+      this.stmt("SELECT COUNT(*) as c FROM note_embeddings").get() as { c: number } | undefined
+    )?.c ?? 0;
+
+    try {
+      const vectorRows = (
+        this.db.prepare("SELECT COUNT(*) as c FROM note_embeddings_vec").get() as
+          | { c: number }
+          | undefined
+      )?.c ?? 0;
+      const missingVectorRows =
+        vectorRows < embeddingRows
+          ? (this.db.prepare(
+              `
+              SELECT COUNT(*) as c
+              FROM note_embeddings e
+              WHERE NOT EXISTS (
+                SELECT 1
+                FROM note_embeddings_vec v
+                WHERE v.note_id = e.note_id
+              )
+            `,
+            ).get() as { c: number } | undefined)?.c ?? 0
+          : 0;
+
+      return {
+        vecAvailable: true,
+        embeddingRows,
+        vectorRows,
+        missingVectorRows,
+      };
+    } catch {
+      return {
+        vecAvailable: false,
+        embeddingRows,
+        vectorRows: 0,
+        missingVectorRows: embeddingRows,
+      };
+    }
+  }
+
+  syncMissingVectorsFromEmbeddings(): number {
+    if (!this.ensureVectorIndexTable()) {
+      return 0;
+    }
+
+    const missing = this.db
+      .prepare(
+        `
+        SELECT e.note_id, e.embedding
+        FROM note_embeddings e
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM note_embeddings_vec v
+          WHERE v.note_id = e.note_id
+        )
+      `,
+      )
+      .all() as Array<{ note_id: number; embedding: Buffer }>;
+
+    if (missing.length === 0) {
+      return 0;
+    }
+
+    const insert = this.db.prepare(
+      "INSERT INTO note_embeddings_vec (note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
+    );
+    const tx = this.db.transaction(() => {
+      for (const row of missing) {
+        insert.run(row.note_id, row.embedding);
+      }
+    });
+    tx();
+
+    return missing.length;
   }
 
   /**
@@ -1239,5 +1317,22 @@ export class KnowledgeRepository {
   close(): void {
     this._stmtCache.clear();
     this.db.close();
+  }
+
+  private ensureVectorIndexTable(): boolean {
+    try {
+      this.db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS note_embeddings_vec USING vec0(
+          note_id INTEGER PRIMARY KEY,
+          embedding FLOAT[384]
+        );
+        CREATE TRIGGER IF NOT EXISTS note_embeddings_ad AFTER DELETE ON note_embeddings BEGIN
+          DELETE FROM note_embeddings_vec WHERE note_id = old.note_id;
+        END;
+      `);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
