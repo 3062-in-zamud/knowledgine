@@ -18,9 +18,11 @@ export class SemanticSearcher {
   ) {}
 
   async search(query: string, limit: number = 20): Promise<SemanticSearchResult[]> {
-    const vectorStats = this.repository.getVectorIndexStats();
-    if (vectorStats.missingVectorRows > 0) {
+    try {
       this.repository.syncMissingVectorsFromEmbeddings();
+    } catch {
+      // Best-effort backfill: continue searching so semantic search can
+      // degrade gracefully when sqlite-vec is unavailable or stored rows are bad.
     }
 
     const queryEmbedding = await this.embeddingProvider.embedQuery(query);
