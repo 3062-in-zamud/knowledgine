@@ -178,6 +178,7 @@ program
     "--no-embeddings",
     "Skip embedding generation after ingest (semantic search will not work for these notes)",
   )
+  .option("--embed-missing", "Generate embeddings for notes missing them (no ingest performed)")
   .addHelpText(
     "after",
     `
@@ -193,6 +194,7 @@ Examples:
   knowledgine ingest --source git-history --exclude-pattern "**/vendor/**" --path ~/notes
   knowledgine ingest --source markdown --observe --path ~/notes
   knowledgine ingest --source markdown --observe --observe-limit 20 --path ~/notes
+  knowledgine ingest --embed-missing --path ~/notes
 
 Source-specific options:
   --source github --repo owner/repo  Ingest GitHub PRs and issues (requires GITHUB_TOKEN env var)
