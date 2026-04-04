@@ -299,6 +299,20 @@ export class EntityExtractor {
     "packages",
     "user-attachments",
     "badges",
+    "components",
+    "pages",
+    "views",
+    "routes",
+    "controllers",
+    "services",
+    "hooks",
+    "layouts",
+    "stores",
+    "schemas",
+    "styles",
+    "templates",
+    "fixtures",
+    "mocks",
   ]);
 
   constructor(rules?: ExtractionRules) {
@@ -316,6 +330,7 @@ export class EntityExtractor {
 
     // Strip Markdown syntax to prevent artifacts from being extracted as entities
     cleanContent = this.stripMarkdownSyntax(cleanContent);
+    cleanContent = this.stripFilePaths(cleanContent); // KNOW-361: strip file paths
 
     results.push(...this.extractFromFrontmatterTags(frontmatter));
     results.push(...this.extractFromFrontmatterFields(frontmatter));
@@ -601,6 +616,17 @@ export class EntityExtractor {
     // Also extract org/repo from GitHub URLs specifically
     results.push(...this.extractOrgReposFromUrls(content));
     return results;
+  }
+
+  /**
+   * Strip file paths from content to prevent path components from being extracted.
+   * Requires at least one slash to avoid stripping tech names like "Next.js" or "Vue.js".
+   */
+  private stripFilePaths(content: string): string {
+    return content.replace(
+      /(?:^|\s)([\w.-]{1,50}\/[\w./-]{1,200}\.(?:ts|tsx|js|jsx|json|md|css|html|py|go|rs|java|rb|php|sh|yaml|yml|toml|xml|sql|vue|svelte))(?=\s|$|[)>\],;])/gm,
+      " ",
+    );
   }
 
   /**
