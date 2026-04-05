@@ -263,11 +263,15 @@ main/examples is just a directory listing
 
     it("preserves tech names like Next.js Vue.js Node.js (no slash)", () => {
       const content = "We use Next.js and Vue.js with Node.js runtime";
-      const _entities = extractor.extract(content);
-      // These should NOT be stripped (no slash in name)
-      // stripFilePaths requires at least one slash, so "Next.js" etc. are preserved in content
-      // (They may or may not be extracted depending on other extraction rules,
-      // but the key assertion is they are not incorrectly removed by stripFilePaths)
+      const entities = extractor.extract(content);
+      // stripFilePaths requires at least one slash, so "Next.js" etc. are not removed.
+      // These are not in TECH_DICTIONARY so won't be extracted as entities,
+      // but we verify the extraction process completes without error and that
+      // no path-segment-like entity is spuriously created from them.
+      const names = entities.map((e) => e.name);
+      expect(names).not.toContain("next");
+      expect(names).not.toContain("vue");
+      expect(names).not.toContain("node");
     });
 
     it("does not extract path segments like hooks and layouts as org/repo", () => {
