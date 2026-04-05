@@ -15,6 +15,7 @@ describe("KNOW-374: Entity ranking boost", () => {
     const mockRepo = {
       searchNotesWithSnippet: vi.fn().mockReturnValue([]),
       searchNotesWithRank: vi.fn().mockReturnValue([]),
+      getEmbeddingModelNames: vi.fn().mockReturnValue([]),
     } as unknown as KnowledgeRepository;
 
     const searcher = new KnowledgeSearcher(mockRepo);
