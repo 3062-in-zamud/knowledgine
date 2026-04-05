@@ -776,6 +776,15 @@ export class KnowledgeRepository {
           // Replace phrase placeholders
           const phMatch = t.match(/^__PHRASE_(\d+)__$/);
           if (phMatch) return phrases[parseInt(phMatch[1])];
+
+          // ハイフン/ドット含みの複合語はフレーズクエリに変換（早期return）
+          if (/[-.]/.test(t)) {
+            const normalized = t.replace(/[-.]/g, " ").trim();
+            if (normalized.includes(" ")) {
+              return `"${normalized}"`;
+            }
+          }
+
           // Escape FTS5 special characters in regular terms
           return t.replace(/[*^"]/g, "");
         })
@@ -826,6 +835,7 @@ export class KnowledgeRepository {
         FROM knowledge_notes n
         JOIN ${ftsTable} fts ON n.id = fts.rowid
         WHERE ${ftsTable} MATCH ?
+        AND (n.confidence IS NULL OR n.confidence > 0.1)
         ${deprecatedFilter}
         ${dateFromFilter}
         ${dateToFilter}
@@ -864,7 +874,7 @@ export class KnowledgeRepository {
     if (dateTo) dateParams.push(dateTo);
 
     const fallbackRows = this.stmt(
-      `SELECT n.* FROM knowledge_notes n WHERE (n.title LIKE ? OR n.content LIKE ?) ${deprecatedClause} ${dateFromFilter} ${dateToFilter} LIMIT ?`,
+      `SELECT n.* FROM knowledge_notes n WHERE (n.title LIKE ? OR n.content LIKE ?) AND (n.confidence IS NULL OR n.confidence > 0.1) ${deprecatedClause} ${dateFromFilter} ${dateToFilter} LIMIT ?`,
     ).all(`%${query}%`, `%${query}%`, ...dateParams, limit) as Array<
       KnowledgeNote & { rank: number }
     >;
@@ -911,6 +921,7 @@ export class KnowledgeRepository {
         FROM knowledge_notes n
         JOIN ${ftsTable} fts ON n.id = fts.rowid
         WHERE ${ftsTable} MATCH ?
+        AND (n.confidence IS NULL OR n.confidence > 0.1)
         ${deprecatedFilter}
         ${dateFromFilter}
         ${dateToFilter}
@@ -1305,6 +1316,17 @@ export class KnowledgeRepository {
       .pluck()
       .all() as string[];
     return rows;
+  }
+
+  /**
+   * note_embeddingsテーブルに保存されている埋め込みモデル名の一覧を取得する
+   */
+  getEmbeddingModelNames(): string[] {
+    try {
+      return this.stmt("SELECT DISTINCT model_name FROM note_embeddings").pluck().all() as string[];
+    } catch {
+      return [];
+    }
   }
 
   /**

@@ -785,4 +785,89 @@ describe("KnowledgeRepository", () => {
       expect(results).toHaveLength(0);
     });
   });
+
+  describe("transformQueryToFts5 (via searchNotesWithRank — KNOW-417)", () => {
+    // transformQueryToFts5 はprivateメソッドのため searchNotesWithRank 経由で間接テスト
+    // ハイフン/ドット含みクエリがFTS5フレーズクエリに変換されて正しく検索できることを確認
+
+    beforeEach(() => {
+      // ハイフン/ドット含みコンテンツを持つノート群を登録
+      ctx.repository.saveNote({
+        filePath: "docs/vue-router.md",
+        title: "Vue Router Guide",
+        content: "How to configure vue-router for SPA navigation.",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.saveNote({
+        filePath: "docs/http-client.md",
+        title: "HTTP Client",
+        content: "Setting up http.client with retry logic.",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.saveNote({
+        filePath: "docs/versions.md",
+        title: "Node Version",
+        content: "Node v1.2.3 is required for this project.",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.saveNote({
+        filePath: "docs/normal.md",
+        title: "Normal Query",
+        content: "A document without hyphens or dots in the key terms.",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+    });
+
+    it("should find notes when querying with hyphenated term (vue-router)", () => {
+      const results = ctx.repository.searchNotesWithRank("vue-router", 10);
+      expect(results.length).toBeGreaterThan(0);
+      const found = results.some((r) => r.note.file_path === "docs/vue-router.md");
+      expect(found).toBe(true);
+    });
+
+    it("should find notes when querying with dot-separated term (http.client)", () => {
+      const results = ctx.repository.searchNotesWithRank("http.client", 10);
+      expect(results.length).toBeGreaterThan(0);
+      const found = results.some((r) => r.note.file_path === "docs/http-client.md");
+      expect(found).toBe(true);
+    });
+
+    it("should find notes when querying with multi-dot version (v1.2.3)", () => {
+      const results = ctx.repository.searchNotesWithRank("v1.2.3", 10);
+      expect(results.length).toBeGreaterThan(0);
+      const found = results.some((r) => r.note.file_path === "docs/versions.md");
+      expect(found).toBe(true);
+    });
+
+    it("should return results for normal term without hyphens or dots", () => {
+      const results = ctx.repository.searchNotesWithRank("Normal", 10);
+      expect(results.length).toBeGreaterThan(0);
+      const found = results.some((r) => r.note.file_path === "docs/normal.md");
+      expect(found).toBe(true);
+    });
+  });
+
+  describe("getEmbeddingModelNames", () => {
+    it("should return empty array when no embeddings exist", () => {
+      expect(ctx.repository.getEmbeddingModelNames()).toEqual([]);
+    });
+
+    it("should return distinct model names", () => {
+      const noteId = ctx.repository.saveNote({
+        filePath: "embedding-test.md",
+        title: "Embedding Test",
+        content: "Test content for embedding",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      const embedding = new Float32Array(384).fill(0.1);
+      ctx.repository.saveEmbedding(noteId, embedding, "model-a");
+      const names = ctx.repository.getEmbeddingModelNames();
+      expect(names).toContain("model-a");
+    });
+  });
 });
