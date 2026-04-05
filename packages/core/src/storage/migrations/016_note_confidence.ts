@@ -16,7 +16,8 @@ export const migration016: Migration = {
       )
       .all() as Array<{ name: string; sql: string }>;
     for (const v of views) {
-      db.exec(`DROP VIEW IF EXISTS ${v.name};`);
+      const quotedName = `"${v.name.replace(/"/g, '""')}"`;
+      db.exec(`DROP VIEW IF EXISTS ${quotedName};`);
     }
     db.exec(`
       CREATE TABLE knowledge_notes_new (
