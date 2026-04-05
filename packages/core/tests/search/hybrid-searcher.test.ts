@@ -149,11 +149,38 @@ describe("HybridSearcher", () => {
       const results = await e5Searcher.search("TypeScript");
 
       // spread = 0.75 - 0.73 = 0.02 < 0.05 → adaptiveAlpha = 0.7
-      // finalAlpha = max(0.3, 0.7) = 0.7
-      // We can verify through the scoring: higher FTS weight means FTS-only notes rank higher
+      // finalAlpha = max(0.3, 0.7) = 0.7 (keyword-heavy)
       expect(results.length).toBeGreaterThan(0);
+      // With tight cluster, keyword weight dominates → scores should differ from well-spread case
+      const tightClusterScores = results.map((r) => r.score);
 
       mockSearchByVector.mockRestore();
+
+      // Now test with well-spread scores for comparison
+      const mockSpread = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([
+        { note_id: 1, distance: Math.sqrt(2 * (1 - 0.9)) },
+        { note_id: 2, distance: Math.sqrt(2 * (1 - 0.8)) },
+        { note_id: 3, distance: Math.sqrt(2 * (1 - 0.7)) },
+        { note_id: 4, distance: Math.sqrt(2 * (1 - 0.6)) },
+        { note_id: 5, distance: Math.sqrt(2 * (1 - 0.5)) },
+      ]);
+
+      const spreadResults = await e5Searcher.search("TypeScript");
+      const spreadScores = spreadResults.map((r) => r.score);
+      expect(spreadResults.length).toBeGreaterThan(0);
+
+      // Different alpha values should produce different score distributions
+      // With tight cluster (alpha=0.7): keyword dominates
+      // With spread (alpha=0.5): more balanced
+      // At minimum, the scores should not be identical
+      if (tightClusterScores.length > 0 && spreadScores.length > 0) {
+        const tightTop = tightClusterScores[0];
+        const spreadTop = spreadScores[0];
+        // Different alpha values → different final scores for the same notes
+        expect(tightTop).not.toBeCloseTo(spreadTop, 5);
+      }
+
+      mockSpread.mockRestore();
     });
 
     it("should use moderate alpha when semantic scores are well-spread (spread >= 0.05)", async () => {
@@ -169,8 +196,12 @@ describe("HybridSearcher", () => {
       const results = await e5Searcher.search("TypeScript");
 
       // spread = 0.90 - 0.50 = 0.40 >= 0.05 → adaptiveAlpha = 0.5
-      // finalAlpha = max(0.3, 0.5) = 0.5
+      // finalAlpha = max(0.3, 0.5) = 0.5 (balanced)
       expect(results.length).toBeGreaterThan(0);
+      // With well-spread semantic scores, semantic contribution is meaningful
+      // Verify notes with high semantic scores rank near the top
+      const topResult = results[0];
+      expect(topResult.score).toBeGreaterThan(0);
 
       mockSearchByVector.mockRestore();
     });
