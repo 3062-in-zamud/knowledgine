@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-04-05
+
+### Added
+
+#### Core — search (`@knowledgine/core`)
+
+- **Embedding model mismatch detection**: `KnowledgeSearcher` detects when stored embeddings use a different model than the current default and exposes a warning via `embeddingModelMismatchWarning`
+- **FTS5 compound word support**: Hyphen/dot tokens (`vue-router`, `http.client`) are converted to FTS5 phrase queries for accurate compound-word matching
+- **Hybrid CHANGELOG/README discount**: 0.3x score discount for CHANGELOG/CHANGES/HISTORY/README files in hybrid search mode
+- **Hybrid low-confidence discount**: 0.5x score discount for notes with confidence <= 0.3 in hybrid search results
+- **Noise note SQL filtering**: `searchNotesWithRank`, `searchNotesWithSnippet`, and `searchNotesWithLike` exclude notes with confidence <= 0.1
+
+#### Tests
+
+- **Regression test suite**: 12 regression tests covering adaptive alpha, CHANGELOG discount, FTS5 compound words, confidence filtering, semantic search, and AND→OR fallback
+
+### Fixed
+
+#### Core — search (`@knowledgine/core`)
+
+- **Adaptive alpha bug**: Only shift alpha toward keyword when semantic scores are flat (spread < 0.05). Previously `Math.max(effectiveAlpha, 0.5)` always raised alpha even with well-spread scores, unnecessarily reducing semantic weight from 70% to 50%
+- **Discount ordering**: Apply CHANGELOG/confidence discounts to a wider candidate pool (limit×3) before final sort and truncation, preventing discounted notes from displacing better post-discount candidates
+- **FTS5 special character sanitization**: Sanitize `*`, `^`, `"` from tokens before compound-word phrase conversion to prevent malformed MATCH queries
+
+#### CLI (`@knowledgine/cli`)
+
+- **Upgrade warning format**: Model mismatch warning in `upgrade --semantic` now shows old → new model names with actionable reindex command
+
 ## [0.6.6] - 2026-04-05
 
 ### Added
@@ -588,7 +616,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Configurable watch patterns and ignore patterns
 - Graceful shutdown handling (SIGINT/SIGTERM)
 
-[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.6...HEAD
+[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.7...HEAD
+[0.6.7]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.3...v0.6.4
