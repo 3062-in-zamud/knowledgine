@@ -777,16 +777,18 @@ export class KnowledgeRepository {
           const phMatch = t.match(/^__PHRASE_(\d+)__$/);
           if (phMatch) return phrases[parseInt(phMatch[1])];
 
-          // ハイフン/ドット含みの複合語はフレーズクエリに変換（早期return）
-          if (/[-.]/.test(t)) {
-            const normalized = t.replace(/[-.]/g, " ").trim();
+          // Escape FTS5 special characters consistently before any further transformation
+          const sanitizedToken = t.replace(/[*^"]/g, "");
+
+          // ハイフン/ドット含みの複合語はフレーズクエリに変換
+          if (/[-.]/.test(sanitizedToken)) {
+            const normalized = sanitizedToken.replace(/[-.]/g, " ").trim().replace(/\s+/g, " ");
             if (normalized.includes(" ")) {
               return `"${normalized}"`;
             }
           }
 
-          // Escape FTS5 special characters in regular terms
-          return t.replace(/[*^"]/g, "");
+          return sanitizedToken;
         })
         .join(" ");
     });
@@ -1319,14 +1321,11 @@ export class KnowledgeRepository {
   }
 
   /**
-   * note_embeddingsテーブルに保存されている埋め込みモデル名の一覧を取得する
+   * note_embeddingsテーブルに保存されている埋め込みモデル名の一覧を取得する。
+   * getExistingEmbeddingModelNames() に委譲（NOT NULLフィルタ付き）。
    */
   getEmbeddingModelNames(): string[] {
-    try {
-      return this.stmt("SELECT DISTINCT model_name FROM note_embeddings").pluck().all() as string[];
-    } catch {
-      return [];
-    }
+    return this.getExistingEmbeddingModelNames();
   }
 
   /**
