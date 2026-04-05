@@ -88,10 +88,9 @@ export class HybridSearcher {
       vecScores.length >= 2 ? vecScores[0] - vecScores[Math.min(4, vecScores.length - 1)] : 1.0; // Single or no result → assume good spread
 
     let finalAlpha = effectiveAlpha;
-    if (effectiveAlpha < 1.0) {
-      // Only adjust when semantic search is active
-      const adaptiveAlpha = semanticSpread < 0.05 ? 0.7 : 0.5;
-      finalAlpha = Math.max(effectiveAlpha, adaptiveAlpha);
+    if (effectiveAlpha < 1.0 && semanticSpread < 0.05) {
+      // semantic平坦化時のみkeyword側にシフト（spread良好時は調整なし）
+      finalAlpha = Math.max(effectiveAlpha, 0.7);
     }
 
     // 全ノートIDを統合
@@ -113,17 +112,39 @@ export class HybridSearcher {
     const notes = this.repository.getNotesSummaryByIds(topNIds);
     const noteMap = new Map<number, KnowledgeNoteSummary>(notes.map((n) => [n.id, n]));
 
+    // CHANGELOG/README discount + confidence割引を適用してresults構築
+    const CHANGELOG_PATTERN = /^(CHANGELOG|CHANGES|HISTORY|README)\.(md|txt|rst)$/i;
+    const CHANGELOG_DISCOUNT = 0.3;
+    const LOW_CONFIDENCE_DISCOUNT = 0.5;
+    const LOW_CONFIDENCE_THRESHOLD = 0.3;
+
     const results: SemanticSearchResult[] = [];
     for (const { noteId, score } of topN) {
       const note = noteMap.get(noteId);
       if (!note) continue;
+
+      // CHANGELOG/README discount
+      const basename = note.file_path.split("/").pop() ?? "";
+      const changelogDiscount = CHANGELOG_PATTERN.test(basename) ? CHANGELOG_DISCOUNT : 1.0;
+
+      // low-confidence discount (noise=0はSQL層で除外済み、low-value=0.3は割引)
+      const confidenceDiscount =
+        note.confidence !== null && note.confidence <= LOW_CONFIDENCE_THRESHOLD
+          ? LOW_CONFIDENCE_DISCOUNT
+          : 1.0;
+
+      const adjustedScore = score * changelogDiscount * confidenceDiscount;
+
       const hasFts = ftsMap.has(noteId);
       const hasVec = vecMap.has(noteId);
       const reasons: string[] = [];
       if (hasFts) reasons.push(`キーワード: ${(ftsMap.get(noteId)! * 100).toFixed(1)}%`);
       if (hasVec) reasons.push(`セマンティック: ${(vecMap.get(noteId)! * 100).toFixed(1)}%`);
-      results.push({ note, score, matchReason: reasons });
+      results.push({ note, score: adjustedScore, matchReason: reasons });
     }
+
+    // discount適用後に再ソート
+    results.sort((a, b) => b.score - a.score);
 
     return results;
   }
