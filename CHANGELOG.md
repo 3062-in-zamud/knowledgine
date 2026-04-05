@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-04-05
+
+### Changed
+
+#### Core (`@knowledgine/core`)
+
+- **Vector index DDL memoization**: `ensureVectorIndexTable` is now cached per repository instance, avoiding repeated DDL checks during large ingests
+- **Normalized blacklist lookup**: Entity blacklist converted from Array to Set for O(1) lookups
+
+### Fixed
+
+#### Core — graph (`@knowledgine/core`)
+
+- **File path entity contamination**: `stripFilePaths()` prevents file path fragments (e.g. `components`, `pages`, `hooks`) from being extracted as entities
+- **Entity type conservative classification**: `classifyEntityType()` separated as a pure function; low-confidence sources (`unknown` + `link`/`mention`) filtered out
+- **Entity normalization**: `normalizeEntityName()` merges duplicate entities caused by casing/whitespace variation. Migration 014 deduplicates existing data with FK-safe table swap
+- **Migration 014 FK enforcement**: Disable foreign key enforcement during entity table swap and clean orphaned rows to prevent constraint violations
+- **Migration 015 schema constraints**: Preserve PK, NOT NULL, and FK ON DELETE CASCADE constraints in `down()` rollback
+
+#### Core — search (`@knowledgine/core`)
+
+- **Semantic search vector repair**: Detect and backfill missing vector index rows when `vector_index` table exists but rows are absent
+- **Vector sync graceful degradation**: `SemanticSearcher` and `HybridSearcher` wrap vector sync in try/catch to prevent search failures when sqlite-vec is unavailable
+- **Vector stats accuracy**: `getVectorIndexStats` always computes `missingVectorRows` with `NOT EXISTS` subquery instead of row-count shortcut
+- **Vector backfill robustness**: `syncMissingVectorsFromEmbeddings` uses `iterate()` instead of `.all()` to avoid loading all BLOBs into memory; per-row try/catch prevents one malformed embedding from aborting the entire backfill
+- **Semantic readiness model check**: `checkSemanticReadiness` now passes the configured `modelName` to `isModelAvailable`
+
+#### Core — embedding (`@knowledgine/core`)
+
+- **Embedding path context**: `buildEmbeddingInput()` prefixes file path to embedding input with `shortenPath()` for token efficiency, preventing same-name files from polluting each other's embeddings. Migration 015 adds `format_version` column
+- **Global install model download path**: Fallback path resolution (env var → pkg-relative → `~/.knowledgine/models/`) replaces broken `import.meta.url` relative path
+
+#### Core — security (`@knowledgine/core`)
+
+- **Redaction pattern coverage**: Added `Authorization Bearer/Basic/Token` header patterns with regression and negative tests
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **Nonexistent GitHub repository handling**: `isRepositoryNotFoundError()` detects 404/not-found patterns from GraphQL, REST, and `gh` CLI responses, surfacing a clear error message instead of crashing
+- **Not-found fallback narrowing**: Removed overly broad `/\bnot found\b/i` regex that could misclassify private-repo permission errors as missing repos
+
+#### CLI (`@knowledgine/cli`)
+
+- **Embedding batch progress tracking**: Use `saveEmbeddingBatch` result for accurate progress reporting instead of assuming all embeddings succeed
+
+## [0.6.4] - 2026-04-04
+
 ## [0.6.3] - 2026-04-01
 
 ### Added
@@ -507,6 +554,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Configurable watch patterns and ignore patterns
 - Graceful shutdown handling (SIGINT/SIGTERM)
 
-[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.5...HEAD
+[0.6.5]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.4...v0.6.5
+[0.6.4]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.2...v0.6.3
 [0.0.1]: https://github.com/3062-in-zamud/knowledgine/releases/tag/v0.0.1
