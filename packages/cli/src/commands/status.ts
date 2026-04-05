@@ -4,6 +4,7 @@ import {
   loadConfig,
   resolveDefaultPath,
   createDatabase,
+  loadSqliteVecExtension,
   Migrator,
   KnowledgeRepository,
   ALL_MIGRATIONS,
@@ -75,6 +76,9 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   let readiness: SemanticReadiness | undefined;
   try {
     const db = createDatabase(dbPath);
+    if (config.embedding?.enabled) {
+      await loadSqliteVecExtension(db);
+    }
     new Migrator(db, ALL_MIGRATIONS).migrate();
     const repository = new KnowledgeRepository(db);
 

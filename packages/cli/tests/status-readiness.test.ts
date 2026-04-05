@@ -29,10 +29,19 @@ function makeModelManager(available: boolean): ModelManager {
   } as unknown as ModelManager;
 }
 
-function makeRepository(totalNotes: number, notesWithoutEmbeddings: number): KnowledgeRepository {
+function makeRepository(
+  totalNotes: number,
+  vectorRows: number,
+  embeddingRows: number = vectorRows,
+): KnowledgeRepository {
   return {
     getStats: vi.fn().mockReturnValue({ totalNotes, totalPatterns: 0 }),
-    getNotesWithoutEmbeddingIds: vi.fn().mockReturnValue(new Array(notesWithoutEmbeddings)),
+    getVectorIndexStats: vi.fn().mockReturnValue({
+      vecAvailable: true,
+      embeddingRows,
+      vectorRows,
+      missingVectorRows: Math.max(0, embeddingRows - vectorRows),
+    }),
   } as unknown as KnowledgeRepository;
 }
 
@@ -40,7 +49,7 @@ describe("checkSemanticReadiness", () => {
   it("embeddings=0, config.enabled=false -> label 'FTS5 only', ready=false", () => {
     const config = makeConfig(false);
     const modelManager = makeModelManager(false);
-    const repository = makeRepository(5, 5); // 5 notes, none have embeddings
+    const repository = makeRepository(5, 0);
 
     const result = checkSemanticReadiness(config, modelManager, repository);
 
@@ -50,24 +59,24 @@ describe("checkSemanticReadiness", () => {
     expect(result.embeddingsCount).toBe(0);
   });
 
-  it("embeddings=0, config.enabled=true, model available -> label 'FTS5 only', ready=false (no embeddings generated)", () => {
+  it("vectors=0, config.enabled=true, model available -> label 'FTS5 only', ready=false", () => {
     const config = makeConfig(true);
     const modelManager = makeModelManager(true);
-    const repository = makeRepository(5, 5); // model available but no embeddings generated yet
+    const repository = makeRepository(5, 0); // model available but no searchable vectors yet
 
     const result = checkSemanticReadiness(config, modelManager, repository);
 
     expect(result.ready).toBe(false);
-    expect(result.label).toBe("FTS5 only — run 'ingest --all' to generate embeddings");
+    expect(result.label).toBe("FTS5 only — run 'ingest --embed-missing' to repair semantic search");
     expect(result.modelAvailable).toBe(true);
     expect(result.configEnabled).toBe(true);
     expect(result.embeddingsCount).toBe(0);
   });
 
-  it("embeddings>0, config.enabled=true, model available -> label 'Ready (semantic + FTS5)', ready=true", () => {
+  it("vectors>0, config.enabled=true, model available -> label 'Ready (semantic + FTS5)', ready=true", () => {
     const config = makeConfig(true);
     const modelManager = makeModelManager(true);
-    const repository = makeRepository(5, 0); // all notes have embeddings
+    const repository = makeRepository(5, 5);
 
     const result = checkSemanticReadiness(config, modelManager, repository);
 
@@ -91,7 +100,7 @@ describe("checkSemanticReadiness", () => {
   it("partial embeddings (some notes indexed, not all) -> ready=false when embeddingsCount=0", () => {
     const config = makeConfig(true);
     const modelManager = makeModelManager(true);
-    const repository = makeRepository(3, 3); // 3 notes, none with embeddings
+    const repository = makeRepository(3, 0);
 
     const result = checkSemanticReadiness(config, modelManager, repository);
 
@@ -102,7 +111,7 @@ describe("checkSemanticReadiness", () => {
   it("partial embeddings (some notes have embeddings) -> ready=true", () => {
     const config = makeConfig(true);
     const modelManager = makeModelManager(true);
-    const repository = makeRepository(5, 2); // 5 notes, 3 have embeddings
+    const repository = makeRepository(5, 3);
 
     const result = checkSemanticReadiness(config, modelManager, repository);
 
@@ -114,7 +123,7 @@ describe("checkSemanticReadiness", () => {
   it("returns correct counts", () => {
     const config = makeConfig(true);
     const modelManager = makeModelManager(true);
-    const repository = makeRepository(10, 4); // 10 notes, 6 have embeddings
+    const repository = makeRepository(10, 6);
 
     const result = checkSemanticReadiness(config, modelManager, repository);
 

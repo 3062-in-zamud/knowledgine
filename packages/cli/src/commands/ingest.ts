@@ -615,14 +615,28 @@ async function embedMissingCommand(options: IngestOptions): Promise<void> {
       return;
     }
 
-    const noteIdsNeedingEmbeddings = repository.getNotesWithoutEmbeddingIds();
     const totalNotes = repository.getStats().totalNotes;
+    let repairedVectors = 0;
+    const initialVectorStats = repository.getVectorIndexStats();
+    if (initialVectorStats.missingVectorRows > 0) {
+      repairedVectors = repository.syncMissingVectorsFromEmbeddings();
+    }
+
+    const noteIdsNeedingEmbeddings = repository.getNotesWithoutEmbeddingIds();
 
     if (noteIdsNeedingEmbeddings.length === 0) {
-      const coverage = totalNotes > 0 ? 100 : 0;
-      console.error(
-        `  ${symbols.success} ${colors.success(`All notes have embeddings (coverage: ${coverage}%)`)}`,
-      );
+      const finalVectorStats = repository.getVectorIndexStats();
+      const coverage =
+        totalNotes > 0 ? Math.round((finalVectorStats.vectorRows / totalNotes) * 100) : 100;
+      if (repairedVectors > 0) {
+        console.error(
+          `  ${symbols.success} ${colors.success(`Vector index repaired: ${repairedVectors} embeddings synced (coverage: ${coverage}%)`)}`,
+        );
+      } else {
+        console.error(
+          `  ${symbols.success} ${colors.success(`All notes have embeddings (coverage: ${coverage}%)`)}`,
+        );
+      }
       return;
     }
 
@@ -679,9 +693,10 @@ async function embedMissingCommand(options: IngestOptions): Promise<void> {
     process.stderr.write("\n");
 
     // Calculate final coverage
+    const finalVectorStats = repository.getVectorIndexStats();
     const notesTotal = totalNotes > 0 ? totalNotes : total + generated;
-    const nowWithEmbeddings = notesTotal - repository.getNotesWithoutEmbeddingIds().length;
-    const coveragePct = notesTotal > 0 ? Math.round((nowWithEmbeddings / notesTotal) * 100) : 100;
+    const coveragePct =
+      notesTotal > 0 ? Math.round((finalVectorStats.vectorRows / notesTotal) * 100) : 100;
 
     if (failed > 0) {
       console.error(

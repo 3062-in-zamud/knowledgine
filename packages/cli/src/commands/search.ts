@@ -192,9 +192,11 @@ export async function searchCommand(query: string, options: SearchCommandOptions
     let embeddingProvider: EmbeddingProvider | undefined;
     if (mode !== "keyword") {
       const modelManager = new ModelManager();
-      const semanticReadiness = checkSemanticReadiness(config, modelManager, repository);
-      if (semanticReadiness.ready) {
-        embeddingProvider = new OnnxEmbeddingProvider(DEFAULT_MODEL_NAME, modelManager);
+      const vectorStats = repository.getVectorIndexStats();
+      const hasEmbeddings = vectorStats.embeddingRows > 0;
+      const modelName = config.embedding?.modelName ?? DEFAULT_MODEL_NAME;
+      if (config.embedding?.enabled && hasEmbeddings && modelManager.isModelAvailable(modelName)) {
+        embeddingProvider = new OnnxEmbeddingProvider(modelName, modelManager);
       }
     }
 
