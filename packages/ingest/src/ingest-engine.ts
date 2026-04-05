@@ -150,7 +150,7 @@ export class IngestEngine {
           );
         }
       }
-      // Set confidence based on noise classification for commit/discussion/review events.
+      // Set confidence based on noise classification for ingested events (commit/discussion/review).
       // Only set if not already provided by the plugin (preserve plugin-specific scoring).
       if (
         event.metadata.confidence === undefined &&
