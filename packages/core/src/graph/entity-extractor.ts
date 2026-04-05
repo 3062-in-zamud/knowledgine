@@ -1,6 +1,7 @@
 import type { EntityType } from "../types.js";
 import type { ExtractionRules } from "../feedback/feedback-learner.js";
 import { CodeBlockDetector } from "../utils/code-block-detector.js";
+import { normalizeEntityName } from "./entity-utils.js";
 
 export interface ExtractedEntity {
   name: string;
@@ -299,6 +300,20 @@ export class EntityExtractor {
     "packages",
     "user-attachments",
     "badges",
+    "components",
+    "pages",
+    "views",
+    "routes",
+    "controllers",
+    "services",
+    "hooks",
+    "layouts",
+    "stores",
+    "schemas",
+    "styles",
+    "templates",
+    "fixtures",
+    "mocks",
   ]);
 
   constructor(rules?: ExtractionRules) {
@@ -314,13 +329,16 @@ export class EntityExtractor {
     const filtered = detector.filterNonCodeLines(lines, codeBlocks);
     let cleanContent = filtered.map((l) => l.line).join("\n");
 
-    // Strip Markdown syntax to prevent artifacts from being extracted as entities
-    cleanContent = this.stripMarkdownSyntax(cleanContent);
-
     results.push(...this.extractFromFrontmatterTags(frontmatter));
     results.push(...this.extractFromFrontmatterFields(frontmatter));
     results.push(...this.extractImports(cleanContent));
+    // Markdownリンクはstrip前に抽出（strip後はパターンが消える）
     results.push(...this.extractMarkdownLinks(cleanContent));
+
+    // Strip Markdown syntax to prevent artifacts from being extracted as entities
+    cleanContent = this.stripMarkdownSyntax(cleanContent);
+    cleanContent = this.stripFilePaths(cleanContent); // KNOW-361: strip file paths
+
     results.push(...this.extractInlineCode(cleanContent));
     results.push(...this.extractMentions(cleanContent));
     results.push(...this.extractOrgRepos(cleanContent));
@@ -328,8 +346,11 @@ export class EntityExtractor {
     let deduped = this.deduplicate(results);
     deduped = this.resolveEntityTypes(deduped);
 
-    // Filter out low-confidence unknown entities (mention-only, no other signals)
-    deduped = deduped.filter((e) => !(e.entityType === "unknown" && e.sourceType === "mention"));
+    // Filter out low-confidence unknown entities (mention/link-only, no other signals)
+    const LOW_CONFIDENCE_SOURCES: Set<ExtractedEntity["sourceType"]> = new Set(["mention", "link"]);
+    deduped = deduped.filter(
+      (e) => !(e.entityType === "unknown" && LOW_CONFIDENCE_SOURCES.has(e.sourceType)),
+    );
 
     if (this.rules) {
       deduped = this.applyRules(deduped);
@@ -341,8 +362,9 @@ export class EntityExtractor {
   private applyRules(entities: ExtractedEntity[]): ExtractedEntity[] {
     const rules = this.rules!;
 
-    // 1. Filter out blacklisted entities
-    let filtered = entities.filter((e) => !rules.entityBlacklist.includes(e.name));
+    // 1. Filter out blacklisted entities (normalize both sides for matching)
+    const normalizedBlacklist = new Set(rules.entityBlacklist.map(normalizeEntityName));
+    let filtered = entities.filter((e) => !normalizedBlacklist.has(normalizeEntityName(e.name)));
 
     // 2. Apply type overrides
     filtered = filtered.map((e) => {
@@ -535,7 +557,8 @@ export class EntityExtractor {
       if (url.startsWith("http") && text && !this.isStopWord(text.toLowerCase())) {
         // Skip very long link texts (likely sentences)
         if (text.length <= 40 && !text.includes(" ")) {
-          results.push({ name: text.toLowerCase(), entityType: "technology", sourceType: "link" });
+          const entityType = this.classifyEntityType(text.toLowerCase());
+          results.push({ name: text.toLowerCase(), entityType, sourceType: "link" });
         }
       }
     }
@@ -571,14 +594,20 @@ export class EntityExtractor {
     return results;
   }
 
+  /** entityType判定のみ（sourceTypeに依存しない純粋関数） */
+  private classifyEntityType(name: string): EntityType {
+    const techType = TECH_DICTIONARY.get(name);
+    if (techType) return techType;
+    if (NOT_PERSON_LIST.has(name)) return "concept";
+    return "unknown";
+  }
+
+  /** mention用の分類（既存互換） */
   private classifyMention(name: string): {
     entityType: EntityType;
     sourceType: ExtractedEntity["sourceType"];
   } {
-    const techType = TECH_DICTIONARY.get(name);
-    if (techType) return { entityType: techType, sourceType: "mention" };
-    if (NOT_PERSON_LIST.has(name)) return { entityType: "concept", sourceType: "mention" };
-    return { entityType: "unknown", sourceType: "mention" };
+    return { entityType: this.classifyEntityType(name), sourceType: "mention" };
   }
 
   private extractOrgRepos(content: string): ExtractedEntity[] {
@@ -601,6 +630,17 @@ export class EntityExtractor {
     // Also extract org/repo from GitHub URLs specifically
     results.push(...this.extractOrgReposFromUrls(content));
     return results;
+  }
+
+  /**
+   * Strip file paths from content to prevent path components from being extracted.
+   * Requires at least one slash to avoid stripping tech names like "Next.js" or "Vue.js".
+   */
+  private stripFilePaths(content: string): string {
+    return content.replace(
+      /(?:^|\s)([\w.-]{1,50}\/[\w./-]{1,200}\.(?:ts|tsx|js|jsx|json|md|css|html|py|go|rs|java|rb|php|sh|yaml|yml|toml|xml|sql|vue|svelte))(?=\s|$|[)>\],;])/gm,
+      " ",
+    );
   }
 
   /**
@@ -696,7 +736,7 @@ export class EntityExtractor {
   private deduplicate(entities: ExtractedEntity[]): ExtractedEntity[] {
     const seen = new Map<string, ExtractedEntity>();
     for (const e of entities) {
-      const key = `${e.entityType}:${e.name}`;
+      const key = `${e.entityType}:${normalizeEntityName(e.name)}`;
       if (!seen.has(key)) {
         seen.set(key, e);
       }

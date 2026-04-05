@@ -16,6 +16,7 @@ import {
   DEFAULT_MODEL_NAME,
   downloadModel,
   VERSION,
+  buildEmbeddingInput,
 } from "@knowledgine/core";
 import { IngestEngine, PluginRegistry, MarkdownPlugin } from "@knowledgine/ingest";
 import { createProgress, createStepProgress, formatDuration } from "../lib/progress.js";
@@ -500,7 +501,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
           for (let attempt = 0; attempt <= MAX_EMBED_RETRIES; attempt++) {
             try {
               const embeddings = await embeddingProvider.embedBatch(
-                orderedNotes.map((n) => n.content),
+                orderedNotes.map((n) => buildEmbeddingInput(n)),
               );
               const result = repository.saveEmbeddingBatch(
                 orderedNotes.map((n, j) => ({

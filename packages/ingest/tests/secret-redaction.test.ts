@@ -101,4 +101,72 @@ describe("secret redaction 強化", () => {
     expect(result).toContain("[REDACTED]");
     expect(result).not.toContain("glpat-abcdefghijklmnopqrst");
   });
+
+  // --- KNOW-401: プレフィックス漏れ回帰テスト ---
+
+  it("GITHUB_TOKEN=ghp_xxx → トークン値がマスクされる", () => {
+    const ghpToken = "ghp_" + "a".repeat(36);
+    const content = `GITHUB_TOKEN=${ghpToken}`;
+    const result = sanitizeContent(content);
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain(ghpToken);
+  });
+
+  it("DATABASE_URL=postgres://user:pass@host:5432/db → 接続文字列がマスクされる", () => {
+    const content = "DATABASE_URL=postgres://user:pass@host:5432/db";
+    const result = sanitizeContent(content);
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("postgres://user:pass@host:5432/db");
+  });
+
+  it("AWS_SECRET_ACCESS_KEY=xxx → AWS_SECRET も消える", () => {
+    const content = 'AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"';
+    const result = sanitizeContent(content);
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("AWS_SECRET");
+  });
+
+  it("複数シークレットが同一行にある場合すべてマスクされる", () => {
+    const ghpToken = "ghp_" + "b".repeat(36);
+    const content = `API_KEY="sk-proj-abcdef1234567890" GITHUB_TOKEN=${ghpToken}`;
+    const result = sanitizeContent(content);
+    expect(result).not.toContain("sk-proj-abcdef1234567890");
+    expect(result).not.toContain(ghpToken);
+  });
+
+  it('YAML形式 token: "sk-xxx" をマスクする', () => {
+    const content = 'token: "sk-proj-abcdefghijklmnopqrstuvwxyz"';
+    const result = sanitizeContent(content);
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("sk-proj-abcdefghijklmnopqrstuvwxyz");
+  });
+
+  it("Authorization: Bearer eyJxxx をマスクする", () => {
+    const fakeJwt =
+      "eyJhbGci" +
+      "OiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIi" +
+      "OiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U";
+    const content = `Authorization: Bearer ${fakeJwt}`;
+    const result = sanitizeContent(content);
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("Bearer");
+    expect(result).not.toContain(fakeJwt);
+  });
+
+  it("Authorization: Basic dXNlcm5hbWU6xxx をマスクする", () => {
+    const basicCred = "dXNlcm5hbWU6cGFzc3dvcmQxMjM0NTY3ODkw";
+    const content = `Authorization: Basic ${basicCred}`;
+    const result = sanitizeContent(content);
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain("Basic");
+    expect(result).not.toContain(basicCred);
+  });
+
+  // --- KNOW-401: 過剰redaction否定テスト ---
+
+  it("AUTHENTICATION_FLOW = oauth2-standard は変更されない", () => {
+    const content = "AUTHENTICATION_FLOW = oauth2-standard";
+    const result = sanitizeContent(content);
+    expect(result).toBe(content);
+  });
 });

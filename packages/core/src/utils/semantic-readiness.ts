@@ -19,9 +19,9 @@ export function checkSemanticReadiness(
 ): SemanticReadiness {
   const stats = repository.getStats();
   const totalNotes = stats.totalNotes;
-  const notesWithoutEmbeddings = repository.getNotesWithoutEmbeddingIds().length;
-  const embeddingsCount = totalNotes - notesWithoutEmbeddings;
-  const modelAvailable = modelManager.isModelAvailable();
+  const vectorStats = repository.getVectorIndexStats();
+  const embeddingsCount = vectorStats.vectorRows;
+  const modelAvailable = modelManager.isModelAvailable(config.embedding.modelName);
   const configEnabled = config.embedding.enabled;
 
   const embeddingCoverage = totalNotes > 0 ? Math.round((embeddingsCount / totalNotes) * 100) : 0;
@@ -37,7 +37,7 @@ export function checkSemanticReadiness(
   } else if (!modelAvailable) {
     label = "FTS5 only — run 'upgrade --semantic' to enable";
   } else if (embeddingsCount === 0) {
-    label = "FTS5 only — run 'ingest --all' to generate embeddings";
+    label = "FTS5 only — run 'ingest --embed-missing' to repair semantic search";
   } else if (embeddingsCount < totalNotes) {
     label = `Ready (semantic: ${embeddingCoverage}% coverage + FTS5)`;
   } else {

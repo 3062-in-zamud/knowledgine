@@ -27,7 +27,14 @@ vi.mock("@knowledgine/core", async (importOriginal) => {
     Migrator: vi.fn().mockImplementation(() => ({
       migrate: vi.fn(),
     })),
-    KnowledgeRepository: vi.fn().mockImplementation(() => ({})),
+    KnowledgeRepository: vi.fn().mockImplementation(() => ({
+      getVectorIndexStats: vi.fn().mockReturnValue({
+        vecAvailable: true,
+        embeddingRows: 0,
+        vectorRows: 0,
+        missingVectorRows: 0,
+      }),
+    })),
     GraphRepository: vi.fn().mockImplementation(() => ({})),
     KnowledgeService: vi.fn().mockImplementation(() => ({
       search: vi.fn().mockResolvedValue({
@@ -60,7 +67,9 @@ vi.mock("@knowledgine/core", async (importOriginal) => {
       }),
     })),
     OnnxEmbeddingProvider: vi.fn(),
-    ModelManager: vi.fn().mockImplementation(() => ({})),
+    ModelManager: vi.fn().mockImplementation(() => ({
+      isModelAvailable: vi.fn().mockReturnValue(false),
+    })),
     checkSemanticReadiness: vi.fn().mockReturnValue({ ready: false }),
     CrossProjectSearcher: vi.fn(),
     ALL_MIGRATIONS: [],

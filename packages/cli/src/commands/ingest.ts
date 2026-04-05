@@ -19,8 +19,9 @@ import {
   DEFAULT_MODEL_NAME,
   loadSqliteVecExtension,
   OnnxEmbeddingProvider,
+  buildEmbeddingInput,
 } from "@knowledgine/core";
-import { IngestEngine } from "@knowledgine/ingest";
+import { IngestEngine, isRepositoryNotFoundError } from "@knowledgine/ingest";
 import { createDefaultRegistry, initializePlugins } from "../lib/plugin-loader.js";
 import { createProgress, formatDuration, createSummaryReport } from "../lib/progress.js";
 import { colors, symbols } from "../lib/ui/index.js";
@@ -503,7 +504,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
                     if (orderedNotes.length === 0) continue;
 
                     const embeddings = await embeddingProvider.embedBatch(
-                      orderedNotes.map((n) => n.content),
+                      orderedNotes.map((n) => buildEmbeddingInput(n)),
                     );
 
                     repository.saveEmbeddingBatch(
@@ -552,6 +553,13 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       }
     }
   } catch (error) {
+    if (options.source === "github" && options.repo && isRepositoryNotFoundError(error)) {
+      console.error(colors.error(`Error: Repository '${options.repo}' not found.`));
+      console.error("  Check the repository name and ensure you have access to it on GitHub.");
+      console.error("  Usage: knowledgine ingest --source github --repo owner/repo");
+      process.exitCode = 1;
+      return;
+    }
     console.error(
       colors.error(`Ingest failed: ${error instanceof Error ? error.message : String(error)}`),
     );
@@ -614,14 +622,28 @@ async function embedMissingCommand(options: IngestOptions): Promise<void> {
       return;
     }
 
-    const noteIdsNeedingEmbeddings = repository.getNotesWithoutEmbeddingIds();
     const totalNotes = repository.getStats().totalNotes;
+    let repairedVectors = 0;
+    const initialVectorStats = repository.getVectorIndexStats();
+    if (initialVectorStats.missingVectorRows > 0) {
+      repairedVectors = repository.syncMissingVectorsFromEmbeddings();
+    }
+
+    const noteIdsNeedingEmbeddings = repository.getNotesWithoutEmbeddingIds();
 
     if (noteIdsNeedingEmbeddings.length === 0) {
-      const coverage = totalNotes > 0 ? 100 : 0;
-      console.error(
-        `  ${symbols.success} ${colors.success(`All notes have embeddings (coverage: ${coverage}%)`)}`,
-      );
+      const finalVectorStats = repository.getVectorIndexStats();
+      const coverage =
+        totalNotes > 0 ? Math.round((finalVectorStats.vectorRows / totalNotes) * 100) : 100;
+      if (repairedVectors > 0) {
+        console.error(
+          `  ${symbols.success} ${colors.success(`Vector index repaired: ${repairedVectors} embeddings synced (coverage: ${coverage}%)`)}`,
+        );
+      } else {
+        console.error(
+          `  ${symbols.success} ${colors.success(`All notes have embeddings (coverage: ${coverage}%)`)}`,
+        );
+      }
       return;
     }
 
@@ -646,7 +668,7 @@ async function embedMissingCommand(options: IngestOptions): Promise<void> {
         for (let attempt = 0; attempt <= MAX_EMBED_RETRIES; attempt++) {
           try {
             const embeddings = await embeddingProvider.embedBatch(
-              orderedNotes.map((n) => n.content),
+              orderedNotes.map((n) => buildEmbeddingInput(n)),
             );
             const result = repository.saveEmbeddingBatch(
               orderedNotes.map((n, j) => ({
@@ -678,9 +700,10 @@ async function embedMissingCommand(options: IngestOptions): Promise<void> {
     process.stderr.write("\n");
 
     // Calculate final coverage
+    const finalVectorStats = repository.getVectorIndexStats();
     const notesTotal = totalNotes > 0 ? totalNotes : total + generated;
-    const nowWithEmbeddings = notesTotal - repository.getNotesWithoutEmbeddingIds().length;
-    const coveragePct = notesTotal > 0 ? Math.round((nowWithEmbeddings / notesTotal) * 100) : 100;
+    const coveragePct =
+      notesTotal > 0 ? Math.round((finalVectorStats.vectorRows / notesTotal) * 100) : 100;
 
     if (failed > 0) {
       console.error(

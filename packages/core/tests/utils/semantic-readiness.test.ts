@@ -16,11 +16,17 @@ function createMockModelManager(available: boolean): ModelManager {
 
 function createMockRepository(
   totalNotes: number,
-  notesWithoutEmbeddings: number,
+  vectorRows: number,
+  embeddingRows: number = vectorRows,
 ): KnowledgeRepository {
   return {
     getStats: () => ({ totalNotes, totalPatterns: 0 }),
-    getNotesWithoutEmbeddingIds: () => new Array(notesWithoutEmbeddings).fill(0),
+    getVectorIndexStats: () => ({
+      vecAvailable: true,
+      embeddingRows,
+      vectorRows,
+      missingVectorRows: Math.max(0, embeddingRows - vectorRows),
+    }),
   } as unknown as KnowledgeRepository;
 }
 
@@ -50,23 +56,37 @@ describe("checkSemanticReadiness", () => {
       expect(result.modelAvailable).toBe(false);
     });
 
-    it("should return FTS5-only label with ingest hint when model available but embeddings=0", () => {
+    it("should return FTS5-only label with ingest hint when model available but vectors=0", () => {
       const result = checkSemanticReadiness(
         createMockConfig(true),
         createMockModelManager(true),
-        createMockRepository(10, 10), // all 10 notes without embeddings
+        createMockRepository(10, 0), // no searchable vectors available
       );
 
-      expect(result.label).toBe("FTS5 only — run 'ingest --all' to generate embeddings");
+      expect(result.label).toBe(
+        "FTS5 only — run 'ingest --embed-missing' to repair semantic search",
+      );
       expect(result.ready).toBe(false);
       expect(result.embeddingsCount).toBe(0);
     });
 
-    it("should return partial coverage label when some embeddings exist", () => {
+    it("should treat embedding rows without vector rows as not ready", () => {
       const result = checkSemanticReadiness(
         createMockConfig(true),
         createMockModelManager(true),
-        createMockRepository(10, 5), // 5 out of 10 = 50%
+        createMockRepository(10, 0, 10),
+      );
+
+      expect(result.ready).toBe(false);
+      expect(result.embeddingsCount).toBe(0);
+      expect(result.embeddingCoverage).toBe(0);
+    });
+
+    it("should return partial coverage label when some vectors exist", () => {
+      const result = checkSemanticReadiness(
+        createMockConfig(true),
+        createMockModelManager(true),
+        createMockRepository(10, 5),
       );
 
       expect(result.label).toBe("Ready (semantic: 50% coverage + FTS5)");
@@ -78,7 +98,7 @@ describe("checkSemanticReadiness", () => {
       const result = checkSemanticReadiness(
         createMockConfig(true),
         createMockModelManager(true),
-        createMockRepository(10, 0), // all 10 notes have embeddings
+        createMockRepository(10, 10),
       );
 
       expect(result.label).toBe("Ready (semantic + FTS5)");
@@ -102,7 +122,7 @@ describe("checkSemanticReadiness", () => {
       const result = checkSemanticReadiness(
         createMockConfig(true),
         createMockModelManager(true),
-        createMockRepository(10, 10),
+        createMockRepository(10, 0),
       );
 
       expect(result.embeddingCoverage).toBe(0);
@@ -112,7 +132,7 @@ describe("checkSemanticReadiness", () => {
       const result = checkSemanticReadiness(
         createMockConfig(true),
         createMockModelManager(true),
-        createMockRepository(3, 1), // 2/3 = 66.67% -> 67%
+        createMockRepository(3, 2), // 2/3 = 66.67% -> 67%
       );
 
       expect(result.embeddingCoverage).toBe(67);
@@ -122,7 +142,7 @@ describe("checkSemanticReadiness", () => {
       const result = checkSemanticReadiness(
         createMockConfig(true),
         createMockModelManager(true),
-        createMockRepository(5, 0),
+        createMockRepository(5, 5),
       );
 
       expect(result.embeddingCoverage).toBe(100);
@@ -132,7 +152,7 @@ describe("checkSemanticReadiness", () => {
       const result = checkSemanticReadiness(
         createMockConfig(true),
         createMockModelManager(true),
-        createMockRepository(10, 2), // 8/10 = 80%
+        createMockRepository(10, 8), // 8/10 = 80%
       );
 
       expect(result.embeddingCoverage).toBe(80);
@@ -144,7 +164,7 @@ describe("checkSemanticReadiness", () => {
       const result = checkSemanticReadiness(
         createMockConfig(true),
         createMockModelManager(true),
-        createMockRepository(10, 2), // 8 embeddings
+        createMockRepository(10, 8),
       );
 
       expect(result.ready).toBe(true);
@@ -154,7 +174,7 @@ describe("checkSemanticReadiness", () => {
       const result = checkSemanticReadiness(
         createMockConfig(true),
         createMockModelManager(true),
-        createMockRepository(10, 10),
+        createMockRepository(10, 0),
       );
 
       expect(result.ready).toBe(false);
@@ -184,7 +204,7 @@ describe("checkSemanticReadiness", () => {
 
   it("should not mutate the config object", () => {
     const config = createMockConfig(false);
-    checkSemanticReadiness(config, createMockModelManager(true), createMockRepository(10, 10));
+    checkSemanticReadiness(config, createMockModelManager(true), createMockRepository(10, 0));
 
     expect(config.embedding.enabled).toBe(false);
   });

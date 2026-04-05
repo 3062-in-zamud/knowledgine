@@ -38,6 +38,13 @@ export class HybridSearcher {
 
   async search(query: string, limit: number = 20): Promise<SemanticSearchResult[]> {
     const effectiveAlpha = this.determineAlpha(query);
+    if (effectiveAlpha < 1.0) {
+      try {
+        this.repository.syncMissingVectorsFromEmbeddings();
+      } catch {
+        // ベクトル同期失敗時もFTSのみで継続してgraceful degradationする
+      }
+    }
 
     // 両方のスコアを並行取得。alpha=1.0のときはベクトル検索をスキップ。
     const [ftsRows, vecResults] = await Promise.all([

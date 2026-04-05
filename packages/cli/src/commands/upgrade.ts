@@ -13,6 +13,7 @@ import {
   ModelManager,
   DEFAULT_MODEL_NAME,
   downloadModel,
+  buildEmbeddingInput,
 } from "@knowledgine/core";
 import { createProgress } from "../lib/progress.js";
 import { colors, symbols, createBox } from "../lib/ui/index.js";
@@ -60,58 +61,13 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
   const vecLoaded = await loadSqliteVecExtension(db);
   new Migrator(db, ALL_MIGRATIONS).migrate();
 
-  // Ensure vec0 virtual table exists and is populated
+  const repository = new KnowledgeRepository(db);
   if (vecLoaded) {
-    // Create vec table if it doesn't exist
-    try {
-      db.prepare("SELECT COUNT(*) FROM note_embeddings_vec").get();
-    } catch {
-      db.exec(`
-        CREATE VIRTUAL TABLE IF NOT EXISTS note_embeddings_vec USING vec0(
-          note_id INTEGER PRIMARY KEY,
-          embedding FLOAT[384]
-        );
-        CREATE TRIGGER IF NOT EXISTS note_embeddings_ad AFTER DELETE ON note_embeddings BEGIN
-          DELETE FROM note_embeddings_vec WHERE note_id = old.note_id;
-        END;
-      `);
-    }
-
-    // Backfill: sync embeddings that exist in note_embeddings but not in note_embeddings_vec
-    const vecCount = (
-      db.prepare("SELECT COUNT(*) as c FROM note_embeddings_vec").get() as { c: number }
-    ).c;
-    const embCount = (
-      db.prepare("SELECT COUNT(*) as c FROM note_embeddings").get() as { c: number }
-    ).c;
-
-    if (embCount > 0 && vecCount < embCount) {
-      // Find embeddings missing from vec table
-      const missing = db
-        .prepare(
-          `
-        SELECT e.note_id, e.embedding FROM note_embeddings e
-        WHERE e.note_id NOT IN (SELECT note_id FROM note_embeddings_vec)
-      `,
-        )
-        .all() as Array<{ note_id: number; embedding: Buffer }>;
-
-      if (missing.length > 0) {
-        const insert = db.prepare(
-          "INSERT INTO note_embeddings_vec (note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
-        );
-        const tx = db.transaction(() => {
-          for (const row of missing) {
-            insert.run(row.note_id, row.embedding);
-          }
-        });
-        tx();
-        console.error(`Synced ${missing.length} embeddings into vector index.`);
-      }
+    const synced = repository.syncMissingVectorsFromEmbeddings();
+    if (synced > 0) {
+      console.error(`Synced ${synced} embeddings into vector index.`);
     }
   }
-
-  const repository = new KnowledgeRepository(db);
 
   // Check for mixed models warning
   const consistency = repository.checkEmbeddingModelConsistency(DEFAULT_MODEL_NAME);
@@ -181,7 +137,9 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
       const noteMap = new Map(noteRows.map((n) => [n.id, n]));
       const orderedNotes = batchIds.map((id) => noteMap.get(id)).filter((n) => n != null);
       try {
-        const embeddings = await embeddingProvider.embedBatch(orderedNotes.map((n) => n.content));
+        const embeddings = await embeddingProvider.embedBatch(
+          orderedNotes.map((n) => buildEmbeddingInput(n)),
+        );
         const result = repository.saveEmbeddingBatch(
           orderedNotes.map((n, j) => ({
             noteId: n.id,
@@ -295,7 +253,9 @@ async function reindexCommand(rootPath: string): Promise<void> {
     const noteMap = new Map(noteRows.map((n) => [n.id, n]));
     const orderedNotes = batchIds.map((id) => noteMap.get(id)).filter((n) => n != null);
     try {
-      const embeddings = await embeddingProvider.embedBatch(orderedNotes.map((n) => n.content));
+      const embeddings = await embeddingProvider.embedBatch(
+        orderedNotes.map((n) => buildEmbeddingInput(n)),
+      );
       const result = repository.saveEmbeddingBatch(
         orderedNotes.map((n, j) => ({
           noteId: n.id,
