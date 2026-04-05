@@ -254,10 +254,16 @@ export class KnowledgeSearcher {
               const andNoteIds = new Set(rows.map((r) => r.note.id));
               const OR_DISCOUNT = 0.8;
 
+              // Precompute noteId→index map to avoid O(n²) findIndex
+              const orNoteIdToIdx = new Map<number, number>();
+              for (let idx = 0; idx < orRows.length; idx++) {
+                orNoteIdToIdx.set(orRows[idx].note.id, idx);
+              }
+
               orSupplementResults = orRows
                 .filter(({ note }) => !andNoteIds.has(note.id))
                 .map(({ note }, _i) => {
-                  const origIdx = orRows.findIndex((r) => r.note.id === note.id);
+                  const origIdx = orNoteIdToIdx.get(note.id)!;
                   const normalized =
                     orRange > 0 ? (orAdjustedRanks[origIdx] - orMinRank) / orRange : 0;
                   const score = (1 - normalized) * OR_DISCOUNT;
