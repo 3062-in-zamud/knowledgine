@@ -58,9 +58,7 @@ export class KnowledgeSearcher {
     this.graphRepository = graphRepository;
 
     // ミスマッチ検出: DBに保存されているモデル名と現在のDEFAULT_MODEL_NAMEを比較
-    const storedModels = repository
-      .getEmbeddingModelNames()
-      .filter((m) => m !== null && m !== undefined);
+    const storedModels = repository.getEmbeddingModelNames();
     if (storedModels.length > 0 && storedModels.some((m) => m !== DEFAULT_MODEL_NAME)) {
       const oldModels = storedModels.filter((m) => m !== DEFAULT_MODEL_NAME);
       this.embeddingModelMismatchWarning =
