@@ -189,7 +189,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
   const ingestedNoteIds: number[] = [];
 
   /** Plugins with these schemes accept filesystem paths directly */
-  const FILE_COMPATIBLE_SCHEMES = new Set(["file://", "git://"]);
+  const FILE_COMPATIBLE_SCHEMES = new Set(["file://", "git://", "obsidian://"]);
 
   try {
     if (options.all) {
