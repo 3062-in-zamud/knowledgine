@@ -17,6 +17,12 @@ const DEPENDABOT_SUBJECT_PATTERNS = [
   /^bump\s+\S+\s+from\s+/i,
 ];
 
+const BUNDLE_COMMIT_PATTERNS = [
+  /^Bundle\s+\d{4}-W\d+/i,
+  /^Merge\s+\d+\s+commits?\b/i,
+  /^Auto-?merge\b/i,
+];
+
 const DEFAULT_BOT_AUTHORS = ["dependabot[bot]", "renovate[bot]"];
 
 const DEFAULT_SHORT_MESSAGE_THRESHOLD = 10;
@@ -74,6 +80,10 @@ export class NoiseFilter {
     return subject.trim().length < this.shortMessageThreshold;
   }
 
+  isBundleCommit(subject: string): boolean {
+    return BUNDLE_COMMIT_PATTERNS.some((re) => re.test(subject));
+  }
+
   classify(subject: string, author: string, changedPaths: string[]): NoiseLevel {
     if (this.compiledExcludeMatcher && changedPaths.length > 0) {
       if (changedPaths.every((p) => this.compiledExcludeMatcher!(p))) return "noise";
@@ -88,8 +98,19 @@ export class NoiseFilter {
 
     if (this.isI18nOnlyCommit(changedPaths)) return "noise";
     if (this.isDependabotCommit(subject, author)) return "low-value";
+    if (this.isBundleCommit(subject)) return "low-value";
     if (this.isShortCommitMessage(subject)) return "low-value";
     return "normal";
+  }
+
+  classifyWithConfidence(
+    subject: string,
+    author: string,
+    changedPaths: string[],
+  ): { level: NoiseLevel; confidence: number } {
+    const level = this.classify(subject, author, changedPaths);
+    const confidence = level === "noise" ? 0.0 : level === "low-value" ? 0.3 : 1.0;
+    return { level, confidence };
   }
 }
 
@@ -131,4 +152,16 @@ export function classifyNoiseLevel(
   relatedPaths: string[],
 ): NoiseLevel {
   return defaultFilter.classify(subject, author, relatedPaths);
+}
+
+export function classifyWithConfidence(
+  subject: string,
+  author: string,
+  relatedPaths: string[],
+): { level: NoiseLevel; confidence: number } {
+  return defaultFilter.classifyWithConfidence(subject, author, relatedPaths);
+}
+
+export function isBundleCommit(subject: string): boolean {
+  return defaultFilter.isBundleCommit(subject);
 }

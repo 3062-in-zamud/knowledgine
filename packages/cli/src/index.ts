@@ -70,13 +70,18 @@ program
   .option("-y, --yes", "Automatically answer yes to all prompts")
   .option("--save-config", "Save defaultPath to .knowledginerc.json in current directory")
   .option("--verbose", "Show details of errors and skipped items")
+  .option("--github [repo]", "Show GitHub integration guide")
   .addHelpText(
     "after",
     `
 Examples:
   knowledgine init --path ~/notes
   knowledgine init --path ~/project --semantic
-  knowledgine init --demo`,
+  knowledgine init --demo
+
+GitHub integration:
+  knowledgine ingest --source github --repo <owner/repo>
+  knowledgine ingest --source github --repo <owner/repo> --limit 500`,
   )
   .action(initCommand);
 

@@ -44,6 +44,7 @@ export interface KnowledgeData {
   updatedAt?: string;
   /** JSON blob for code location info (file path, line, side) */
   codeLocationJson?: string;
+  confidence?: number;
 }
 
 /** Fallback information when AND→OR expansion is used */

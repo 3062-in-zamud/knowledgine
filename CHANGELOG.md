@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-04-05
+
+### Added
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **Bundle commit noise classification**: Detect "Bundle YYYY-WNN", "Merge N commits", and "Auto-merge" patterns as low-value. New `classifyWithConfidence()` API returns both noise level and numeric confidence (0.0/0.3/1.0)
+- **Note confidence column**: Migration 016 adds `confidence REAL DEFAULT 1.0` to `knowledge_notes` for filtering low-value notes from embedding generation
+
+#### CLI (`@knowledgine/cli`)
+
+- **`init --github` discoverability**: `--github [repo]` flag prints the correct `ingest --source github --repo` command and exits. Help text includes GitHub integration examples
+
+### Changed
+
+#### Core — search (`@knowledgine/core`)
+
+- **FTS5 compound query relaxation**: AND-to-OR fallback threshold lowered from `=== 0` to `< 3`. When AND returns 1-2 results, OR supplements are merged with 0.8x score discount, respecting the `limit` contract
+- **Hybrid adaptive alpha**: Detect flattened semantic scores (top-5 spread < 5%) and shift alpha from 0.3 to 0.7 (keyword-heavy). CJK alpha=1.0 path is unaffected
+
+### Fixed
+
+#### Core — storage (`@knowledgine/core`)
+
+- **Low-confidence embedding exclusion**: `getNotesWithoutEmbeddingIds()` filters notes with confidence <= 0.3, preventing dependency-update PRs and bundle commits from polluting semantic search results
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **Preserve plugin confidence**: `IngestEngine` only sets confidence when not already provided by the plugin, preserving plugin-specific scoring
+
+#### CLI (`@knowledgine/cli`)
+
+- **`ingest --all` URI scheme fix**: Skip plugins requiring URI schemes (github, cicd, sessions) when `--all` passes filesystem paths. Obsidian plugin is correctly treated as file-compatible
+
 ## [0.6.5] - 2026-04-05
 
 ### Changed
@@ -554,7 +588,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Configurable watch patterns and ignore patterns
 - Graceful shutdown handling (SIGINT/SIGTERM)
 
-[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.5...HEAD
+[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.6...HEAD
+[0.6.6]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.2...v0.6.3
