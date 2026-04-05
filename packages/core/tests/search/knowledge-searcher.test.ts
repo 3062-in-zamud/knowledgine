@@ -163,28 +163,34 @@ describe("KnowledgeSearcher", () => {
       // OR should additionally match typescript-guide.md (TypeScript only)
       const results = await searcher.search({ query: "TypeScript debugging" });
       expect(results.length).toBeGreaterThan(0);
-      // Verify that results include notes from different sources
-      const hasOrSupplement = results.some((r) => r.fellBack === true);
-      const hasAndResult = results.some((r) => !r.fellBack);
-      // At least AND result should exist
-      if (results.length >= 2) {
-        // When both AND and OR results are present, both types should appear
-        expect(hasAndResult || hasOrSupplement).toBe(true);
+      // Must have at least one result (AND or OR)
+      const orResults = results.filter((r) => r.fellBack === true);
+      const andResults = results.filter((r) => !r.fellBack);
+      // When the OR supplement path is triggered, verify structure
+      if (orResults.length > 0) {
+        // OR results must have fallbackInfo with the supplement reason
+        for (const r of orResults) {
+          expect(r.fallbackInfo).toBeDefined();
+          expect(r.fallbackInfo!.reason).toMatch(/insufficient|expanded/);
+          expect(r.fallbackInfo!.modeUsed).toBe("keyword");
+        }
       }
+      // At least some results should exist regardless of path taken
+      expect(andResults.length + orResults.length).toBeGreaterThan(0);
     });
 
     it("should apply 0.8x discount to OR-only supplement results", async () => {
-      // Use a query that triggers the supplement path
       const results = await searcher.search({ query: "TypeScript debugging" });
       const orResults = results.filter((r) => r.fellBack === true);
       const andResults = results.filter((r) => !r.fellBack);
-      // OR-supplemented results should have lower scores due to 0.8x discount
       if (orResults.length > 0 && andResults.length > 0) {
         const maxOrScore = Math.max(...orResults.map((r) => r.score));
         const maxAndScore = Math.max(...andResults.map((r) => r.score));
-        // OR results should generally score lower than AND results
+        // OR results must score lower than AND results (0.8x discount)
         expect(maxOrScore).toBeLessThanOrEqual(maxAndScore);
       }
+      // Always verify result count respects the limit contract
+      expect(results.length).toBeLessThanOrEqual(20); // default limit
     });
   });
 
