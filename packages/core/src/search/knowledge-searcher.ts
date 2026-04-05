@@ -383,6 +383,11 @@ export class KnowledgeSearcher {
         results.push(...orSupplementResults);
         results.sort((a, b) => b.score - a.score);
       }
+
+      // Preserve the search({ limit }) contract after merging supplements
+      if (results.length > limit) {
+        results.splice(limit);
+      }
     }
 
     // agentic モード: LLMベース ReasoningReranker を使用
