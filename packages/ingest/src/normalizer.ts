@@ -88,6 +88,7 @@ export function normalizeToKnowledgeData(event: NormalizedEvent): KnowledgeData 
     },
     createdAt: event.timestamp.toISOString(),
     ...(codeLocationJson !== undefined ? { codeLocationJson } : {}),
+    ...(event.metadata.confidence !== undefined ? { confidence: event.metadata.confidence } : {}),
   };
 }
 

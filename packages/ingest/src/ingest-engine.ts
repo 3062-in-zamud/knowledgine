@@ -15,6 +15,7 @@ import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
 import { getHeapUsageRatio, getAdaptiveBatchSize } from "./heap-monitor.js";
 import picomatch from "picomatch";
+import { classifyWithConfidence } from "./noise-filter.js";
 
 const DEFAULT_BATCH_SIZE = 50;
 
@@ -148,6 +149,19 @@ export class IngestEngine {
             `  [skip] large diff (metadata only): ${event.sourceUri} — ${event.title}\n`,
           );
         }
+      }
+      // Set confidence based on noise classification for commit events
+      if (
+        event.eventType === "commit" ||
+        event.eventType === "discussion" ||
+        event.eventType === "review"
+      ) {
+        const { confidence } = classifyWithConfidence(
+          event.title,
+          event.metadata.author ?? "",
+          event.relatedPaths ?? [],
+        );
+        event.metadata.confidence = confidence;
       }
       batch.push(event);
       processedPaths.add(event.sourceUri);

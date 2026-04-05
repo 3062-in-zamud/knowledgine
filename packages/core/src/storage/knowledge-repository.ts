@@ -22,13 +22,14 @@ export interface KnowledgeNote {
   // migration 009: extraction metadata
   extracted_at: string | null;
   code_location_json: string | null;
+  confidence: number | null;
 }
 
 export type KnowledgeNoteSummary = Omit<KnowledgeNote, "content" | "frontmatter_json">;
 
 const SUMMARY_COLUMNS = `id, file_path, title, created_at, updated_at, content_hash,
   version, supersedes, valid_from, deprecated, deprecation_reason,
-  extracted_at, code_location_json`;
+  extracted_at, code_location_json, confidence`;
 
 export interface ExtractedPatternRow {
   id: number;
@@ -160,7 +161,8 @@ export class KnowledgeRepository {
           `
           UPDATE knowledge_notes
           SET title = ?, content = ?, frontmatter_json = ?,
-              updated_at = ?, content_hash = ?, code_location_json = ?
+              updated_at = ?, content_hash = ?, code_location_json = ?,
+              confidence = ?
           WHERE id = ?
         `,
         ).run(
@@ -170,6 +172,7 @@ export class KnowledgeRepository {
           now,
           contentHash,
           codeLocationJson,
+          data.confidence ?? existing.confidence ?? 1.0,
           existing.id,
         );
         this.clearResultCache();
@@ -179,8 +182,9 @@ export class KnowledgeRepository {
           `
           INSERT INTO knowledge_notes (
             file_path, title, content, frontmatter_json,
-            created_at, updated_at, content_hash, code_location_json
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            created_at, updated_at, content_hash, code_location_json,
+            confidence
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         ).run(
           data.filePath,
@@ -191,6 +195,7 @@ export class KnowledgeRepository {
           now,
           contentHash,
           codeLocationJson,
+          data.confidence ?? 1.0,
         );
         this.clearResultCache();
         return Number(info.lastInsertRowid);
@@ -1027,7 +1032,7 @@ export class KnowledgeRepository {
    */
   getNotesWithoutEmbeddingIds(): number[] {
     return this.stmt(
-      "SELECT n.id FROM knowledge_notes n WHERE NOT EXISTS (SELECT 1 FROM note_embeddings e WHERE e.note_id = n.id)",
+      "SELECT n.id FROM knowledge_notes n WHERE NOT EXISTS (SELECT 1 FROM note_embeddings e WHERE e.note_id = n.id) AND (n.confidence IS NULL OR n.confidence > 0.3)",
     )
       .pluck()
       .all() as number[];
