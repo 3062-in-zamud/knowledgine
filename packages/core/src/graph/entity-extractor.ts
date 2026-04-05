@@ -363,10 +363,8 @@ export class EntityExtractor {
     const rules = this.rules!;
 
     // 1. Filter out blacklisted entities (normalize both sides for matching)
-    const normalizedBlacklist = rules.entityBlacklist.map(normalizeEntityName);
-    let filtered = entities.filter(
-      (e) => !normalizedBlacklist.includes(normalizeEntityName(e.name)),
-    );
+    const normalizedBlacklist = new Set(rules.entityBlacklist.map(normalizeEntityName));
+    let filtered = entities.filter((e) => !normalizedBlacklist.has(normalizeEntityName(e.name)));
 
     // 2. Apply type overrides
     filtered = filtered.map((e) => {
