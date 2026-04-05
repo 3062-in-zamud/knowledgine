@@ -155,8 +155,12 @@ export class KnowledgeSearcher {
         dateTo,
       );
 
-      // AND→OR fallback: if AND (default) returns 0 results, try OR
-      if (rows.length === 0) {
+      // AND→OR fallback: if AND results are insufficient (< 3), supplement with OR
+      // When rows.length === 0: full OR fallback (original behavior)
+      // When 0 < rows.length < 3: merge AND results with OR-only results (0.8x discount)
+      let orSupplementResults: SearchResult[] | undefined;
+
+      if (rows.length < 3) {
         const terms = query.trim().split(/\s+/);
         if (terms.length > 1 && !query.includes(" OR ")) {
           const orQuery = terms.join(" OR ");
@@ -190,63 +194,98 @@ export class KnowledgeSearcher {
             const orMaxRank = Math.max(...orAdjustedRanks);
             const orRange = orMaxRank - orMinRank;
 
-            results = orRows.map(({ note }, i) => {
-              const normalized = orRange > 0 ? (orAdjustedRanks[i] - orMinRank) / orRange : 0;
-              const score = 1 - normalized;
-              return {
-                note,
-                score,
-                matchReason: [`キーワード一致 (OR): "${orQuery}"`],
-                fellBack: true,
-                fallbackInfo: {
-                  reason: `No results for AND query "${query}" — expanded to OR`,
-                  modeUsed: "keyword" as const,
-                  originalMode: "keyword",
-                },
-              };
-            });
+            if (rows.length === 0) {
+              // Original behavior: OR results only (no AND results to compare)
+              results = orRows.map(({ note }, i) => {
+                const normalized = orRange > 0 ? (orAdjustedRanks[i] - orMinRank) / orRange : 0;
+                const score = 1 - normalized;
+                return {
+                  note,
+                  score,
+                  matchReason: [`キーワード一致 (OR): "${orQuery}"`],
+                  fellBack: true,
+                  fallbackInfo: {
+                    reason: `No results for AND query "${query}" — expanded to OR`,
+                    modeUsed: "keyword" as const,
+                    originalMode: "keyword",
+                  },
+                };
+              });
 
-            results.sort((a, b) => b.score - a.score);
+              results.sort((a, b) => b.score - a.score);
 
-            // Skip normal keyword processing, jump to reranking
-            if (agentic && results.length > 0) {
-              const reranked = await this.agenticReranker.rerank(query, results);
-              return reranked.map((r) => ({
-                note: r.note,
-                score: r.score,
-                matchReason: [
-                  ...r.matchReason,
-                  ...(r.reasoning ? [`LLM推論: ${r.reasoning}`] : []),
-                ],
-                fellBack: true,
-                fallbackInfo: results.find((orig) => orig.note.id === r.note.id)?.fallbackInfo,
-              }));
+              // Skip normal keyword processing, jump to reranking
+              if (agentic && results.length > 0) {
+                const reranked = await this.agenticReranker.rerank(query, results);
+                return reranked.map((r) => ({
+                  note: r.note,
+                  score: r.score,
+                  matchReason: [
+                    ...r.matchReason,
+                    ...(r.reasoning ? [`LLM推論: ${r.reasoning}`] : []),
+                  ],
+                  fellBack: true,
+                  fallbackInfo: results.find((orig) => orig.note.id === r.note.id)?.fallbackInfo,
+                }));
+              }
+
+              if (rerank && results.length > 0) {
+                const currentReranker = rerankWeights
+                  ? new ReasoningReranker(undefined, this.repository, rerankWeights)
+                  : this.reranker;
+                const rerankInputs = results.map((r) => ({
+                  note: r.note,
+                  baseScore: r.score,
+                  matchReason: r.matchReason,
+                }));
+                const reranked = await currentReranker.rerankLegacy(rerankInputs, { query });
+                return reranked.map((r) => ({
+                  note: r.note,
+                  score: r.finalScore,
+                  matchReason: r.matchReason,
+                  fellBack: true,
+                  fallbackInfo: results.find((orig) => orig.note.id === r.note.id)?.fallbackInfo,
+                }));
+              }
+
+              return results;
+            } else {
+              // AND has 1-2 results: build OR-only supplement (deduped, 0.8x discount)
+              const andNoteIds = new Set(rows.map((r) => r.note.id));
+              const OR_DISCOUNT = 0.8;
+
+              // Precompute noteId→index map to avoid O(n²) findIndex
+              const orNoteIdToIdx = new Map<number, number>();
+              for (let idx = 0; idx < orRows.length; idx++) {
+                orNoteIdToIdx.set(orRows[idx].note.id, idx);
+              }
+
+              orSupplementResults = orRows
+                .filter(({ note }) => !andNoteIds.has(note.id))
+                .map(({ note }, _i) => {
+                  const origIdx = orNoteIdToIdx.get(note.id)!;
+                  const normalized =
+                    orRange > 0 ? (orAdjustedRanks[origIdx] - orMinRank) / orRange : 0;
+                  const score = (1 - normalized) * OR_DISCOUNT;
+                  return {
+                    note,
+                    score,
+                    matchReason: [`キーワード一致 (OR): "${orQuery}"`],
+                    fellBack: true,
+                    fallbackInfo: {
+                      reason: `AND results insufficient (${rows.length}) — supplemented with OR`,
+                      modeUsed: "keyword" as const,
+                      originalMode: "keyword",
+                    },
+                  };
+                });
             }
-
-            if (rerank && results.length > 0) {
-              const currentReranker = rerankWeights
-                ? new ReasoningReranker(undefined, this.repository, rerankWeights)
-                : this.reranker;
-              const rerankInputs = results.map((r) => ({
-                note: r.note,
-                baseScore: r.score,
-                matchReason: r.matchReason,
-              }));
-              const reranked = await currentReranker.rerankLegacy(rerankInputs, { query });
-              return reranked.map((r) => ({
-                note: r.note,
-                score: r.finalScore,
-                matchReason: r.matchReason,
-                fellBack: true,
-                fallbackInfo: results.find((orig) => orig.note.id === r.note.id)?.fallbackInfo,
-              }));
-            }
-
-            return results;
           }
         }
 
-        return [];
+        if (rows.length === 0) {
+          return [];
+        }
       }
 
       const adjustedRanks = rows.map(({ note, rank }) => {
@@ -343,6 +382,17 @@ export class KnowledgeSearcher {
         } catch {
           // Entity boost is non-critical — silently continue
         }
+      }
+
+      // Append OR supplement results (when AND had 1-2 results)
+      if (orSupplementResults && orSupplementResults.length > 0) {
+        results.push(...orSupplementResults);
+        results.sort((a, b) => b.score - a.score);
+      }
+
+      // Preserve the search({ limit }) contract after merging supplements
+      if (results.length > limit) {
+        results.splice(limit);
       }
     }
 

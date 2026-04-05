@@ -15,6 +15,7 @@ import { CursorStore } from "./cursor-store.js";
 import { EventWriter } from "./event-writer.js";
 import { getHeapUsageRatio, getAdaptiveBatchSize } from "./heap-monitor.js";
 import picomatch from "picomatch";
+import { classifyWithConfidence } from "./noise-filter.js";
 
 const DEFAULT_BATCH_SIZE = 50;
 
@@ -148,6 +149,21 @@ export class IngestEngine {
             `  [skip] large diff (metadata only): ${event.sourceUri} — ${event.title}\n`,
           );
         }
+      }
+      // Set confidence based on noise classification for ingested events (commit/discussion/review).
+      // Only set if not already provided by the plugin (preserve plugin-specific scoring).
+      if (
+        event.metadata.confidence === undefined &&
+        (event.eventType === "commit" ||
+          event.eventType === "discussion" ||
+          event.eventType === "review")
+      ) {
+        const { confidence } = classifyWithConfidence(
+          event.title,
+          event.metadata.author ?? "",
+          event.relatedPaths ?? [],
+        );
+        event.metadata.confidence = confidence;
       }
       batch.push(event);
       processedPaths.add(event.sourceUri);

@@ -92,6 +92,7 @@ export { migration012 } from "./storage/migrations/012_fts_trigram_cjk.js";
 export { migration013 } from "./storage/migrations/013_unknown_entity_type.js";
 export { migration014 } from "./storage/migrations/014_entity_normalization.js";
 export { migration015 } from "./storage/migrations/015_embedding_format_version.js";
+export { migration016 } from "./storage/migrations/016_note_confidence.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -120,6 +121,7 @@ import { migration012 } from "./storage/migrations/012_fts_trigram_cjk.js";
 import { migration013 } from "./storage/migrations/013_unknown_entity_type.js";
 import { migration014 } from "./storage/migrations/014_entity_normalization.js";
 import { migration015 } from "./storage/migrations/015_embedding_format_version.js";
+import { migration016 } from "./storage/migrations/016_note_confidence.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -139,6 +141,7 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration013,
   migration014,
   migration015,
+  migration016,
 ];
 
 // Provenance
