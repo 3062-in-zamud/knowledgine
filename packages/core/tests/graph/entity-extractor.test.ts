@@ -247,6 +247,41 @@ main/examples is just a directory listing
     });
   });
 
+  describe("file path stripping (KNOW-361)", () => {
+    it("does not extract entities from file path strings", () => {
+      const content = "Edit src/components/Button.tsx for the fix";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "components")).toBeUndefined();
+      expect(entities.find((e) => e.name === "button")).toBeUndefined();
+    });
+
+    it("does not extract entities from deep file paths", () => {
+      const content = "See packages/core/src/graph/entity-extractor.ts for details";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "graph")).toBeUndefined();
+    });
+
+    it("preserves tech names like Next.js Vue.js Node.js (no slash)", () => {
+      const content = "We use Next.js and Vue.js with Node.js runtime";
+      const entities = extractor.extract(content);
+      // stripFilePaths requires at least one slash, so "Next.js" etc. are not removed.
+      // These are not in TECH_DICTIONARY so won't be extracted as entities,
+      // but we verify the extraction process completes without error and that
+      // no path-segment-like entity is spuriously created from them.
+      const names = entities.map((e) => e.name);
+      expect(names).not.toContain("next");
+      expect(names).not.toContain("vue");
+      expect(names).not.toContain("node");
+    });
+
+    it("does not extract path segments like hooks and layouts as org/repo", () => {
+      const content = "Updated hooks/useAuth.ts and layouts/Main.tsx recently";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "hooks")).toBeUndefined();
+      expect(entities.find((e) => e.name === "layouts")).toBeUndefined();
+    });
+  });
+
   describe("entity type inference improvement (KNOW-362)", () => {
     it("should not classify sandbox as person", () => {
       const content = "Using @sandbox for testing";
@@ -333,6 +368,37 @@ main/examples is just a directory listing
         expect(entity?.entityType).not.toBe("person");
         expect(entity?.entityType).not.toBe("unknown");
       }
+    });
+  });
+
+  describe("conservative entity classification (KNOW-362)", () => {
+    it("does not extract generic words from markdown links as technology", () => {
+      const content = "See [data](https://example.com) for more info";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "data")).toBeUndefined();
+    });
+
+    it("extracts known tech names from markdown links as technology", () => {
+      const content = "We use [React](https://reactjs.org) for the frontend";
+      const entities = extractor.extract(content);
+      const react = entities.find((e) => e.name === "react");
+      expect(react).toBeDefined();
+      expect(react?.entityType).toBe("technology");
+    });
+
+    it("extracts PostgreSQL from markdown links as technology", () => {
+      const content = "Backed by [PostgreSQL](https://postgresql.org)";
+      const entities = extractor.extract(content);
+      const pg = entities.find((e) => e.name === "postgresql");
+      expect(pg).toBeDefined();
+      expect(pg?.entityType).toBe("technology");
+    });
+
+    it("markdown links are extracted before stripMarkdownSyntax removes them", () => {
+      const content = "Using [Docker](https://docker.com) and [Kubernetes](https://kubernetes.io)";
+      const entities = extractor.extract(content);
+      expect(entities.find((e) => e.name === "docker")).toBeDefined();
+      expect(entities.find((e) => e.name === "kubernetes")).toBeDefined();
     });
   });
 

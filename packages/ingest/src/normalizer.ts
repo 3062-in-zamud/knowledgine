@@ -23,6 +23,8 @@ const SECRET_PATTERNS: RegExp[] = [
   // GitHub tokens: ghp_ (PAT), gho_ (OAuth), ghu_ (user-to-server), ghs_ (server), ghr_ (refresh) — already covered above by gh[pousr]_
   // Slack tokens (xoxp-, xoxs-, xoxa-, xoxr-)
   /xox[poras]-[A-Za-z0-9-]+/g,
+  // Authorization headers (Bearer, Basic, Token)
+  /Authorization:\s*(?:Bearer|Basic|Token)\s+[^\s'")\]]{1,512}/gi,
 ];
 
 export function sanitizeContent(content: string): string {
