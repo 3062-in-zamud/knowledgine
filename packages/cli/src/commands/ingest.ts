@@ -188,6 +188,9 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
   const startTime = Date.now();
   const ingestedNoteIds: number[] = [];
 
+  /** Plugins with these schemes accept filesystem paths directly */
+  const FILE_COMPATIBLE_SCHEMES = new Set(["file://", "git://"]);
+
   try {
     if (options.all) {
       const plugins = registry.list();
@@ -202,6 +205,19 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
         if (initResult && !initResult.ok) {
           console.error(
             `  ${symbols.info} ${colors.hint(plugin.manifest.id)} skipped (init failed: ${initResult.error})`,
+          );
+          completed++;
+          progress.update(completed, plugin.manifest.id);
+          continue;
+        }
+
+        // Skip plugins that require URI schemes (e.g. github://, cicd://)
+        const isFileCompatible = plugin.manifest.schemes.some((s: string) =>
+          FILE_COMPATIBLE_SCHEMES.has(s),
+        );
+        if (!isFileCompatible) {
+          console.error(
+            `  ${symbols.info} ${colors.hint(plugin.manifest.id)} skipped (requires explicit --source)`,
           );
           completed++;
           progress.update(completed, plugin.manifest.id);
