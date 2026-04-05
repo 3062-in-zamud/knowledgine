@@ -82,6 +82,18 @@ export class HybridSearcher {
       }
     }
 
+    // Detect flattened semantic scores → shift alpha toward keyword
+    const vecScores = [...vecMap.values()].sort((a, b) => b - a);
+    const semanticSpread =
+      vecScores.length >= 2 ? vecScores[0] - vecScores[Math.min(4, vecScores.length - 1)] : 1.0; // Single or no result → assume good spread
+
+    let finalAlpha = effectiveAlpha;
+    if (effectiveAlpha < 1.0) {
+      // Only adjust when semantic search is active
+      const adaptiveAlpha = semanticSpread < 0.05 ? 0.7 : 0.5;
+      finalAlpha = Math.max(effectiveAlpha, adaptiveAlpha);
+    }
+
     // 全ノートIDを統合
     const allIds = new Set([...ftsMap.keys(), ...vecMap.keys()]);
 
@@ -89,7 +101,7 @@ export class HybridSearcher {
     for (const noteId of allIds) {
       const ftsScore = ftsMap.get(noteId) ?? 0;
       const vecScore = vecMap.get(noteId) ?? 0;
-      const finalScore = effectiveAlpha * ftsScore + (1 - effectiveAlpha) * vecScore;
+      const finalScore = finalAlpha * ftsScore + (1 - finalAlpha) * vecScore;
       scored.push({ noteId, score: finalScore });
     }
 

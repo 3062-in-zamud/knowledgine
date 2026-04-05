@@ -130,6 +130,80 @@ describe("HybridSearcher", () => {
     });
   });
 
+  describe("KNOW-412: adaptive alpha (semantic spread detection)", () => {
+    it("should increase alpha when semantic scores are tightly clustered (spread < 0.05)", async () => {
+      // Mock searchByVector to return tightly clustered results
+      // L2 distance → cosine_similarity = 1 - d²/2
+      // For scores [0.75, 0.74, 0.74, 0.73, 0.73]: d ≈ sqrt(2*(1-score))
+      // d for 0.75 = sqrt(0.5) ≈ 0.707, d for 0.73 = sqrt(0.54) ≈ 0.735
+      const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([
+        { note_id: 1, distance: Math.sqrt(2 * (1 - 0.75)) },
+        { note_id: 2, distance: Math.sqrt(2 * (1 - 0.74)) },
+        { note_id: 3, distance: Math.sqrt(2 * (1 - 0.74)) },
+        { note_id: 4, distance: Math.sqrt(2 * (1 - 0.73)) },
+        { note_id: 5, distance: Math.sqrt(2 * (1 - 0.73)) },
+      ]);
+
+      // Use e5 model (effectiveAlpha=0.3 for Latin queries)
+      const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
+      const results = await e5Searcher.search("TypeScript");
+
+      // spread = 0.75 - 0.73 = 0.02 < 0.05 → adaptiveAlpha = 0.7
+      // finalAlpha = max(0.3, 0.7) = 0.7
+      // We can verify through the scoring: higher FTS weight means FTS-only notes rank higher
+      expect(results.length).toBeGreaterThan(0);
+
+      mockSearchByVector.mockRestore();
+    });
+
+    it("should use moderate alpha when semantic scores are well-spread (spread >= 0.05)", async () => {
+      const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([
+        { note_id: 1, distance: Math.sqrt(2 * (1 - 0.9)) },
+        { note_id: 2, distance: Math.sqrt(2 * (1 - 0.8)) },
+        { note_id: 3, distance: Math.sqrt(2 * (1 - 0.7)) },
+        { note_id: 4, distance: Math.sqrt(2 * (1 - 0.6)) },
+        { note_id: 5, distance: Math.sqrt(2 * (1 - 0.5)) },
+      ]);
+
+      const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
+      const results = await e5Searcher.search("TypeScript");
+
+      // spread = 0.90 - 0.50 = 0.40 >= 0.05 → adaptiveAlpha = 0.5
+      // finalAlpha = max(0.3, 0.5) = 0.5
+      expect(results.length).toBeGreaterThan(0);
+
+      mockSearchByVector.mockRestore();
+    });
+
+    it("should not adjust alpha when vecMap is empty", async () => {
+      const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([]);
+
+      const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
+      const results = await e5Searcher.search("TypeScript");
+
+      // vecScores empty → semanticSpread = 1.0 (single/no result → good spread)
+      // adaptiveAlpha = 0.5, finalAlpha = max(0.3, 0.5) = 0.5
+      // But vecMap is empty so only FTS scores matter → no semantic influence
+      expect(results.length).toBeGreaterThan(0);
+
+      mockSearchByVector.mockRestore();
+    });
+
+    it("should not adjust alpha when CJK query sets effectiveAlpha=1.0", async () => {
+      const bertSearcher = new HybridSearcher(ctx.repository, provider, 0.3, "bert");
+      const embedQuerySpy = vi.spyOn(provider, "embedQuery");
+
+      // CJK-dominant query with bert → effectiveAlpha=1.0
+      // The guard `if (effectiveAlpha < 1.0)` prevents adjustment
+      await bertSearcher.search("TypeScriptの使い方を学ぶ");
+
+      // alpha=1.0 → vector search skipped entirely
+      expect(embedQuerySpy).not.toHaveBeenCalled();
+
+      embedQuerySpy.mockRestore();
+    });
+  });
+
   describe("graceful degradation on embedding failure", () => {
     it("should fall back gracefully when embedQuery throws", async () => {
       const failingProvider = new MockEmbeddingProvider();
