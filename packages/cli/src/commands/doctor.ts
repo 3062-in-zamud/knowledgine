@@ -214,7 +214,7 @@ export function checkEmbeddingCoverage(dbPath: string): DiagnosticResult {
     };
   }
   try {
-    const db = createDatabase(dbPath);
+    const db = createDatabase(dbPath, { enableVec: true });
     try {
       new Migrator(db, ALL_MIGRATIONS).migrate();
       const repository = new KnowledgeRepository(db);
@@ -226,15 +226,16 @@ export function checkEmbeddingCoverage(dbPath: string): DiagnosticResult {
           message: "no notes indexed yet",
         };
       }
-      const withoutEmbeddings = repository.getNotesWithoutEmbeddingIds().length;
-      const withEmbeddings = stats.totalNotes - withoutEmbeddings;
+      const vectorStats = repository.getVectorIndexStats();
+      const withEmbeddings = vectorStats.vectorRows;
+      const withoutEmbeddings = stats.totalNotes - withEmbeddings;
       const coverage = Math.round((withEmbeddings / stats.totalNotes) * 100);
 
       // Determine correct fix command: if model exists, suggest ingest; otherwise, suggest upgrade
       const modelManager = new ModelManager();
       const modelExists = modelManager.isModelAvailable();
       const fixCommand = modelExists
-        ? "knowledgine ingest --all"
+        ? "knowledgine ingest --embed-missing"
         : "knowledgine upgrade --semantic";
 
       if (coverage === 100) {
