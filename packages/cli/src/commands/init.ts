@@ -34,6 +34,7 @@ export interface InitOptions {
   yes?: boolean;
   saveConfig?: boolean;
   verbose?: boolean;
+  github?: string | boolean;
 }
 
 /**
@@ -114,6 +115,24 @@ function formatSkipReason(reason: string): string {
 }
 
 export async function initCommand(options: InitOptions): Promise<void> {
+  // KNOW-414: Guide users who try --github to the correct command
+  if (options.github) {
+    const repo = typeof options.github === "string" ? options.github : "<owner/repo>";
+    console.error("");
+    console.error(
+      `  ${symbols.info} ${colors.info("GitHub integration is available via the ingest command:")}`,
+    );
+    console.error("");
+    console.error(`  ${symbols.arrow} knowledgine ingest --source github --repo ${repo}`);
+    console.error("");
+    console.error(`  Options:`);
+    console.error(`    --limit <n>     Limit number of items to ingest`);
+    console.error(`    --verbose       Show detailed progress`);
+    console.error(`    --path <dir>    Target directory (default: current directory)`);
+    console.error("");
+    return;
+  }
+
   const initStartTime = Date.now();
   let rootPath: string;
 
