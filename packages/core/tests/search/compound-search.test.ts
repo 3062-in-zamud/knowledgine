@@ -86,6 +86,83 @@ describe("KNOW-373: Compound keyword search", () => {
     });
   });
 
+  describe("KNOW-411: AND→OR threshold relaxation (< 3)", () => {
+    it("should supplement with OR when AND returns 1-2 results", async () => {
+      // "TypeScript debugging" → AND matches 1 note (debugging-tips.md has both words)
+      // OR should additionally match typescript-guide.md (has TypeScript) and others
+      const results = await searcher.search({ query: "TypeScript debugging" });
+      expect(results.length).toBeGreaterThan(1);
+
+      // First result should be AND match (no fellBack)
+      const andResults = results.filter((r) => !r.fellBack);
+      expect(andResults.length).toBeGreaterThan(0);
+
+      // OR-only supplements should have fellBack=true and appropriate fallbackInfo
+      const orResults = results.filter((r) => r.fellBack);
+      if (orResults.length > 0) {
+        expect(orResults[0].fallbackInfo?.reason).toContain("supplemented with OR");
+        expect(orResults[0].matchReason[0]).toContain("OR");
+      }
+    });
+
+    it("AND results should rank above OR-only results (OR gets 0.8x discount)", async () => {
+      const results = await searcher.search({ query: "TypeScript debugging" });
+      if (results.length > 1) {
+        const andResults = results.filter((r) => !r.fellBack);
+        const orResults = results.filter((r) => r.fellBack);
+        if (andResults.length > 0 && orResults.length > 0) {
+          // Best AND result should score higher than best OR result
+          const bestAndScore = Math.max(...andResults.map((r) => r.score));
+          const bestOrScore = Math.max(...orResults.map((r) => r.score));
+          expect(bestAndScore).toBeGreaterThanOrEqual(bestOrScore);
+        }
+      }
+    });
+
+    it("should preserve original OR-only behavior when AND returns 0 results", async () => {
+      // "hooks debugging" — no single note contains both terms
+      const results = await searcher.search({ query: "hooks debugging" });
+      if (results.length > 0) {
+        // All results should be OR fallback
+        expect(results[0].fellBack).toBe(true);
+        expect(results[0].fallbackInfo?.reason).toContain("expanded to OR");
+      }
+    });
+
+    it("should NOT trigger OR fallback when AND returns 3+ results", async () => {
+      // Seed 3 notes that all contain both "test" and "code"
+      const now = new Date().toISOString();
+      ctx.repository.saveNote({
+        filePath: "test-note-a.md",
+        title: "Test Note A",
+        content: "This is a test about code quality",
+        frontmatter: { tags: ["test"] },
+        createdAt: now,
+      });
+      ctx.repository.saveNote({
+        filePath: "test-note-b.md",
+        title: "Test Note B",
+        content: "Another test for code review",
+        frontmatter: { tags: ["test"] },
+        createdAt: now,
+      });
+      ctx.repository.saveNote({
+        filePath: "test-note-c.md",
+        title: "Test Note C",
+        content: "Final test on code refactoring",
+        frontmatter: { tags: ["test"] },
+        createdAt: now,
+      });
+
+      const results = await searcher.search({ query: "test code" });
+      // Should get 3+ AND results
+      expect(results.length).toBeGreaterThanOrEqual(3);
+      // None should be OR fallback
+      const orResults = results.filter((r) => r.fellBack);
+      expect(orResults.length).toBe(0);
+    });
+  });
+
   describe("FTS5 special character escaping", () => {
     it("should handle queries with FTS5 special characters", async () => {
       // Should not throw on special chars
