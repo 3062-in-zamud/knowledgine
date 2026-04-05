@@ -216,7 +216,9 @@ describe("repository not found helpers", () => {
   });
 
   it("should classify the raw GraphQL repository error", () => {
-    const error = new Error("GraphQL: Could not resolve to a Repository with the name 'owner/repo'.");
+    const error = new Error(
+      "GraphQL: Could not resolve to a Repository with the name 'owner/repo'.",
+    );
 
     expect(isRepositoryNotFoundError(error)).toBe(true);
   });
