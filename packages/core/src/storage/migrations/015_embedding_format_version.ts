@@ -10,13 +10,24 @@ export const migration015: Migration = {
   },
 
   down(db: Database.Database) {
-    // SQLite doesn't support DROP COLUMN before 3.35.0
-    // Recreate table without format_version
+    // SQLite < 3.35.0 doesn't support DROP COLUMN — recreate with original schema
+    db.pragma("foreign_keys = OFF");
     db.exec(`
-      CREATE TABLE note_embeddings_new AS SELECT note_id, embedding, model_name, dimensions, created_at, updated_at FROM note_embeddings;
+      CREATE TABLE note_embeddings_new (
+        note_id INTEGER PRIMARY KEY,
+        embedding BLOB NOT NULL,
+        model_name TEXT NOT NULL DEFAULT 'all-MiniLM-L6-v2',
+        dimensions INTEGER NOT NULL DEFAULT 384,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        FOREIGN KEY (note_id) REFERENCES knowledge_notes(id) ON DELETE CASCADE
+      );
+      INSERT INTO note_embeddings_new (note_id, embedding, model_name, dimensions, created_at, updated_at)
+        SELECT note_id, embedding, model_name, dimensions, created_at, updated_at FROM note_embeddings;
       DROP TABLE note_embeddings;
       ALTER TABLE note_embeddings_new RENAME TO note_embeddings;
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_note_embeddings_note ON note_embeddings(note_id);
+      CREATE INDEX idx_note_embeddings_model ON note_embeddings(model_name);
     `);
+    db.pragma("foreign_keys = ON");
   },
 };
