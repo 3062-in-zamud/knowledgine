@@ -72,14 +72,15 @@ export async function upgradeCommand(options: UpgradeOptions): Promise<void> {
   // Check for mixed models warning
   const consistency = repository.checkEmbeddingModelConsistency(DEFAULT_MODEL_NAME);
   if (!consistency.consistent) {
+    const oldModels = consistency.existingModels.filter((m) => m !== DEFAULT_MODEL_NAME);
     console.error(
       colors.warning(
-        `Warning: Existing embeddings use different model(s): ${consistency.existingModels.join(", ")}`,
+        `\u26a0 embeddingモデルが変更されています (${oldModels.join(", ")} \u2192 ${DEFAULT_MODEL_NAME})`,
       ),
     );
     console.error(
       colors.warning(
-        `Semantic search may produce incorrect results. Run 'knowledgine upgrade --reindex' to fix.`,
+        `  \`knowledgine upgrade --reindex\` を実行してembeddingを再生成してください。`,
       ),
     );
   }

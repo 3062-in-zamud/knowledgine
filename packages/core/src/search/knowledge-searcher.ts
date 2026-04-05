@@ -46,6 +46,7 @@ export class KnowledgeSearcher {
   private agenticReranker: ReasoningReranker;
   private orchestrator?: QueryOrchestrator;
   private graphRepository?: GraphRepository;
+  readonly embeddingModelMismatchWarning?: string;
 
   constructor(
     private repository: KnowledgeRepository,
@@ -55,6 +56,16 @@ export class KnowledgeSearcher {
     graphRepository?: GraphRepository,
   ) {
     this.graphRepository = graphRepository;
+
+    // ミスマッチ検出: DBに保存されているモデル名と現在のDEFAULT_MODEL_NAMEを比較
+    const storedModels = repository.getEmbeddingModelNames();
+    if (storedModels.length > 0 && storedModels.some((m) => m !== DEFAULT_MODEL_NAME)) {
+      const oldModels = storedModels.filter((m) => m !== DEFAULT_MODEL_NAME);
+      this.embeddingModelMismatchWarning =
+        `embeddingモデルが変更されています (${oldModels.join(", ")} → ${DEFAULT_MODEL_NAME})` +
+        ` — \`knowledgine upgrade --reindex\` を実行してembeddingを再生成してください。`;
+    }
+
     if (embeddingProvider) {
       this.semanticSearcher = new SemanticSearcher(repository, embeddingProvider);
       const modelFamily =

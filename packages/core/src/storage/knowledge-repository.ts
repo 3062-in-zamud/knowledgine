@@ -776,8 +776,19 @@ export class KnowledgeRepository {
           // Replace phrase placeholders
           const phMatch = t.match(/^__PHRASE_(\d+)__$/);
           if (phMatch) return phrases[parseInt(phMatch[1])];
-          // Escape FTS5 special characters in regular terms
-          return t.replace(/[*^"]/g, "");
+
+          // Escape FTS5 special characters consistently before any further transformation
+          const sanitizedToken = t.replace(/[*^"]/g, "");
+
+          // ハイフン/ドット含みの複合語はフレーズクエリに変換
+          if (/[-.]/.test(sanitizedToken)) {
+            const normalized = sanitizedToken.replace(/[-.]/g, " ").trim().replace(/\s+/g, " ");
+            if (normalized.includes(" ")) {
+              return `"${normalized}"`;
+            }
+          }
+
+          return sanitizedToken;
         })
         .join(" ");
     });
@@ -826,6 +837,7 @@ export class KnowledgeRepository {
         FROM knowledge_notes n
         JOIN ${ftsTable} fts ON n.id = fts.rowid
         WHERE ${ftsTable} MATCH ?
+        AND (n.confidence IS NULL OR n.confidence > 0.1)
         ${deprecatedFilter}
         ${dateFromFilter}
         ${dateToFilter}
@@ -864,7 +876,7 @@ export class KnowledgeRepository {
     if (dateTo) dateParams.push(dateTo);
 
     const fallbackRows = this.stmt(
-      `SELECT n.* FROM knowledge_notes n WHERE (n.title LIKE ? OR n.content LIKE ?) ${deprecatedClause} ${dateFromFilter} ${dateToFilter} LIMIT ?`,
+      `SELECT n.* FROM knowledge_notes n WHERE (n.title LIKE ? OR n.content LIKE ?) AND (n.confidence IS NULL OR n.confidence > 0.1) ${deprecatedClause} ${dateFromFilter} ${dateToFilter} LIMIT ?`,
     ).all(`%${query}%`, `%${query}%`, ...dateParams, limit) as Array<
       KnowledgeNote & { rank: number }
     >;
@@ -911,6 +923,7 @@ export class KnowledgeRepository {
         FROM knowledge_notes n
         JOIN ${ftsTable} fts ON n.id = fts.rowid
         WHERE ${ftsTable} MATCH ?
+        AND (n.confidence IS NULL OR n.confidence > 0.1)
         ${deprecatedFilter}
         ${dateFromFilter}
         ${dateToFilter}
@@ -1305,6 +1318,14 @@ export class KnowledgeRepository {
       .pluck()
       .all() as string[];
     return rows;
+  }
+
+  /**
+   * note_embeddingsテーブルに保存されている埋め込みモデル名の一覧を取得する。
+   * getExistingEmbeddingModelNames() に委譲（NOT NULLフィルタ付き）。
+   */
+  getEmbeddingModelNames(): string[] {
+    return this.getExistingEmbeddingModelNames();
   }
 
   /**
