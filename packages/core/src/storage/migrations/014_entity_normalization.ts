@@ -52,7 +52,7 @@ export const migration014: Migration = {
       }
     }
 
-    // Step 3: Remap FK references
+    // Step 3: Remap FK references — update first, then delete orphaned rows
     for (const [oldId, newId] of idMapping) {
       if (oldId !== newId) {
         db.prepare(
@@ -70,14 +70,18 @@ export const migration014: Migration = {
           newId,
           oldId,
         );
+        // Delete any rows that UPDATE OR IGNORE skipped (would violate UNIQUE)
+        db.prepare("DELETE FROM relations WHERE from_entity_id = ? OR to_entity_id = ?").run(
+          oldId,
+          oldId,
+        );
+        db.prepare("DELETE FROM observations WHERE entity_id = ?").run(oldId);
+        db.prepare("DELETE FROM entity_note_links WHERE entity_id = ?").run(oldId);
       }
     }
-    // Remove duplicate FK rows
-    db.exec(
-      "DELETE FROM relations WHERE rowid NOT IN (SELECT MIN(rowid) FROM relations GROUP BY from_entity_id, to_entity_id, relation_type)",
-    );
 
-    // Step 4: Swap tables, rebuild indexes and FTS
+    // Step 4: Disable FK enforcement during table swap to prevent CASCADE deletes
+    db.pragma("foreign_keys = OFF");
     db.exec(`
       DROP TRIGGER IF EXISTS entities_ai;
       DROP TRIGGER IF EXISTS entities_ad;
@@ -107,10 +111,12 @@ export const migration014: Migration = {
 
       INSERT INTO entities_fts(entities_fts) VALUES('rebuild');
     `);
+    db.pragma("foreign_keys = ON");
   },
 
   down(db: Database.Database) {
     // Revert: remove normalized_name column (data merging is irreversible)
+    db.pragma("foreign_keys = OFF");
     db.exec(`
       CREATE TABLE entities_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -141,5 +147,6 @@ export const migration014: Migration = {
       CREATE TRIGGER entities_au AFTER UPDATE ON entities BEGIN INSERT INTO entities_fts(entities_fts, rowid, name, description) VALUES ('delete', old.id, old.name, COALESCE(old.description, '')); INSERT INTO entities_fts(rowid, name, description) VALUES (new.id, new.name, COALESCE(new.description, '')); END;
       INSERT INTO entities_fts(entities_fts) VALUES('rebuild');
     `);
+    db.pragma("foreign_keys = ON");
   },
 };
