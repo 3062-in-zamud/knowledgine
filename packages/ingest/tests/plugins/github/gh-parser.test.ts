@@ -10,6 +10,8 @@ import {
   commentToNormalizedEvent,
   reviewToNormalizedEvent,
   parseReviewComments,
+  createRepositoryNotFoundError,
+  isRepositoryNotFoundError,
 } from "../../../src/plugins/github/gh-parser.js";
 import type { ParsedPR, ParsedIssue } from "../../../src/plugins/github/gh-parser.js";
 
@@ -202,6 +204,35 @@ describe("parseGitHubSourceUri", () => {
 
   it("should throw for URI missing repo", () => {
     expect(() => parseGitHubSourceUri("github://owner")).toThrow("Invalid GitHub source URI");
+  });
+});
+
+describe("repository not found helpers", () => {
+  it("should classify the dedicated repository not found error", () => {
+    const error = createRepositoryNotFoundError("owner", "repo");
+
+    expect(error.message).toBe("Repository 'owner/repo' not found.");
+    expect(isRepositoryNotFoundError(error)).toBe(true);
+  });
+
+  it("should classify the raw GraphQL repository error", () => {
+    const error = new Error(
+      "GraphQL: Could not resolve to a Repository with the name 'owner/repo'.",
+    );
+
+    expect(isRepositoryNotFoundError(error)).toBe(true);
+  });
+
+  it("should classify gh REST 404 responses as repository not found", () => {
+    const error = new Error("gh: Not Found (HTTP 404)");
+
+    expect(isRepositoryNotFoundError(error)).toBe(true);
+  });
+
+  it("should not classify unrelated network errors as repository not found", () => {
+    const error = new Error("socket hang up");
+
+    expect(isRepositoryNotFoundError(error)).toBe(false);
   });
 });
 

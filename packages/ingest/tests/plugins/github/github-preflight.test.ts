@@ -92,6 +92,21 @@ describe("GitHubPlugin preflight check (has_issues)", () => {
   });
 
   describe("ingestAll", () => {
+    it("should fail early with a friendly repository error when the repo does not exist", async () => {
+      mockedFetchRepoMeta.mockRejectedValue(
+        new Error("GraphQL: Could not resolve to a Repository with the name 'owner/repo'."),
+      );
+
+      const collect = async (): Promise<void> => {
+        for await (const _ of plugin.ingestAll("github://owner/repo")) {
+          // noop
+        }
+      };
+
+      await expect(collect()).rejects.toThrow("Repository 'owner/repo' not found.");
+      expect(mockedExecGh).not.toHaveBeenCalled();
+    });
+
     it("should skip issue loop when has_issues is false", async () => {
       mockedFetchRepoMeta.mockResolvedValue({
         has_issues: false,
@@ -183,6 +198,22 @@ describe("GitHubPlugin preflight check (has_issues)", () => {
   });
 
   describe("ingestIncremental", () => {
+    it("should fail early with a friendly repository error when the repo does not exist", async () => {
+      mockedFetchRepoMeta.mockRejectedValue(new Error("gh: Not Found (HTTP 404)"));
+
+      const collect = async (): Promise<void> => {
+        for await (const _ of plugin.ingestIncremental(
+          "github://owner/repo",
+          "2025-01-01T00:00:00Z",
+        )) {
+          // noop
+        }
+      };
+
+      await expect(collect()).rejects.toThrow("Repository 'owner/repo' not found.");
+      expect(mockedExecGh).not.toHaveBeenCalled();
+    });
+
     it("should skip issue loop when has_issues is false", async () => {
       mockedFetchRepoMeta.mockResolvedValue({
         has_issues: false,

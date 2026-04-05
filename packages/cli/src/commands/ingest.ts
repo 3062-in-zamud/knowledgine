@@ -21,7 +21,7 @@ import {
   OnnxEmbeddingProvider,
   buildEmbeddingInput,
 } from "@knowledgine/core";
-import { IngestEngine } from "@knowledgine/ingest";
+import { IngestEngine, isRepositoryNotFoundError } from "@knowledgine/ingest";
 import { createDefaultRegistry, initializePlugins } from "../lib/plugin-loader.js";
 import { createProgress, formatDuration, createSummaryReport } from "../lib/progress.js";
 import { colors, symbols } from "../lib/ui/index.js";
@@ -553,6 +553,13 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       }
     }
   } catch (error) {
+    if (options.source === "github" && options.repo && isRepositoryNotFoundError(error)) {
+      console.error(colors.error(`Error: Repository '${options.repo}' not found.`));
+      console.error("  Check the repository name and ensure you have access to it on GitHub.");
+      console.error("  Usage: knowledgine ingest --source github --repo owner/repo");
+      process.exitCode = 1;
+      return;
+    }
     console.error(
       colors.error(`Ingest failed: ${error instanceof Error ? error.message : String(error)}`),
     );
