@@ -195,8 +195,8 @@ describe("HybridSearcher", () => {
       const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
       const results = await e5Searcher.search("TypeScript");
 
-      // spread = 0.90 - 0.50 = 0.40 >= 0.05 → adaptiveAlpha = 0.5
-      // finalAlpha = max(0.3, 0.5) = 0.5 (balanced)
+      // spread = 0.90 - 0.50 = 0.40 >= 0.05 → 調整なし
+      // finalAlpha = 0.3（effectiveAlpha維持、semantic 70%重み）
       expect(results.length).toBeGreaterThan(0);
       // With well-spread semantic scores, semantic contribution is meaningful
       // Verify notes with high semantic scores rank near the top
@@ -213,8 +213,8 @@ describe("HybridSearcher", () => {
       const results = await e5Searcher.search("TypeScript");
 
       // vecScores empty → semanticSpread = 1.0 (single/no result → good spread)
-      // adaptiveAlpha = 0.5, finalAlpha = max(0.3, 0.5) = 0.5
-      // But vecMap is empty so only FTS scores matter → no semantic influence
+      // spread >= 0.05 → 調整なし、finalAlpha = 0.3
+      // vecMap is empty so only FTS scores matter → no semantic influence
       expect(results.length).toBeGreaterThan(0);
 
       mockSearchByVector.mockRestore();
