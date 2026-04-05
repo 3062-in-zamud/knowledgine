@@ -150,11 +150,13 @@ export class IngestEngine {
           );
         }
       }
-      // Set confidence based on noise classification for commit events
+      // Set confidence based on noise classification for commit/discussion/review events.
+      // Only set if not already provided by the plugin (preserve plugin-specific scoring).
       if (
-        event.eventType === "commit" ||
-        event.eventType === "discussion" ||
-        event.eventType === "review"
+        event.metadata.confidence === undefined &&
+        (event.eventType === "commit" ||
+          event.eventType === "discussion" ||
+          event.eventType === "review")
       ) {
         const { confidence } = classifyWithConfidence(
           event.title,
