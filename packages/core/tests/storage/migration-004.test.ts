@@ -48,27 +48,35 @@ describe("migration004: knowledge_graph", () => {
     expect(result).toBeDefined();
   });
 
-  it("should enforce UNIQUE constraint on entities (name, entity_type)", () => {
+  it("should enforce UNIQUE constraint on entities (normalized_name, entity_type)", () => {
     const now = new Date().toISOString();
     ctx.db
-      .prepare("INSERT INTO entities (name, entity_type, created_at) VALUES (?, ?, ?)")
-      .run("typescript", "technology", now);
+      .prepare(
+        "INSERT INTO entities (name, normalized_name, entity_type, created_at) VALUES (?, ?, ?, ?)",
+      )
+      .run("typescript", "typescript", "technology", now);
 
     expect(() => {
       ctx.db
-        .prepare("INSERT INTO entities (name, entity_type, created_at) VALUES (?, ?, ?)")
-        .run("typescript", "technology", now);
+        .prepare(
+          "INSERT INTO entities (name, normalized_name, entity_type, created_at) VALUES (?, ?, ?, ?)",
+        )
+        .run("typescript", "typescript", "technology", now);
     }).toThrow();
   });
 
   it("should enforce UNIQUE constraint on relations (from, to, type)", () => {
     const now = new Date().toISOString();
     ctx.db
-      .prepare("INSERT INTO entities (name, entity_type, created_at) VALUES (?, ?, ?)")
-      .run("entity-a", "technology", now);
+      .prepare(
+        "INSERT INTO entities (name, normalized_name, entity_type, created_at) VALUES (?, ?, ?, ?)",
+      )
+      .run("entity-a", "entity-a", "technology", now);
     ctx.db
-      .prepare("INSERT INTO entities (name, entity_type, created_at) VALUES (?, ?, ?)")
-      .run("entity-b", "project", now);
+      .prepare(
+        "INSERT INTO entities (name, normalized_name, entity_type, created_at) VALUES (?, ?, ?, ?)",
+      )
+      .run("entity-b", "entity-b", "project", now);
     const fromId = (
       ctx.db.prepare("SELECT id FROM entities WHERE name='entity-a'").get() as { id: number }
     ).id;

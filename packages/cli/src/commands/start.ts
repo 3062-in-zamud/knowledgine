@@ -17,6 +17,7 @@ import {
   ModelManager,
   DEFAULT_MODEL_NAME,
   checkSemanticReadiness,
+  buildEmbeddingInput,
 } from "@knowledgine/core";
 import { createKnowledgineMcpServer, StdioServerTransport } from "@knowledgine/mcp-server";
 import { indexFile } from "../lib/indexer.js";
@@ -228,7 +229,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
         if (embeddingProvider) {
           const note = repository.getNoteById(noteId);
           if (note) {
-            const embedding = await embeddingProvider.embed(note.content);
+            const embedding = await embeddingProvider.embed(buildEmbeddingInput(note));
             repository.saveEmbedding(noteId, embedding, config.embedding.modelName);
           }
         }
@@ -253,7 +254,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
         if (embeddingProvider) {
           const note = repository.getNoteById(noteId);
           if (note) {
-            const embedding = await embeddingProvider.embed(note.content);
+            const embedding = await embeddingProvider.embed(buildEmbeddingInput(note));
             repository.saveEmbedding(noteId, embedding, config.embedding.modelName);
           }
         }

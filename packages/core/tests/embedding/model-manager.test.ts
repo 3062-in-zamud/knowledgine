@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   ModelManager,
   MODEL_REGISTRY,
@@ -116,5 +116,40 @@ describe("ModelManager path methods", () => {
 
   it("should use DEFAULT_MODEL_NAME when no model specified", () => {
     expect(manager.getModelDir()).toContain(DEFAULT_MODEL_NAME);
+  });
+});
+
+describe("ModelManager.resolveDefaultModelsDir", () => {
+  const originalEnv = process.env.KNOWLEDGINE_MODELS_DIR;
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env.KNOWLEDGINE_MODELS_DIR;
+    } else {
+      process.env.KNOWLEDGINE_MODELS_DIR = originalEnv;
+    }
+  });
+
+  it("should use explicit modelsDir when provided", () => {
+    const manager = new ModelManager("/custom/models");
+    expect(manager.getModelDir(DEFAULT_MODEL_NAME)).toBe(
+      join("/custom/models", DEFAULT_MODEL_NAME),
+    );
+  });
+
+  it("should use KNOWLEDGINE_MODELS_DIR env var when set", () => {
+    process.env.KNOWLEDGINE_MODELS_DIR = "/env/override/models";
+    const resolved = ModelManager.resolveDefaultModelsDir();
+    expect(resolved).toBe("/env/override/models");
+  });
+
+  it("should resolve to a defined path when no env var is set", () => {
+    delete process.env.KNOWLEDGINE_MODELS_DIR;
+    const resolved = ModelManager.resolveDefaultModelsDir();
+    // Should be either pkg-relative (if model exists) or ~/.knowledgine/models/
+    expect(typeof resolved).toBe("string");
+    expect(resolved.length).toBeGreaterThan(0);
+    // Must end with "models" in the path
+    expect(resolved).toMatch(/models$/);
   });
 });

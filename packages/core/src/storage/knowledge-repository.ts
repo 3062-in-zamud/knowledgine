@@ -513,13 +513,14 @@ export class KnowledgeRepository {
         // note_embeddings テーブルに upsert
         this.stmt(
           `
-          INSERT INTO note_embeddings (note_id, embedding, model_name, dimensions, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT INTO note_embeddings (note_id, embedding, model_name, dimensions, created_at, updated_at, format_version)
+          VALUES (?, ?, ?, ?, ?, ?, 2)
           ON CONFLICT(note_id) DO UPDATE SET
             embedding = excluded.embedding,
             model_name = excluded.model_name,
             dimensions = excluded.dimensions,
-            updated_at = excluded.updated_at
+            updated_at = excluded.updated_at,
+            format_version = excluded.format_version
         `,
         ).run(noteId, embBuf, modelName, embedding.length, now, now);
 
@@ -558,13 +559,14 @@ export class KnowledgeRepository {
     const now = new Date().toISOString();
 
     const upsertStmt = this.stmt(`
-      INSERT INTO note_embeddings (note_id, embedding, model_name, dimensions, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO note_embeddings (note_id, embedding, model_name, dimensions, created_at, updated_at, format_version)
+      VALUES (?, ?, ?, ?, ?, ?, 2)
       ON CONFLICT(note_id) DO UPDATE SET
         embedding = excluded.embedding,
         model_name = excluded.model_name,
         dimensions = excluded.dimensions,
-        updated_at = excluded.updated_at
+        updated_at = excluded.updated_at,
+        format_version = excluded.format_version
     `);
     const vecDeleteStmt = vec0Available
       ? this.stmt("DELETE FROM note_embeddings_vec WHERE note_id = CAST(? AS INTEGER)")
