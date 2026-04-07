@@ -203,6 +203,44 @@ describe("classifyWithConfidence", () => {
   });
 });
 
+describe("isDependabotCommit - extended bot authors", () => {
+  it("should detect netlify[bot] as a bot author", () => {
+    expect(isDependabotCommit("deploy preview", "netlify[bot]")).toBe(true);
+  });
+
+  it("should detect vercel[bot] as a bot author", () => {
+    expect(isDependabotCommit("deploy preview", "vercel[bot]")).toBe(true);
+  });
+
+  it("should detect github-actions[bot] as a bot author", () => {
+    expect(isDependabotCommit("ci: auto-commit", "github-actions[bot]")).toBe(true);
+  });
+
+  it("should detect greenkeeper[bot] as a bot author", () => {
+    expect(isDependabotCommit("chore: update deps", "greenkeeper[bot]")).toBe(true);
+  });
+
+  it("should detect codecov[bot] as a bot author", () => {
+    expect(isDependabotCommit("coverage report", "codecov[bot]")).toBe(true);
+  });
+
+  it("should detect generic [bot] suffix (e.g. custom-ci[bot])", () => {
+    expect(isDependabotCommit("automated commit", "custom-ci[bot]")).toBe(true);
+  });
+
+  it("should detect [bot] suffix case-insensitively (Netlify[Bot])", () => {
+    expect(isDependabotCommit("deploy preview", "Netlify[Bot]")).toBe(true);
+  });
+
+  it("should detect [bot] suffix case-insensitively (GITHUB-ACTIONS[BOT])", () => {
+    expect(isDependabotCommit("ci run", "GITHUB-ACTIONS[BOT]")).toBe(true);
+  });
+
+  it("should not flag normal human author", () => {
+    expect(isDependabotCommit("fix: typo", "alice")).toBe(false);
+  });
+});
+
 describe("backward-compatible function exports", () => {
   it("classifyNoiseLevel should work as before", () => {
     expect(classifyNoiseLevel("wip", "dev", ["src/a.ts"])).toBe("low-value");

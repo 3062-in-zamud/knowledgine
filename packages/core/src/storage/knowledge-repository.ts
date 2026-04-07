@@ -735,7 +735,8 @@ export class KnowledgeRepository {
   ): Array<{ note_id: number; distance: number }> {
     try {
       const buf = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
-      return this.stmt(
+      // 高ノイズリポでバッファ不足を防ぐため limit * 3 で多めに取得
+      const raw = this.stmt(
         `
         SELECT note_id, distance
         FROM note_embeddings_vec
@@ -743,7 +744,22 @@ export class KnowledgeRepository {
         ORDER BY distance
         LIMIT ?
       `,
-      ).all(buf, limit) as Array<{ note_id: number; distance: number }>;
+      ).all(buf, limit * 3) as Array<{ note_id: number; distance: number }>;
+
+      if (raw.length === 0) return raw;
+
+      // confidence が 0.1 以下のノートをフィルタリング（post-query方式）
+      // sqlite-vec の vec0 テーブルは JOIN 非対応のため
+      const noteIds = raw.map((r) => r.note_id);
+      const notes = this.getNotesSummaryByIds(noteIds);
+      const confMap = new Map(notes.map((n) => [n.id, n.confidence]));
+
+      return raw
+        .filter((r) => {
+          const conf = confMap.get(r.note_id);
+          return conf === null || conf === undefined || conf > 0.1;
+        })
+        .slice(0, limit);
     } catch {
       // vec0テーブルが存在しない場合（sqlite-vec未ロード）は空を返す
       return [];

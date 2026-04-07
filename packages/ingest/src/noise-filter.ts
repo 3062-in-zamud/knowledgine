@@ -23,7 +23,15 @@ const BUNDLE_COMMIT_PATTERNS = [
   /^Auto-?merge\b/i,
 ];
 
-const DEFAULT_BOT_AUTHORS = ["dependabot[bot]", "renovate[bot]"];
+const DEFAULT_BOT_AUTHORS = [
+  "dependabot[bot]",
+  "renovate[bot]",
+  "netlify[bot]",
+  "vercel[bot]",
+  "github-actions[bot]",
+  "greenkeeper[bot]",
+  "codecov[bot]",
+];
 
 const DEFAULT_SHORT_MESSAGE_THRESHOLD = 10;
 
@@ -39,6 +47,7 @@ export interface NoiseFilterConfig {
 export class NoiseFilter {
   private shortMessageThreshold: number;
   private botAuthors: string[];
+  private useGenericBotSuffix: boolean;
   private compiledExcludeMatcher: ((path: string) => boolean) | null;
   private compiledSubjectRegexes: RegExp[];
 
@@ -46,6 +55,9 @@ export class NoiseFilter {
     this.shortMessageThreshold = config?.shortMessageThreshold ?? DEFAULT_SHORT_MESSAGE_THRESHOLD;
     // Normalize to lowercase at construction time for case-insensitive comparison
     this.botAuthors = (config?.botAuthors ?? DEFAULT_BOT_AUTHORS).map((a) => a.toLowerCase());
+    // 汎用 [bot] suffix 検出はデフォルトリスト使用時のみ有効
+    // カスタム botAuthors が指定された場合はそのリストのみで判定する
+    this.useGenericBotSuffix = config?.botAuthors === undefined;
 
     // Pre-compile exclude patterns
     this.compiledExcludeMatcher =
@@ -72,7 +84,13 @@ export class NoiseFilter {
   }
 
   isDependabotCommit(subject: string, author?: string): boolean {
-    if (author && this.botAuthors.includes(author.toLowerCase())) return true;
+    if (author) {
+      const lower = author.toLowerCase();
+      if (this.botAuthors.includes(lower)) return true;
+      // 汎用 [bot] suffix 検出: デフォルトリスト使用時のみ適用
+      // カスタム botAuthors 指定時はそのリストが上書き semantics となる
+      if (this.useGenericBotSuffix && lower.endsWith("[bot]")) return true;
+    }
     return DEPENDABOT_SUBJECT_PATTERNS.some((re) => re.test(subject));
   }
 
