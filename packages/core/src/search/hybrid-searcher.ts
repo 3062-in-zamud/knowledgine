@@ -5,9 +5,16 @@ import { applyScoreDiscounts } from "./score-adjustments.js";
 
 export class HybridSearcher {
   /**
-   * @param alpha - FTSスコアの重み (0-1)。デフォルト 0.3。CJKクエリの動的alpha判定に使用。
-   * @param modelFamily - 使用するモデルファミリー。CJKクエリの動的alpha判定に使用。
-   * @param semanticThreshold - semantic スコアの最低閾値。これ未満のエントリは vecMap から除外。デフォルト 0.5。
+   * @param alpha - CJK gate threshold (0-1). Default 0.3. When a CJK-dominant
+   *   query is detected with a bert model, effectiveAlpha is raised to 1.0
+   *   (FTS-only). For alpha < 1.0, scores are fused via Reciprocal Rank Fusion
+   *   (RRF) without per-source weighting. The alpha value itself does not scale
+   *   FTS vs vector contributions in RRF mode.
+   * @param modelFamily - Embedding model family. Used with alpha to determine
+   *   whether CJK queries should fall back to FTS-only mode.
+   * @param semanticThreshold - Minimum cosine similarity for vector results.
+   *   Entries below this threshold are excluded from the vector result set.
+   *   Default 0.5.
    */
   constructor(
     private repository: KnowledgeRepository,
