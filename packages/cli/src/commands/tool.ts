@@ -261,13 +261,35 @@ export function registerToolCommands(program: Command): void {
   const toolCmd = program.command("tool").description("Knowledge base query tools");
 
   toolCmd
-    .command("search <query>")
+    .command("search [query]")
     .description("Search indexed notes")
+    .option("--query <q>", "Search query (use for queries starting with -)")
     .option("--path <dir>", "Root directory")
     .option("--limit <n>", "Maximum results (1-10000)", "20")
     .option("--mode <mode>", "Search mode: keyword, semantic, hybrid", "keyword")
     .option("--format <format>", "Output format: json, table, plain", "table")
-    .action(toolSearchCommand);
+    .action(
+      (
+        positionalQuery: string | undefined,
+        opts: {
+          query?: string;
+          path?: string;
+          limit?: string;
+          mode?: string;
+          format?: string;
+        },
+      ) => {
+        const query = opts.query ?? positionalQuery;
+        if (!query || !query.trim()) {
+          console.error("Error: Search query is required.");
+          console.error('Usage: knowledgine tool search "your query"');
+          console.error('       knowledgine tool search --query "your query"');
+          process.exitCode = 1;
+          return;
+        }
+        return toolSearchCommand(query, opts);
+      },
+    );
 
   toolCmd
     .command("related")
