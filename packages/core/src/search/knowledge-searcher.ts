@@ -142,8 +142,9 @@ export class KnowledgeSearcher {
     let results: SearchResult[];
 
     if (mode === "semantic" && this.semanticSearcher) {
-      // 2x expanded pool → discount → re-rank → slice
-      const expanded = await this.semanticSearcher.search(query, limit * 2);
+      // searchByVector already fetches limit*3 internally for confidence filtering,
+      // so no additional expansion needed here. Apply discounts → re-rank → slice.
+      const expanded = await this.semanticSearcher.search(query, limit);
       const discounted = expanded.map((r) => ({
         ...r,
         score: applyScoreDiscounts(r.score, {
