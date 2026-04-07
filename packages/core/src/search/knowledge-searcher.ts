@@ -13,6 +13,7 @@ import { ReasoningReranker } from "./reasoning-reranker.js";
 import type { RerankerWeights } from "./reasoning-reranker.js";
 import { QueryOrchestrator } from "./query-orchestrator.js";
 import { MODEL_REGISTRY, DEFAULT_MODEL_NAME } from "../embedding/model-manager.js";
+import { CHANGELOG_PATTERN, CHANGELOG_DISCOUNT, applyScoreDiscounts } from "./score-adjustments.js";
 
 export interface SearchOptions {
   query?: string;
@@ -141,7 +142,17 @@ export class KnowledgeSearcher {
     let results: SearchResult[];
 
     if (mode === "semantic" && this.semanticSearcher) {
-      results = await this.semanticSearcher.search(query, limit);
+      // 2x expanded pool → discount → re-rank → slice
+      const expanded = await this.semanticSearcher.search(query, limit * 2);
+      const discounted = expanded.map((r) => ({
+        ...r,
+        score: applyScoreDiscounts(r.score, {
+          filePath: r.note.file_path,
+          confidence: r.note.confidence,
+        }),
+      }));
+      discounted.sort((a, b) => b.score - a.score);
+      results = discounted.slice(0, limit);
     } else if (mode === "hybrid" && this.hybridSearcher) {
       results = await this.hybridSearcher.search(query, limit);
     } else {
@@ -154,8 +165,7 @@ export class KnowledgeSearcher {
       // BM25 rank はマイナス値で、より負の値ほど良いスコア
       // CHANGELOG / CHANGES / HISTORY は 70% discount: rank を 0.3 倍して 0 に近づける（悪くする）
       // newness bonus: 新しいノートの rank をより負にして良くする（乗算ボーナス）
-      const CHANGELOG_PATTERN = /^(CHANGELOG|CHANGES|HISTORY)\.(md|txt|rst)$/i;
-      const CHANGELOG_DISCOUNT = 0.3;
+      // CHANGELOG_PATTERN and CHANGELOG_DISCOUNT imported from score-adjustments.ts
 
       // keyword mode (デフォルト) — FTS5 + snippet
       const rows = this.repository.searchNotesWithSnippet(
