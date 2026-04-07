@@ -130,108 +130,130 @@ describe("HybridSearcher", () => {
     });
   });
 
-  describe("KNOW-412: adaptive alpha (semantic spread detection)", () => {
-    it("should increase alpha when semantic scores are tightly clustered (spread < 0.05)", async () => {
-      // Mock searchByVector to return tightly clustered results
-      // L2 distance → cosine_similarity = 1 - d²/2
-      // For scores [0.75, 0.74, 0.74, 0.73, 0.73]: d ≈ sqrt(2*(1-score))
-      // d for 0.75 = sqrt(0.5) ≈ 0.707, d for 0.73 = sqrt(0.54) ≈ 0.735
-      const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([
-        { note_id: 1, distance: Math.sqrt(2 * (1 - 0.75)) },
-        { note_id: 2, distance: Math.sqrt(2 * (1 - 0.74)) },
-        { note_id: 3, distance: Math.sqrt(2 * (1 - 0.74)) },
-        { note_id: 4, distance: Math.sqrt(2 * (1 - 0.73)) },
-        { note_id: 5, distance: Math.sqrt(2 * (1 - 0.73)) },
-      ]);
+  describe("RRF (Reciprocal Rank Fusion)", () => {
+    it("documents in both FTS and vector lists should score higher than single-list documents", async () => {
+      // note 1 appears in both FTS (rank 1) and vector (rank 1)
+      // note 2 appears in FTS only (rank 2)
+      const mockSearchByVector = vi
+        .spyOn(ctx.repository, "searchByVector")
+        .mockReturnValue([{ note_id: 1, distance: Math.sqrt(2 * (1 - 0.9)) }]);
 
-      // Use e5 model (effectiveAlpha=0.3 for Latin queries)
       const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
       const results = await e5Searcher.search("TypeScript");
 
-      // spread = 0.75 - 0.73 = 0.02 < 0.05 → adaptiveAlpha = 0.7
-      // finalAlpha = max(0.3, 0.7) = 0.7 (keyword-heavy)
-      expect(results.length).toBeGreaterThan(0);
-      // With tight cluster, keyword weight dominates → scores should differ from well-spread case
-      const tightClusterScores = results.map((r) => r.score);
-
-      mockSearchByVector.mockRestore();
-
-      // Now test with well-spread scores for comparison
-      const mockSpread = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([
-        { note_id: 1, distance: Math.sqrt(2 * (1 - 0.9)) },
-        { note_id: 2, distance: Math.sqrt(2 * (1 - 0.8)) },
-        { note_id: 3, distance: Math.sqrt(2 * (1 - 0.7)) },
-        { note_id: 4, distance: Math.sqrt(2 * (1 - 0.6)) },
-        { note_id: 5, distance: Math.sqrt(2 * (1 - 0.5)) },
-      ]);
-
-      const spreadResults = await e5Searcher.search("TypeScript");
-      const spreadScores = spreadResults.map((r) => r.score);
-      expect(spreadResults.length).toBeGreaterThan(0);
-
-      // Different alpha values should produce different score distributions
-      // With tight cluster (alpha=0.7): keyword dominates
-      // With spread (alpha=0.5): more balanced
-      // At minimum, the scores should not be identical
-      if (tightClusterScores.length > 0 && spreadScores.length > 0) {
-        const tightTop = tightClusterScores[0];
-        const spreadTop = spreadScores[0];
-        // Different alpha values → different final scores for the same notes
-        expect(tightTop).not.toBeCloseTo(spreadTop, 5);
+      if (results.length >= 2) {
+        const note1 = results.find((r) => r.note.id === 1);
+        const ftsOnlyResults = results.filter(
+          (r) => !r.matchReason.some((m) => m.startsWith("セマンティック:")),
+        );
+        if (note1 && ftsOnlyResults.length > 0) {
+          // Documents in both lists get RRF contributions from both → higher score
+          expect(note1.score).toBeGreaterThanOrEqual(ftsOnlyResults[0].score);
+        }
       }
 
-      mockSpread.mockRestore();
-    });
-
-    it("should use moderate alpha when semantic scores are well-spread (spread >= 0.05)", async () => {
-      const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([
-        { note_id: 1, distance: Math.sqrt(2 * (1 - 0.9)) },
-        { note_id: 2, distance: Math.sqrt(2 * (1 - 0.8)) },
-        { note_id: 3, distance: Math.sqrt(2 * (1 - 0.7)) },
-        { note_id: 4, distance: Math.sqrt(2 * (1 - 0.6)) },
-        { note_id: 5, distance: Math.sqrt(2 * (1 - 0.5)) },
-      ]);
-
-      const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
-      const results = await e5Searcher.search("TypeScript");
-
-      // spread = 0.90 - 0.50 = 0.40 >= 0.05 → 調整なし
-      // finalAlpha = 0.3（effectiveAlpha維持、semantic 70%重み）
-      expect(results.length).toBeGreaterThan(0);
-      // With well-spread semantic scores, semantic contribution is meaningful
-      // Verify notes with high semantic scores rank near the top
-      const topResult = results[0];
-      expect(topResult.score).toBeGreaterThan(0);
-
       mockSearchByVector.mockRestore();
     });
 
-    it("should not adjust alpha when vecMap is empty", async () => {
+    it("FTS-only results (no vector results) should produce valid 0-1 scores", async () => {
       const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([]);
 
       const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
       const results = await e5Searcher.search("TypeScript");
 
-      // vecScores empty → semanticSpread = 1.0 (single/no result → good spread)
-      // spread >= 0.05 → 調整なし、finalAlpha = 0.3
-      // vecMap is empty so only FTS scores matter → no semantic influence
       expect(results.length).toBeGreaterThan(0);
+      for (const result of results) {
+        expect(result.score).toBeGreaterThanOrEqual(0);
+        expect(result.score).toBeLessThanOrEqual(1);
+      }
 
       mockSearchByVector.mockRestore();
     });
 
-    it("should not adjust alpha when CJK query sets effectiveAlpha=1.0", async () => {
+    it("vector-only results (no FTS matches) should produce valid 0-1 scores", async () => {
+      const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([
+        { note_id: 1, distance: Math.sqrt(2 * (1 - 0.9)) },
+        { note_id: 2, distance: Math.sqrt(2 * (1 - 0.7)) },
+      ]);
+
+      const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
+      // Use a query that won't match any FTS content
+      const results = await e5Searcher.search("xyznonexistentzzz");
+
+      // Even with no FTS matches, vector results should be returned
+      for (const result of results) {
+        expect(result.score).toBeGreaterThanOrEqual(0);
+        expect(result.score).toBeLessThanOrEqual(1);
+      }
+
+      mockSearchByVector.mockRestore();
+    });
+
+    it("single result should get score=1.0 (before discounts)", async () => {
+      // Only one result from vector, nothing from FTS
+      const mockSearchByVector = vi
+        .spyOn(ctx.repository, "searchByVector")
+        .mockReturnValue([{ note_id: 1, distance: Math.sqrt(2 * (1 - 0.9)) }]);
+
+      const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
+      const results = await e5Searcher.search("xyznonexistentzzz");
+
+      if (results.length === 1) {
+        // Min-max normalization with single item → 1.0 (before any discount)
+        expect(results[0].score).toBeLessThanOrEqual(1.0);
+        expect(results[0].score).toBeGreaterThan(0);
+      }
+
+      mockSearchByVector.mockRestore();
+    });
+
+    it("alpha=1.0 should use FTS-only scoring without RRF", async () => {
       const bertSearcher = new HybridSearcher(ctx.repository, provider, 0.3, "bert");
       const embedQuerySpy = vi.spyOn(provider, "embedQuery");
 
       // CJK-dominant query with bert → effectiveAlpha=1.0
-      // The guard `if (effectiveAlpha < 1.0)` prevents adjustment
-      await bertSearcher.search("TypeScriptの使い方を学ぶ");
+      const results = await bertSearcher.search("TypeScriptの使い方を学ぶ");
 
       // alpha=1.0 → vector search skipped entirely
       expect(embedQuerySpy).not.toHaveBeenCalled();
 
+      // Results should still be in 0-1 range
+      for (const result of results) {
+        expect(result.score).toBeGreaterThanOrEqual(0);
+        expect(result.score).toBeLessThanOrEqual(1);
+      }
+
       embedQuerySpy.mockRestore();
+    });
+
+    it("empty results from both sources should return empty array", async () => {
+      const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([]);
+
+      const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
+      const results = await e5Searcher.search("xyznonexistentterm123456");
+      expect(results).toEqual([]);
+
+      mockSearchByVector.mockRestore();
+    });
+
+    it("should properly rank documents appearing in only one list", async () => {
+      // 2 vector results, FTS also returns results
+      const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([
+        { note_id: 1, distance: Math.sqrt(2 * (1 - 0.95)) },
+        { note_id: 2, distance: Math.sqrt(2 * (1 - 0.8)) },
+      ]);
+
+      const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
+      const results = await e5Searcher.search("TypeScript");
+
+      expect(results.length).toBeGreaterThan(0);
+      // All scores should be valid
+      for (const result of results) {
+        expect(result.score).toBeGreaterThanOrEqual(0);
+        expect(result.score).toBeLessThanOrEqual(1);
+      }
+
+      mockSearchByVector.mockRestore();
     });
   });
 

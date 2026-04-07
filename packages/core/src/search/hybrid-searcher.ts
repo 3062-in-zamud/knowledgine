@@ -1,12 +1,20 @@
 import type { KnowledgeRepository, KnowledgeNoteSummary } from "../storage/knowledge-repository.js";
 import type { EmbeddingProvider } from "../embedding/embedding-provider.js";
 import type { SemanticSearchResult } from "./semantic-searcher.js";
+import { applyScoreDiscounts } from "./score-adjustments.js";
 
 export class HybridSearcher {
   /**
-   * @param alpha - FTSスコアの重み (0-1)。デフォルト 0.3。残り (1-α) がベクトルスコアの重み。
-   * @param modelFamily - 使用するモデルファミリー。CJKクエリの動的alpha判定に使用。
-   * @param semanticThreshold - semantic スコアの最低閾値。これ未満のエントリは vecMap から除外。デフォルト 0.5。
+   * @param alpha - CJK gate threshold (0-1). Default 0.3. When a CJK-dominant
+   *   query is detected with a bert model, effectiveAlpha is raised to 1.0
+   *   (FTS-only). For alpha < 1.0, scores are fused via Reciprocal Rank Fusion
+   *   (RRF) without per-source weighting. The alpha value itself does not scale
+   *   FTS vs vector contributions in RRF mode.
+   * @param modelFamily - Embedding model family. Used with alpha to determine
+   *   whether CJK queries should fall back to FTS-only mode.
+   * @param semanticThreshold - Minimum cosine similarity for vector results.
+   *   Entries below this threshold are excluded from the vector result set.
+   *   Default 0.5.
    */
   constructor(
     private repository: KnowledgeRepository,
@@ -82,26 +90,48 @@ export class HybridSearcher {
       }
     }
 
-    // Detect flattened semantic scores → shift alpha toward keyword
-    const vecScores = [...vecMap.values()].sort((a, b) => b - a);
-    const semanticSpread =
-      vecScores.length >= 2 ? vecScores[0] - vecScores[Math.min(4, vecScores.length - 1)] : 1.0; // Single or no result → assume good spread
+    // --- Score fusion ---
+    let scored: Array<{ noteId: number; score: number }>;
 
-    let finalAlpha = effectiveAlpha;
-    if (effectiveAlpha < 1.0 && semanticSpread < 0.05) {
-      // semantic平坦化時のみkeyword側にシフト（spread良好時は調整なし）
-      finalAlpha = Math.max(effectiveAlpha, 0.7);
-    }
+    if (effectiveAlpha >= 1.0) {
+      // alpha=1.0 (CJK+bert): FTS-only — 現行min-max正規化を維持（RRF不使用）
+      scored = [...ftsMap.entries()].map(([noteId, score]) => ({ noteId, score }));
+    } else {
+      // RRF (Reciprocal Rank Fusion) — alpha < 1.0
+      // FTS結果にランク付与 (score降順 = 最良が rank 1)
+      const ftsRanked = [...ftsMap.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([noteId], i) => ({ noteId, rank: i + 1 }));
 
-    // 全ノートIDを統合し、raw hybrid scoreを計算
-    const allIds = new Set([...ftsMap.keys(), ...vecMap.keys()]);
+      // Vector結果にランク付与 (semanticThreshold通過済みのみ、distance昇順 = 最良が rank 1)
+      const vecRanked = vecResults
+        .filter((r) => vecMap.has(r.note_id))
+        .map((r, i) => ({ noteId: r.note_id, rank: i + 1 }));
 
-    const scored: Array<{ noteId: number; score: number }> = [];
-    for (const noteId of allIds) {
-      const ftsScore = ftsMap.get(noteId) ?? 0;
-      const vecScore = vecMap.get(noteId) ?? 0;
-      const finalScore = finalAlpha * ftsScore + (1 - finalAlpha) * vecScore;
-      scored.push({ noteId, score: finalScore });
+      const k = 60;
+      const rrfScores = new Map<number, number>();
+      for (const { noteId, rank } of ftsRanked) {
+        rrfScores.set(noteId, (rrfScores.get(noteId) ?? 0) + 1 / (k + rank));
+      }
+      for (const { noteId, rank } of vecRanked) {
+        rrfScores.set(noteId, (rrfScores.get(noteId) ?? 0) + 1 / (k + rank));
+      }
+
+      // Min-Max正規化で0-1範囲に復元
+      if (rrfScores.size === 0) {
+        scored = [];
+      } else {
+        const rrfValues = [...rrfScores.values()];
+        const minRrf = Math.min(...rrfValues);
+        const maxRrf = Math.max(...rrfValues);
+        const rrfRange = maxRrf - minRrf;
+
+        scored = [];
+        for (const [noteId, rrf] of rrfScores) {
+          const normalized = rrfRange > 0 ? (rrf - minRrf) / rrfRange : 1.0;
+          scored.push({ noteId, score: normalized });
+        }
+      }
     }
 
     // discount適用前の候補プールを広めに取得（discount後のre-rankで正しい上位を選出するため）
@@ -113,28 +143,15 @@ export class HybridSearcher {
     const notes = this.repository.getNotesSummaryByIds(candidateIds);
     const noteMap = new Map<number, KnowledgeNoteSummary>(notes.map((n) => [n.id, n]));
 
-    // CHANGELOG/README discount + confidence割引をスコアに反映してからソート
-    const CHANGELOG_PATTERN = /^(CHANGELOG|CHANGES|HISTORY|README)\.(md|txt|rst)$/i;
-    const CHANGELOG_DISCOUNT = 0.3;
-    const LOW_CONFIDENCE_DISCOUNT = 0.5;
-    const LOW_CONFIDENCE_THRESHOLD = 0.3;
-
     const results: SemanticSearchResult[] = [];
     for (const { noteId, score } of candidatePool) {
       const note = noteMap.get(noteId);
       if (!note) continue;
 
-      // CHANGELOG/README discount
-      const basename = note.file_path.split("/").pop() ?? "";
-      const changelogDiscount = CHANGELOG_PATTERN.test(basename) ? CHANGELOG_DISCOUNT : 1.0;
-
-      // low-confidence discount (confidence <= 0.1 はSQL層で除外済み、low-value <= 0.3 は割引)
-      const confidenceDiscount =
-        note.confidence !== null && note.confidence <= LOW_CONFIDENCE_THRESHOLD
-          ? LOW_CONFIDENCE_DISCOUNT
-          : 1.0;
-
-      const adjustedScore = score * changelogDiscount * confidenceDiscount;
+      const adjustedScore = applyScoreDiscounts(score, {
+        filePath: note.file_path,
+        confidence: note.confidence,
+      });
 
       const hasFts = ftsMap.has(noteId);
       const hasVec = vecMap.has(noteId);

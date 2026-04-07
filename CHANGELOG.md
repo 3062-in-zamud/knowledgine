@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-04-07
+
+### Changed
+
+#### Core — search (`@knowledgine/core`)
+
+- **Hybrid search RRF migration**: Replace weighted-average fusion with Reciprocal Rank Fusion (k=60), eliminating regression-to-the-mean scoring artifacts. CJK+BERT queries (alpha=1.0) retain FTS-only min-max normalization
+- **Score discount consolidation**: Extract CHANGELOG/README discount, confidence discount, and bot-author pattern into shared `score-adjustments.ts`. Fix README missing from `knowledge-searcher` and `query-orchestrator` patterns
+- **Semantic search discounts**: Apply CHANGELOG/README and low-confidence discounts to semantic search mode via expanded pool, discount, re-rank, and slice
+
+#### Core — storage (`@knowledgine/core`)
+
+- **Vector confidence filter**: `searchByVector` now fetches 3x limit and post-filters by confidence > 0.1 (sqlite-vec vec0 tables do not support JOINs)
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **Expanded bot detection**: Add `netlify[bot]`, `vercel[bot]`, `github-actions[bot]`, `greenkeeper[bot]`, `codecov[bot]` to default bot authors. Add generic `[bot]` suffix detection
+
+### Fixed
+
+#### CLI (`@knowledgine/cli`)
+
+- **Dash-prefixed query support**: Change `search <query>` to `search [query]` with new `--query` option for queries starting with `-`. Add `showHelpAfterError` and updated usage hints
+- **Status model name**: Replace hardcoded `all-MiniLM-L6-v2` with `config.embedding?.modelName ?? DEFAULT_MODEL_NAME` for dynamic model display
+
+#### Tests
+
+- **Sprint 6 regression tests**: Replace 6 adaptive-alpha tests with 7 RRF edge-case tests and 2 RRF regression tests. Add `score-adjustments.test.ts` (13 tests). Add noise-filter bot detection tests
+
 ## [0.6.7] - 2026-04-05
 
 ### Added
@@ -616,7 +645,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Configurable watch patterns and ignore patterns
 - Graceful shutdown handling (SIGINT/SIGTERM)
 
-[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.7...HEAD
+[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.8...HEAD
+[0.6.8]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.4...v0.6.5

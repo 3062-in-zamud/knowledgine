@@ -45,7 +45,8 @@ export async function searchCommand(query: string, options: SearchCommandOptions
   // Validate query
   if (!query || !query.trim()) {
     console.error("Error: Search query cannot be empty.");
-    console.error('Usage: knowledgine search "your query" [--mode keyword|semantic|hybrid]');
+    console.error('Usage: knowledgine search "your query"');
+    console.error('       knowledgine search --query "your query" (for dash-prefixed queries)');
     process.exitCode = 1;
     return;
   }

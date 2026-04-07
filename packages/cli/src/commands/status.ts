@@ -9,6 +9,7 @@ import {
   KnowledgeRepository,
   ALL_MIGRATIONS,
   ModelManager,
+  DEFAULT_MODEL_NAME,
   checkSemanticReadiness,
 } from "@knowledgine/core";
 import type { SemanticReadiness } from "@knowledgine/core";
@@ -131,9 +132,10 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const statusLabel = readiness!.label;
 
   // Build content
+  const modelName = config.embedding?.modelName ?? DEFAULT_MODEL_NAME;
   const modelLine = modelAvailable
-    ? `${symbols.success} all-MiniLM-L6-v2 (available)`
-    : `${symbols.warning} all-MiniLM-L6-v2 (not found)`;
+    ? `${symbols.success} ${modelName} (available)`
+    : `${symbols.warning} ${modelName} (not found)`;
 
   const statusLine = isReady
     ? `${symbols.success} ${colors.success(statusLabel)}`

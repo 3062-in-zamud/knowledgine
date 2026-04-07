@@ -203,6 +203,15 @@ export type { Tokenizer } from "./embedding/tokenizer-factory.js";
 // Search (semantic)
 export { SemanticSearcher } from "./search/semantic-searcher.js";
 export { HybridSearcher } from "./search/hybrid-searcher.js";
+export {
+  CHANGELOG_PATTERN,
+  CHANGELOG_DISCOUNT,
+  LOW_CONFIDENCE_THRESHOLD,
+  LOW_CONFIDENCE_DISCOUNT,
+  BOT_AUTHOR_PATTERN,
+  isChangelogOrReadme,
+  applyScoreDiscounts,
+} from "./search/score-adjustments.js";
 
 // Extraction
 export { CausalLinkDetector } from "./extraction/causal-link-detector.js";

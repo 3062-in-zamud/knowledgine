@@ -3,7 +3,13 @@ import { mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
-import { createDatabase, Migrator, KnowledgeRepository, ALL_MIGRATIONS } from "@knowledgine/core";
+import {
+  createDatabase,
+  Migrator,
+  KnowledgeRepository,
+  ALL_MIGRATIONS,
+  DEFAULT_MODEL_NAME,
+} from "@knowledgine/core";
 import { statusCommand } from "../../src/commands/status.js";
 
 describe("status command", () => {
@@ -66,7 +72,7 @@ describe("status command", () => {
     await statusCommand({ path: testDir });
 
     const output = stderrSpy.mock.calls.map((c) => c[0]).join("\n");
-    expect(output).toContain("all-MiniLM-L6-v2");
+    expect(output).toContain(DEFAULT_MODEL_NAME);
   });
 
   it("should show MCP config status", async () => {

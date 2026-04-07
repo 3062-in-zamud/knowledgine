@@ -13,6 +13,7 @@ import type { SearchResult } from "./knowledge-searcher.js";
 import { SemanticSearcher } from "./semantic-searcher.js";
 import { HybridSearcher } from "./hybrid-searcher.js";
 import { ReasoningReranker } from "./reasoning-reranker.js";
+import { CHANGELOG_PATTERN, CHANGELOG_DISCOUNT } from "./score-adjustments.js";
 import { classifyQuery, getWeightsForQueryType } from "./query-classifier.js";
 import { MODEL_REGISTRY, DEFAULT_MODEL_NAME } from "../embedding/model-manager.js";
 
@@ -110,9 +111,7 @@ export class QueryOrchestrator {
       return [];
     }
 
-    // CHANGELOG discount + newness bonus (knowledge-searcher.ts と同一ロジック)
-    const CHANGELOG_PATTERN = /^(CHANGELOG|CHANGES|HISTORY)\.(md|txt|rst)$/i;
-    const CHANGELOG_DISCOUNT = 0.3;
+    // CHANGELOG discount + newness bonus (CHANGELOG_PATTERN/CHANGELOG_DISCOUNT imported from score-adjustments.ts)
 
     const adjustedRanks = rows.map(({ note, rank }) => {
       let adjusted = rank;
