@@ -748,11 +748,17 @@ export class KnowledgeRepository {
 
       if (raw.length === 0) return raw;
 
-      // confidence が 0.1 以下のノートをフィルタリング（post-query方式）
-      // sqlite-vec の vec0 テーブルは JOIN 非対応のため
+      // Filter out notes with confidence <= 0.1 (post-query because sqlite-vec
+      // vec0 tables do not support JOIN). Use a lightweight query that fetches
+      // only id + confidence instead of full note summaries to avoid a redundant
+      // DB read — callers (SemanticSearcher, HybridSearcher) already fetch full
+      // summaries downstream.
       const noteIds = raw.map((r) => r.note_id);
-      const notes = this.getNotesSummaryByIds(noteIds);
-      const confMap = new Map(notes.map((n) => [n.id, n.confidence]));
+      const placeholders = noteIds.map(() => "?").join(",");
+      const confRows = this.db
+        .prepare(`SELECT id, confidence FROM knowledge_notes WHERE id IN (${placeholders})`)
+        .all(...noteIds) as Array<{ id: number; confidence: number | null }>;
+      const confMap = new Map(confRows.map((r) => [r.id, r.confidence]));
 
       return raw
         .filter((r) => {
