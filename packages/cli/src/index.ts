@@ -260,9 +260,10 @@ program
   .option("--clean", "Remove demo notes and data")
   .action(demoCommand);
 
-program
-  .command("search <query>")
-  .description("Search indexed notes")
+const searchCmd = program
+  .command("search [query]")
+  .description("Search indexed notes (tip: use --query for dash-prefixed queries)")
+  .option("--query <q>", "Search query (use for queries starting with -)")
   .option("--demo", "Search in demo notes")
   .option("--mode <mode>", "Search mode: keyword, semantic, hybrid (default: auto-detect)")
   .option("--limit <n>", "Maximum results", "20")
@@ -280,8 +281,9 @@ program
   .option("--projects <names>", "Search across projects (comma-separated project names)")
   .action(
     (
-      query: string,
+      positionalQuery: string | undefined,
       opts: {
+        query?: string;
         demo?: boolean;
         mode?: string;
         limit?: string;
@@ -296,6 +298,14 @@ program
         projects?: string;
       },
     ) => {
+      const query = opts.query ?? positionalQuery;
+      if (!query || !query.trim()) {
+        console.error("Error: Search query is required.");
+        console.error('Usage: knowledgine search "your query"');
+        console.error('       knowledgine search --query "your query"');
+        process.exitCode = 1;
+        return;
+      }
       return searchCommand(query, {
         demo: opts.demo,
         mode: opts.mode,
@@ -312,6 +322,7 @@ program
       });
     },
   );
+searchCmd.showHelpAfterError(true);
 
 const captureCmd = program.command("capture").description("Capture and manage knowledge snippets");
 captureCmd

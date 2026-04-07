@@ -735,7 +735,8 @@ export class KnowledgeRepository {
   ): Array<{ note_id: number; distance: number }> {
     try {
       const buf = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
-      return this.stmt(
+      // 高ノイズリポでバッファ不足を防ぐため limit * 3 で多めに取得
+      const raw = this.stmt(
         `
         SELECT note_id, distance
         FROM note_embeddings_vec
@@ -743,7 +744,28 @@ export class KnowledgeRepository {
         ORDER BY distance
         LIMIT ?
       `,
-      ).all(buf, limit) as Array<{ note_id: number; distance: number }>;
+      ).all(buf, limit * 3) as Array<{ note_id: number; distance: number }>;
+
+      if (raw.length === 0) return raw;
+
+      // Filter out notes with confidence <= 0.1 (post-query because sqlite-vec
+      // vec0 tables do not support JOIN). Use a lightweight query that fetches
+      // only id + confidence instead of full note summaries to avoid a redundant
+      // DB read — callers (SemanticSearcher, HybridSearcher) already fetch full
+      // summaries downstream.
+      const noteIds = raw.map((r) => r.note_id);
+      const placeholders = noteIds.map(() => "?").join(",");
+      const confRows = this.db
+        .prepare(`SELECT id, confidence FROM knowledge_notes WHERE id IN (${placeholders})`)
+        .all(...noteIds) as Array<{ id: number; confidence: number | null }>;
+      const confMap = new Map(confRows.map((r) => [r.id, r.confidence]));
+
+      return raw
+        .filter((r) => {
+          const conf = confMap.get(r.note_id);
+          return conf === null || conf === undefined || conf > 0.1;
+        })
+        .slice(0, limit);
     } catch {
       // vec0テーブルが存在しない場合（sqlite-vec未ロード）は空を返す
       return [];
