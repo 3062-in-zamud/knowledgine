@@ -55,8 +55,8 @@ export class NoiseFilter {
     this.shortMessageThreshold = config?.shortMessageThreshold ?? DEFAULT_SHORT_MESSAGE_THRESHOLD;
     // Normalize to lowercase at construction time for case-insensitive comparison
     this.botAuthors = (config?.botAuthors ?? DEFAULT_BOT_AUTHORS).map((a) => a.toLowerCase());
-    // 汎用 [bot] suffix 検出はデフォルトリスト使用時のみ有効
-    // カスタム botAuthors が指定された場合はそのリストのみで判定する
+    // Enable generic [bot] suffix detection only when using the default author list
+    // If custom botAuthors are provided, match only against that explicit list
     this.useGenericBotSuffix = config?.botAuthors === undefined;
 
     // Pre-compile exclude patterns
@@ -87,8 +87,8 @@ export class NoiseFilter {
     if (author) {
       const lower = author.toLowerCase();
       if (this.botAuthors.includes(lower)) return true;
-      // 汎用 [bot] suffix 検出: デフォルトリスト使用時のみ適用
-      // カスタム botAuthors 指定時はそのリストが上書き semantics となる
+      // Generic [bot] suffix detection: only active with the default list
+      // When custom botAuthors are provided, that list has override semantics
       if (this.useGenericBotSuffix && lower.endsWith("[bot]")) return true;
     }
     return DEPENDABOT_SUBJECT_PATTERNS.some((re) => re.test(subject));
