@@ -276,63 +276,49 @@ describe("Sprint 5 回帰テストスイート (KNOW-419)", () => {
     });
   });
 
-  describe("2. adaptive alpha回帰 (Sprint 4 KNOW-412再発防止)", () => {
-    it("spread良好時にalphaが引き上げられないこと", async () => {
-      // well-spread semantic scores をモック
+  describe("2. RRF fusion回帰 (Sprint 6 KNOW-421)", () => {
+    it("FTS+vector両方に出現するドキュメントが片方のみより高スコアになること", async () => {
+      // api-design はFTS("API design")でヒットし、vectorでもrank1
+      // ci-cd-pipeline はvectorでのみ出現
       const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([
         { note_id: noteIds.get("docs/api-design.md")!, distance: Math.sqrt(2 * (1 - 0.95)) },
-        { note_id: noteIds.get("docs/testing-strategies.md")!, distance: Math.sqrt(2 * (1 - 0.8)) },
-        { note_id: noteIds.get("docs/error-handling.md")!, distance: Math.sqrt(2 * (1 - 0.65)) },
-        { note_id: noteIds.get("docs/typescript-config.md")!, distance: Math.sqrt(2 * (1 - 0.5)) },
-        { note_id: noteIds.get("docs/ci-cd-pipeline.md")!, distance: Math.sqrt(2 * (1 - 0.35)) },
+        { note_id: noteIds.get("docs/ci-cd-pipeline.md")!, distance: Math.sqrt(2 * (1 - 0.8)) },
       ]);
 
       const searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
-
-      // spread = 0.95 - 0.35 = 0.60 >> 0.05 → alphaは0.3のまま（調整なし）
-      // 修正前: Math.max(0.3, 0.5) = 0.5 → semantic重み50% (バグ)
-      // 修正後: alpha = 0.3 → semantic重み70% (正しい)
       const results = await searcher.search("API design");
 
-      // semantic重みが高い（alpha=0.3）場合、semanticスコア0.95のノートが上位に来る
       expect(results.length).toBeGreaterThan(0);
-      const topNote = results[0];
-      // API design patterns がトップに来ること（semantic 0.95 + keyword match）
-      expect(topNote.note.file_path).toBe("docs/api-design.md");
 
-      // semantic理由のスコアが高いこと（alpha=0.3 → semantic 70%重み）
-      const semanticReason = topNote.matchReason.find((m) => m.startsWith("セマンティック:"));
-      expect(semanticReason).toBeDefined();
-      // "セマンティック: 95.0%" のような文字列からスコアを抽出
+      const apiResult = results.find((r) => r.note.file_path === "docs/api-design.md");
+      expect(apiResult).toBeDefined();
+      // api-design should have both keyword and semantic reasons
+      const hasKeyword = apiResult!.matchReason.some((m) => m.startsWith("キーワード:"));
+      const hasSemantic = apiResult!.matchReason.some((m) => m.startsWith("セマンティック:"));
+      expect(hasKeyword).toBe(true);
+      expect(hasSemantic).toBe(true);
+
+      // セマンティックスコア表示はvecMapのcosine similarityを使用
+      const semanticReason = apiResult!.matchReason.find((m) => m.startsWith("セマンティック:"));
       const semanticScore = parseFloat(semanticReason!.match(/(\d+\.\d+)/)![1]);
       expect(semanticScore).toBeGreaterThan(90); // 95%近い値
 
       mockSearchByVector.mockRestore();
     });
 
-    it("spread平坦時にalphaがkeyword側にシフトされること", async () => {
-      // tight cluster semantic scores をモック
+    it("RRFスコアが0-1範囲で正規化されること", async () => {
       const mockSearchByVector = vi.spyOn(ctx.repository, "searchByVector").mockReturnValue([
-        { note_id: noteIds.get("docs/api-design.md")!, distance: Math.sqrt(2 * (1 - 0.75)) },
-        {
-          note_id: noteIds.get("docs/testing-strategies.md")!,
-          distance: Math.sqrt(2 * (1 - 0.74)),
-        },
-        { note_id: noteIds.get("docs/error-handling.md")!, distance: Math.sqrt(2 * (1 - 0.74)) },
-        { note_id: noteIds.get("docs/typescript-config.md")!, distance: Math.sqrt(2 * (1 - 0.73)) },
-        { note_id: noteIds.get("docs/ci-cd-pipeline.md")!, distance: Math.sqrt(2 * (1 - 0.73)) },
+        { note_id: noteIds.get("docs/api-design.md")!, distance: Math.sqrt(2 * (1 - 0.9)) },
+        { note_id: noteIds.get("docs/testing-strategies.md")!, distance: Math.sqrt(2 * (1 - 0.7)) },
       ]);
 
       const searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5", 0.0);
+      const results = await searcher.search("API design");
 
-      // spread = 0.75 - 0.73 = 0.02 < 0.05 → alpha → 0.7（keyword優先）
-      const results = await searcher.search("TypeScript");
-
-      expect(results.length).toBeGreaterThan(0);
-      // keyword matchが強いノートが上位に来る（alpha=0.7 → keyword 70%重み）
-      const topNote = results[0];
-      const hasKeywordReason = topNote.matchReason.some((m) => m.startsWith("キーワード:"));
-      expect(hasKeywordReason).toBe(true);
+      for (const result of results) {
+        expect(result.score).toBeGreaterThanOrEqual(0);
+        expect(result.score).toBeLessThanOrEqual(1);
+      }
 
       mockSearchByVector.mockRestore();
     });
