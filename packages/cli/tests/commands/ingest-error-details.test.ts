@@ -220,7 +220,7 @@ describe("ingest --all error details display", () => {
     // 11th not shown by default
     expect(output).not.toContain("file://doc10.md");
     // truncation message
-    expect(output).toContain("... and 5 more (use --verbose to see all)");
+    expect(output).toContain("... and 5 more detailed error(s) (use --verbose to see all)");
 
     errorSpy.mockRestore();
   });
