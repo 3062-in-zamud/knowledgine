@@ -465,6 +465,58 @@ describe("KnowledgeRepository", () => {
     });
   });
 
+  describe("getStats notesBySubType", () => {
+    it("should classify notes by file_path URI patterns", () => {
+      ctx.repository.saveNote({
+        filePath: "github://owner/repo/pull/1",
+        title: "PR",
+        content: "PR content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.saveNote({
+        filePath: "github://owner/repo/issues/10",
+        title: "Issue",
+        content: "Issue content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.saveNote({
+        filePath: "github://owner/repo/pull/1/comments",
+        title: "Comment",
+        content: "Comment content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.saveNote({
+        filePath: "git://repo/commit/abc123",
+        title: "Commit",
+        content: "Commit content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+      ctx.repository.saveNote({
+        filePath: "src/index.ts",
+        title: "File",
+        content: "File content",
+        frontmatter: {},
+        createdAt: new Date().toISOString(),
+      });
+
+      const stats = ctx.repository.getStats();
+      expect(stats.notesBySubType["pull_request"]).toBe(1);
+      expect(stats.notesBySubType["issue"]).toBe(1);
+      expect(stats.notesBySubType["pr_comment"]).toBe(1);
+      expect(stats.notesBySubType["commit"]).toBe(1);
+      expect(stats.notesBySubType["file"]).toBe(1);
+    });
+
+    it("should return empty object for empty database", () => {
+      const stats = ctx.repository.getStats();
+      expect(Object.keys(stats.notesBySubType).length).toBe(0);
+    });
+  });
+
   describe("saveSuggestFeedback and getSuggestFeedbackForNote", () => {
     let noteId: number;
 

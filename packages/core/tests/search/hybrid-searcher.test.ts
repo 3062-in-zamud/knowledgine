@@ -63,13 +63,13 @@ describe("HybridSearcher", () => {
       expect(embedQuerySpy).not.toHaveBeenCalled();
     });
 
-    it("CJK-dominant query with e5 model → alpha=0.5 (blended, vector search executed)", async () => {
+    it("CJK-dominant query with e5 model → alpha=0.3 (semantic-leaning blend, vector search executed)", async () => {
       const e5Searcher = new HybridSearcher(ctx.repository, provider, 0.3, "e5");
       const embedQuerySpy = vi.spyOn(provider, "embedQuery");
 
       await e5Searcher.search("TypeScriptの使い方を学ぶ");
 
-      // alpha=0.5 なのでベクトル検索が実行される
+      // alpha=0.3 なのでベクトル検索が実行される (KNOW-435: 0.5→0.3)
       expect(embedQuerySpy).toHaveBeenCalled();
     });
 
