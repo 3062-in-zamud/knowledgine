@@ -407,35 +407,42 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       console.error("\n" + report);
 
       // Show error details when errors occurred
-      if (summary.errors > 0 && summary.errorDetails && summary.errorDetails.length > 0) {
-        const displayCount = options.verbose
-          ? summary.errorDetails.length
-          : Math.min(10, summary.errorDetails.length);
+      if (summary.errors > 0) {
+        const detailedCount = summary.errorDetails?.length ?? 0;
+        const undetailedCount = Math.max(0, summary.errors - detailedCount);
         console.error(
           `\n  ${symbols.warning} ${colors.warning(`${summary.errors} error(s) during ingest:`)}`,
         );
-        for (let i = 0; i < displayCount; i++) {
-          const e = summary.errorDetails[i];
-          console.error(`    [${e.category}] ${e.sourceUri} — ${e.message}`);
-        }
-        if (!options.verbose && summary.errorDetails.length > 10) {
+        if (detailedCount > 0) {
+          const displayCount = options.verbose ? detailedCount : Math.min(10, detailedCount);
+          for (let i = 0; i < displayCount; i++) {
+            const e = summary.errorDetails![i];
+            console.error(`    [${e.category}] ${e.sourceUri} — ${e.message}`);
+          }
+          if (!options.verbose && detailedCount > 10) {
+            console.error(`    ... and ${detailedCount - 10} more (use --verbose to see all)`);
+          }
+          if (undetailedCount > 0) {
+            console.error(`    ${undetailedCount} error(s) did not include detailed records.`);
+          }
+          // Category breakdown (always shown when errors present)
+          const counts: Record<string, number> = {};
+          for (const e of summary.errorDetails!) {
+            counts[e.category] = (counts[e.category] ?? 0) + 1;
+          }
+          const breakdown = Object.entries(counts)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(", ");
+          console.error(`    Categories: ${breakdown}`);
+          // Action hints per category
+          const hints = buildCategoryHints(counts);
+          for (const hint of hints) {
+            console.error(`    ${symbols.info} ${colors.hint(hint)}`);
+          }
+        } else {
           console.error(
-            `    ... and ${summary.errorDetails.length - 10} more (use --verbose to see all)`,
+            `    No error details available; re-run with --verbose for more context if supported.`,
           );
-        }
-        // Category breakdown (always shown when errors present)
-        const counts: Record<string, number> = {};
-        for (const e of summary.errorDetails) {
-          counts[e.category] = (counts[e.category] ?? 0) + 1;
-        }
-        const breakdown = Object.entries(counts)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(", ");
-        console.error(`    Categories: ${breakdown}`);
-        // Action hints per category
-        const hints = buildCategoryHints(counts);
-        for (const hint of hints) {
-          console.error(`    ${symbols.info} ${colors.hint(hint)}`);
         }
       }
 
