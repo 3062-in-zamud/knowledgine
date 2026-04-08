@@ -15,6 +15,9 @@ const DEPENDABOT_SUBJECT_PATTERNS = [
   /^chore\(deps(-dev)?\):/i,
   /^build\(deps(-dev)?\):/i,
   /^bump\s+\S+\s+from\s+/i,
+  /^ci(\(.+\))?:/i,
+  /^chore\(ci\):/i,
+  /update.*github.actions?/i,
 ];
 
 const BUNDLE_COMMIT_PATTERNS = [
@@ -31,6 +34,12 @@ const DEFAULT_BOT_AUTHORS = [
   "github-actions[bot]",
   "greenkeeper[bot]",
   "codecov[bot]",
+  "mend-bolt-for-github[bot]",
+  "sonarcloud[bot]",
+  "allcontributors[bot]",
+  "imgbot[bot]",
+  "stale[bot]",
+  "snyk-bot",
 ];
 
 const DEFAULT_SHORT_MESSAGE_THRESHOLD = 10;
