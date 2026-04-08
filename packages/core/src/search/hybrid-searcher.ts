@@ -28,11 +28,24 @@ export class HybridSearcher {
    * Determine semantic similarity threshold based on query length.
    * Short keyword queries use strict threshold to filter noise;
    * longer natural-language queries use relaxed threshold to find partial matches.
+   * For CJK queries (no spaces), falls back to character count as proxy for token count.
    */
   private getSemanticThreshold(query: string): number {
-    const wordCount = query.trim().split(/\s+/).length;
-    if (wordCount <= 2) return this.semanticThreshold; // short: use configured default
-    if (wordCount <= 5) return Math.min(this.semanticThreshold, 0.4);
+    const trimmed = query.trim();
+    const wordCount = trimmed.split(/\s+/).length;
+
+    // CJK fallback: languages without spaces appear as 1 "word" regardless of length.
+    // Use character count as proxy: ~2 chars per CJK token on average.
+    let effectiveTokenCount = wordCount;
+    if (wordCount === 1 && trimmed.length > 2) {
+      const cjkChars = trimmed.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/g);
+      if (cjkChars && cjkChars.length >= 2) {
+        effectiveTokenCount = Math.ceil(cjkChars.length / 2);
+      }
+    }
+
+    if (effectiveTokenCount <= 2) return this.semanticThreshold; // short: strict
+    if (effectiveTokenCount <= 5) return Math.min(this.semanticThreshold, 0.4);
     return Math.min(this.semanticThreshold, 0.3); // long queries: relaxed
   }
 
@@ -132,11 +145,12 @@ export class HybridSearcher {
 
       // Fixed scaling (replaces min-max normalization to preserve absolute score differences)
       // RRF theoretical max: 2/(k+1) when a doc is rank=1 in both sources
-      // scaleFactor maps this max to 1.0; single-source docs max at ~0.5
+      // scaleFactor maps this max to 1.0; single-source-only docs max at ~0.5 (for 2+ results)
+      // Special case: single result gets 1.0 for backward compat (see size===1 branch)
       if (rrfScores.size === 0) {
         scored = [];
       } else if (rrfScores.size === 1) {
-        // Single result: maintain backward compat score of 1.0
+        // Single result: maintain backward compat score of 1.0 (overrides ~0.5 scaling)
         const [noteId] = rrfScores.keys();
         scored = [{ noteId, score: 1.0 }];
       } else {
