@@ -66,6 +66,24 @@ function getTopEntities(repository: KnowledgeRepository, limit: number): TopEnti
   }
 }
 
+/** Build action hints for a set of error category counts. */
+export function buildCategoryHints(counts: Record<string, number>): string[] {
+  const hints: string[] = [];
+  if (counts["network"]) {
+    hints.push("network errors: check your internet connection or proxy settings.");
+  }
+  if (counts["parse"]) {
+    hints.push("parse errors: some files may be malformed or in an unsupported format.");
+  }
+  if (counts["rate_limit"]) {
+    hints.push("rate_limit errors: you have been rate-limited. Wait and retry, or use --limit.");
+  }
+  if (counts["permission"]) {
+    hints.push("permission errors: check file/API permissions for the affected sources.");
+  }
+  return hints;
+}
+
 export interface IngestOptions {
   source?: string;
   path?: string;
@@ -199,6 +217,7 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       let totalProcessed = 0;
       let totalErrors = 0;
       let totalSkippedLargeDiff = 0;
+      const allErrorDetails: Array<{ category: string; sourceUri: string; message: string }> = [];
 
       for (const plugin of plugins) {
         const initResult = initResults.get(plugin.manifest.id);
@@ -235,6 +254,9 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
           totalErrors += summary.errors;
           totalSkippedLargeDiff += summary.skippedLargeDiff ?? 0;
           if (summary.noteIds) ingestedNoteIds.push(...summary.noteIds);
+          if (summary.errorDetails) {
+            allErrorDetails.push(...summary.errorDetails);
+          }
           progress.update(completed, plugin.manifest.id);
 
           const parts = [`${summary.processed} events`];
@@ -286,6 +308,56 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       const report = createSummaryReport("knowledgine ingest", reportEntries);
       console.error("\n" + report);
 
+      // Show error summary/details from all plugins
+      if (totalErrors > 0) {
+        const detailedErrorCount = allErrorDetails.length;
+        const undetailedErrorCount = Math.max(0, totalErrors - detailedErrorCount);
+        console.error(
+          `\n  ${symbols.warning} ${colors.warning(`${totalErrors} error(s) during ingest:`)}`,
+        );
+        if (detailedErrorCount > 0 || undetailedErrorCount > 0) {
+          console.error(
+            `    ${detailedErrorCount} with details, ${undetailedErrorCount} without details`,
+          );
+        }
+
+        if (detailedErrorCount > 0) {
+          const displayCount = options.verbose
+            ? detailedErrorCount
+            : Math.min(10, detailedErrorCount);
+          for (let i = 0; i < displayCount; i++) {
+            const e = allErrorDetails[i];
+            console.error(`    [${e.category}] ${e.sourceUri} — ${e.message}`);
+          }
+          if (!options.verbose && detailedErrorCount > 10) {
+            console.error(
+              `    ... and ${detailedErrorCount - 10} more detailed error(s) (use --verbose to see all)`,
+            );
+          }
+          if (undetailedErrorCount > 0) {
+            console.error(`    ${undetailedErrorCount} error(s) did not include detailed records.`);
+          }
+          // Category breakdown (shown when detailed errors are present)
+          const counts: Record<string, number> = {};
+          for (const e of allErrorDetails) {
+            counts[e.category] = (counts[e.category] ?? 0) + 1;
+          }
+          const breakdown = Object.entries(counts)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(", ");
+          console.error(`    Categories: ${breakdown}`);
+          // Action hints per category
+          const hints = buildCategoryHints(counts);
+          for (const hint of hints) {
+            console.error(`    ${symbols.info} ${colors.hint(hint)}`);
+          }
+        } else {
+          console.error(
+            `    No error details available; re-run with --verbose for more context if supported.`,
+          );
+        }
+      }
+
       // Next-step hint after --all ingest
       const uniqueAllNoteIds = Array.from(new Set(ingestedNoteIds));
       if (uniqueAllNoteIds.length > 0) {
@@ -335,32 +407,42 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       console.error("\n" + report);
 
       // Show error details when errors occurred
-      if (summary.errors > 0 && summary.errorDetails && summary.errorDetails.length > 0) {
-        const displayCount = options.verbose
-          ? summary.errorDetails.length
-          : Math.min(5, summary.errorDetails.length);
+      if (summary.errors > 0) {
+        const detailedCount = summary.errorDetails?.length ?? 0;
+        const undetailedCount = Math.max(0, summary.errors - detailedCount);
         console.error(
           `\n  ${symbols.warning} ${colors.warning(`${summary.errors} error(s) during ingest:`)}`,
         );
-        for (let i = 0; i < displayCount; i++) {
-          const e = summary.errorDetails[i];
-          console.error(`    [${e.category}] ${e.sourceUri} — ${e.message}`);
-        }
-        if (!options.verbose && summary.errorDetails.length > 5) {
-          console.error(
-            `    ... and ${summary.errorDetails.length - 5} more (use --verbose to see all)`,
-          );
-        }
-        if (options.verbose) {
-          // category breakdown
+        if (detailedCount > 0) {
+          const displayCount = options.verbose ? detailedCount : Math.min(10, detailedCount);
+          for (let i = 0; i < displayCount; i++) {
+            const e = summary.errorDetails![i];
+            console.error(`    [${e.category}] ${e.sourceUri} — ${e.message}`);
+          }
+          if (!options.verbose && detailedCount > 10) {
+            console.error(`    ... and ${detailedCount - 10} more (use --verbose to see all)`);
+          }
+          if (undetailedCount > 0) {
+            console.error(`    ${undetailedCount} error(s) did not include detailed records.`);
+          }
+          // Category breakdown (always shown when errors present)
           const counts: Record<string, number> = {};
-          for (const e of summary.errorDetails) {
+          for (const e of summary.errorDetails!) {
             counts[e.category] = (counts[e.category] ?? 0) + 1;
           }
           const breakdown = Object.entries(counts)
             .map(([k, v]) => `${k}: ${v}`)
             .join(", ");
           console.error(`    Categories: ${breakdown}`);
+          // Action hints per category
+          const hints = buildCategoryHints(counts);
+          for (const hint of hints) {
+            console.error(`    ${symbols.info} ${colors.hint(hint)}`);
+          }
+        } else {
+          console.error(
+            `    No error details available; re-run with --verbose for more context if supported.`,
+          );
         }
       }
 
