@@ -241,6 +241,95 @@ describe("isDependabotCommit - extended bot authors", () => {
   });
 });
 
+describe("KNOW-432: expanded CI/bot noise filter patterns", () => {
+  describe("new bot authors in DEFAULT_BOT_AUTHORS", () => {
+    it("should detect mend-bolt-for-github[bot] as a bot author", () => {
+      expect(isDependabotCommit("dependency update", "mend-bolt-for-github[bot]")).toBe(true);
+    });
+
+    it("should detect sonarcloud[bot] as a bot author", () => {
+      expect(isDependabotCommit("quality report", "sonarcloud[bot]")).toBe(true);
+    });
+
+    it("should detect allcontributors[bot] as a bot author", () => {
+      expect(isDependabotCommit("add contributor", "allcontributors[bot]")).toBe(true);
+    });
+
+    it("should detect imgbot[bot] as a bot author", () => {
+      expect(isDependabotCommit("optimize images", "imgbot[bot]")).toBe(true);
+    });
+
+    it("should detect stale[bot] as a bot author", () => {
+      expect(isDependabotCommit("mark stale", "stale[bot]")).toBe(true);
+    });
+
+    it("should detect snyk-bot (no [bot] suffix) as a bot author", () => {
+      expect(isDependabotCommit("fix vulnerability", "snyk-bot")).toBe(true);
+    });
+
+    it("should detect snyk-bot case-insensitively", () => {
+      expect(isDependabotCommit("fix vulnerability", "Snyk-Bot")).toBe(true);
+    });
+  });
+
+  describe("new DEPENDABOT_SUBJECT_PATTERNS", () => {
+    it('should match "ci: update workflow"', () => {
+      expect(isDependabotCommit("ci: update workflow")).toBe(true);
+    });
+
+    it('should match "ci(lint): update linting config"', () => {
+      expect(isDependabotCommit("ci(lint): update linting config")).toBe(true);
+    });
+
+    it('should match "chore(ci): update config"', () => {
+      expect(isDependabotCommit("chore(ci): update config")).toBe(true);
+    });
+
+    it('should match "Update GitHub Actions workflow"', () => {
+      expect(isDependabotCommit("Update GitHub Actions workflow")).toBe(true);
+    });
+
+    it('should match "update github actions" case-insensitively', () => {
+      expect(isDependabotCommit("update github actions")).toBe(true);
+    });
+
+    it('should match "Update GitHub Action (singular)"', () => {
+      expect(isDependabotCommit("Update GitHub Action to latest")).toBe(true);
+    });
+
+    it("should not match unrelated ci-prefixed strings", () => {
+      // "circuit" starts with "ci" but not "ci:" pattern
+      expect(isDependabotCommit("circuit breaker refactoring")).toBe(false);
+    });
+  });
+
+  describe("classifyNoiseLevel for new patterns returns low-value", () => {
+    it("should classify snyk-bot commits as low-value", () => {
+      expect(classifyNoiseLevel("fix vulnerability", "snyk-bot", ["package.json"])).toBe(
+        "low-value",
+      );
+    });
+
+    it('should classify "ci: update workflow" as low-value', () => {
+      expect(classifyNoiseLevel("ci: update workflow", "user", [".github/workflows/ci.yml"])).toBe(
+        "low-value",
+      );
+    });
+
+    it('should classify "chore(ci): update config" as low-value', () => {
+      expect(
+        classifyNoiseLevel("chore(ci): update config", "user", [".github/workflows/lint.yml"]),
+      ).toBe("low-value");
+    });
+
+    it('should classify "Update GitHub Actions workflow" as low-value', () => {
+      expect(
+        classifyNoiseLevel("Update GitHub Actions workflow", "user", [".github/workflows/ci.yml"]),
+      ).toBe("low-value");
+    });
+  });
+});
+
 describe("backward-compatible function exports", () => {
   it("classifyNoiseLevel should work as before", () => {
     expect(classifyNoiseLevel("wip", "dev", ["src/a.ts"])).toBe("low-value");

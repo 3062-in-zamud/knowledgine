@@ -73,7 +73,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   // Open DB and get stats
   let totalNotes = 0;
   let totalPatterns = 0;
-  let notesBySource: Record<string, number> = {};
+  let notesBySubType: Record<string, number> = {};
   let readiness: SemanticReadiness | undefined;
   try {
     const db = createDatabase(dbPath);
@@ -86,7 +86,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const stats = repository.getStats();
     totalNotes = stats.totalNotes;
     totalPatterns = stats.totalPatterns;
-    notesBySource = stats.notesBySource;
+    notesBySubType = stats.notesBySubType;
 
     const modelManager = new ModelManager();
     readiness = checkSemanticReadiness(config, modelManager, repository);
@@ -165,17 +165,31 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
       ? `${symbols.success} ${colors.success(configuredTools.join(", "))}`
       : colors.hint("none configured");
 
-  // Build source breakdown lines
-  const sourceEntries = Object.entries(notesBySource).sort(([, a], [, b]) => b - a);
-  const sourceLines = sourceEntries.map(
-    ([source, count]) => `    ${colors.dim(source.padEnd(16))}${count}`,
-  );
+  // Build sub-type breakdown lines (more granular than source)
+  const SUB_TYPE_LABELS: Record<string, string> = {
+    commit: "commits",
+    pull_request: "pull requests",
+    pr_comment: "PR comments",
+    pr_review: "PR reviews",
+    issue: "issues",
+    issue_comment: "issue comments",
+    github_other: "github other",
+    file: "files",
+    claude_session: "claude sessions",
+    cursor_session: "cursor sessions",
+    obsidian: "obsidian notes",
+  };
+  const subTypeEntries = Object.entries(notesBySubType).sort(([, a], [, b]) => b - a);
+  const subTypeLines = subTypeEntries.map(([type, count]) => {
+    const label = SUB_TYPE_LABELS[type] ?? type;
+    return `    ${colors.dim(label.padEnd(16))}${count}`;
+  });
 
   const contentParts = [
     `${colors.bold("Database")}`,
     `  ${pad("Path:")}${dbPath} (${sizeStr})`,
     `  ${pad("Notes:")}${colors.info(String(totalNotes))} indexed`,
-    ...(sourceEntries.length > 1 ? sourceLines : []),
+    ...(subTypeEntries.length > 1 ? subTypeLines : []),
     `  ${pad("Patterns:")}${colors.info(String(totalPatterns))} extracted`,
     `  ${pad("Embeddings:")}${colors.info(`${embeddingsGenerated}/${totalNotes} (${embeddingCoverage}%)`)} generated`,
     "",

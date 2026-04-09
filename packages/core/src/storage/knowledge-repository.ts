@@ -451,6 +451,7 @@ export class KnowledgeRepository {
     totalPairs: number;
     patternsByType: Record<string, number>;
     notesBySource: Record<string, number>;
+    notesBySubType: Record<string, number>;
   } {
     const totalNotes = (
       this.stmt("SELECT COUNT(*) as count FROM knowledge_notes").get() as { count: number }
@@ -487,7 +488,50 @@ export class KnowledgeRepository {
       notesBySource[row.source] = row.count;
     }
 
-    return { totalNotes, totalPatterns, totalLinks, totalPairs, patternsByType, notesBySource };
+    // Sub-type breakdown using file_path URI patterns
+    const subTypeRows = this.db
+      .prepare(
+        `SELECT
+          CASE
+            WHEN file_path LIKE 'github://%/pr/%/inline-comments' THEN 'pr_comment'
+            WHEN file_path LIKE 'github://%/pr/%/details' THEN 'pull_request'
+            WHEN file_path LIKE 'github://%/pull/%/comments' THEN 'pr_comment'
+            WHEN file_path LIKE 'github://%/pull/%/reviews/%' THEN 'pr_review'
+            WHEN file_path LIKE 'github://%/pull/%/reviews' THEN 'pr_review'
+            WHEN file_path LIKE 'github://%/pull/%' THEN 'pull_request'
+            WHEN file_path LIKE 'github://%/pulls/%/comments' THEN 'pr_comment'
+            WHEN file_path LIKE 'github://%/pulls/%/reviews/%' THEN 'pr_review'
+            WHEN file_path LIKE 'github://%/pulls/%/reviews' THEN 'pr_review'
+            WHEN file_path LIKE 'github://%/pulls/%' THEN 'pull_request'
+            WHEN file_path LIKE 'github://%/issues/%/comments' THEN 'issue_comment'
+            WHEN file_path LIKE 'github://%/issues/%' THEN 'issue'
+            WHEN file_path LIKE 'github://%' THEN 'github_other'
+            WHEN file_path LIKE 'git://%' THEN 'commit'
+            WHEN file_path LIKE 'claude-session://%' THEN 'claude_session'
+            WHEN file_path LIKE 'cursor://%' THEN 'cursor_session'
+            WHEN file_path LIKE 'obsidian://%' THEN 'obsidian'
+            ELSE 'file'
+          END as sub_type,
+          COUNT(*) as count
+        FROM knowledge_notes
+        GROUP BY sub_type
+        ORDER BY count DESC`,
+      )
+      .all() as Array<{ sub_type: string; count: number }>;
+    const notesBySubType: Record<string, number> = {};
+    for (const row of subTypeRows) {
+      notesBySubType[row.sub_type] = row.count;
+    }
+
+    return {
+      totalNotes,
+      totalPatterns,
+      totalLinks,
+      totalPairs,
+      patternsByType,
+      notesBySource,
+      notesBySubType,
+    };
   }
 
   /**

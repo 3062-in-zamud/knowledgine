@@ -25,11 +25,36 @@ export class HybridSearcher {
   ) {}
 
   /**
+   * Determine semantic similarity threshold based on query length.
+   * Short keyword queries use strict threshold to filter noise;
+   * longer natural-language queries use relaxed threshold to find partial matches.
+   * For CJK queries (no spaces), falls back to character count as proxy for token count.
+   */
+  private getSemanticThreshold(query: string): number {
+    const trimmed = query.trim();
+    const wordCount = trimmed.split(/\s+/).length;
+
+    // CJK fallback: languages without spaces appear as 1 "word" regardless of length.
+    // Use character count as proxy: ~2 chars per CJK token on average.
+    let effectiveTokenCount = wordCount;
+    if (wordCount === 1 && trimmed.length > 2) {
+      const cjkChars = trimmed.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/g);
+      if (cjkChars && cjkChars.length >= 2) {
+        effectiveTokenCount = Math.ceil(cjkChars.length / 2);
+      }
+    }
+
+    if (effectiveTokenCount <= 2) return this.semanticThreshold; // short: strict
+    if (effectiveTokenCount <= 5) return Math.min(this.semanticThreshold, 0.4);
+    return Math.min(this.semanticThreshold, 0.3); // long queries: relaxed
+  }
+
+  /**
    * クエリに応じてalphaを動的に決定する。
    * CJK文字が支配的な場合、モデルの多言語能力に応じてalphaを調整する。
    *
    * - CJK割合 < 30%: 通常のalpha（主にラテン文字クエリ）
-   * - CJK支配的 + e5モデル: alpha=0.5（多言語モデルはblendedが有効）
+   * - CJK支配的 + e5モデル: alpha=0.3（多言語モデルはsemantic寄りblendedが有効）
    * - CJK支配的 + bertモデル: alpha=1.0（英語専用モデルはキーワードのみ）
    */
   private determineAlpha(query: string): number {
@@ -40,7 +65,7 @@ export class HybridSearcher {
     if (cjkRatio < 0.3) return this.alpha; // 主にラテン文字 → 通常
 
     // CJK支配的なクエリ
-    if (this.modelFamily === "e5") return 0.5; // 多言語モデル → blended
+    if (this.modelFamily === "e5") return 0.3; // 多言語モデル → semantic寄りblended
     return 1.0; // 英語専用モデル → キーワードのみ
   }
 
@@ -80,12 +105,13 @@ export class HybridSearcher {
       }
     }
 
-    // ベクトルスコアマップ (L2 distance → cosine similarity)。semanticThreshold 未満は除外。
+    // ベクトルスコアマップ (L2 distance → cosine similarity)。動的threshold未満は除外。
     // SemanticSearcher と同じ変換式: cosine_similarity = 1 - L2_distance² / 2 (unit vectors)
+    const effectiveThreshold = this.getSemanticThreshold(query);
     const vecMap = new Map<number, number>();
     for (const { note_id, distance } of vecResults) {
       const score = Math.max(0, 1 - (distance * distance) / 2);
-      if (score >= this.semanticThreshold) {
+      if (score >= effectiveThreshold) {
         vecMap.set(note_id, score);
       }
     }
@@ -117,19 +143,21 @@ export class HybridSearcher {
         rrfScores.set(noteId, (rrfScores.get(noteId) ?? 0) + 1 / (k + rank));
       }
 
-      // Min-Max正規化で0-1範囲に復元
+      // Fixed scaling (replaces min-max normalization to preserve absolute score differences)
+      // RRF theoretical max: 2/(k+1) when a doc is rank=1 in both sources
+      // scaleFactor maps this max to 1.0; single-source-only docs max at ~0.5 (for 2+ results)
+      // Special case: single result gets 1.0 for backward compat (see size===1 branch)
       if (rrfScores.size === 0) {
         scored = [];
+      } else if (rrfScores.size === 1) {
+        // Single result: maintain backward compat score of 1.0 (overrides ~0.5 scaling)
+        const [noteId] = rrfScores.keys();
+        scored = [{ noteId, score: 1.0 }];
       } else {
-        const rrfValues = [...rrfScores.values()];
-        const minRrf = Math.min(...rrfValues);
-        const maxRrf = Math.max(...rrfValues);
-        const rrfRange = maxRrf - minRrf;
-
+        const scaleFactor = (k + 1) / 2;
         scored = [];
         for (const [noteId, rrf] of rrfScores) {
-          const normalized = rrfRange > 0 ? (rrf - minRrf) / rrfRange : 1.0;
-          scored.push({ noteId, score: normalized });
+          scored.push({ noteId, score: Math.min(1.0, rrf * scaleFactor) });
         }
       }
     }
