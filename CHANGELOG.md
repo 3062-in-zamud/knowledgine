@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-04-09
+
+### Added
+
+#### CLI (`@knowledgine/cli`)
+
+- **Source sub-type breakdown in status**: `status` command now shows per-source sub-type breakdown (e.g., issues, pull requests, commits)
+
+### Fixed
+
+#### Core — search (`@knowledgine/core`)
+
+- **RRF fixed scaling + CJK alpha + dynamic threshold**: Fix RRF score normalization with fixed 0–1 scaling, CJK-aware alpha calculation, and dynamic semantic threshold
+- **CJK character-count fallback**: Add CJK character-count fallback for semantic threshold when tokenizer produces fewer tokens than expected
+- **Pulls URI pattern**: Handle `/pulls/` (plural) URI patterns in `notesBySubType`
+
+#### CLI (`@knowledgine/cli`)
+
+- **Error details in ingest modes**: Show error details when `ingest --all` or single-source ingest encounters source-level failures
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **Expanded CI/bot noise filter**: Add additional CI/bot commit patterns to noise filter
+
+### Security
+
+- **Dependency audit**: Fix security audit vulnerabilities in production dependencies
+
+### Tests
+
+- **Sprint 7 regression tests**: Add regression tests covering RRF scaling, CJK alpha, and dynamic threshold changes
+- **CI benchmark threshold**: Relax flaky benchmark threshold for CI environments
+- **CLI truncation message**: Update truncation message assertion for detailed error count format
+
 ## [0.6.8] - 2026-04-07
 
 ### Changed
@@ -645,7 +679,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Configurable watch patterns and ignore patterns
 - Graceful shutdown handling (SIGINT/SIGTERM)
 
-[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.8...HEAD
+[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.9...HEAD
+[0.6.9]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.5...v0.6.6
