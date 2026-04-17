@@ -37,7 +37,7 @@ jobs:
         if: steps.tag_check.outputs.exists == 'true'
         run: echo "Tag ${{ steps.version.outputs.version }} already exists. Skipping release."
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         if: steps.tag_check.outputs.exists == 'false'
 
       - uses: actions/setup-node@v6
