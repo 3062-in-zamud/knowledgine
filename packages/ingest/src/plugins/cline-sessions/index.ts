@@ -43,10 +43,12 @@ function buildSummary(
   taskId: string,
 ): string {
   const head = messages.slice(0, MAX_HEAD_MESSAGES);
-  const tail =
-    messages.length > MAX_HEAD_MESSAGES + MAX_TAIL_MESSAGES
-      ? messages.slice(messages.length - MAX_TAIL_MESSAGES)
-      : [];
+  // When a task has more messages than the head budget, append a tail block as
+  // well. The tail size is capped at MAX_TAIL_MESSAGES *and* at the number of
+  // messages remaining after the head, so head/tail never overlap.
+  const remaining = Math.max(0, messages.length - head.length);
+  const tailSize = Math.min(MAX_TAIL_MESSAGES, remaining);
+  const tail = tailSize > 0 ? messages.slice(messages.length - tailSize) : [];
   const truncated = Math.max(0, messages.length - head.length - tail.length);
 
   const decisionCount = { value: 0 };
@@ -103,13 +105,26 @@ function buildEvent(
   taskId: string,
   ctx: ProcessContext,
   messages: ClineNormalizedMessage[],
+  fallbackMtime: number,
 ): NormalizedEvent {
   const history = ctx.history.get(taskId);
   const summary = buildSummary(messages, history, taskId);
-  const ts =
+  // Prefer HistoryItem.ts (task start, recorded by Cline). When absent, fall
+  // back to (a) the first parsed message timestamp if extracted from
+  // ui_messages.json (api_conversation_history.json messages carry no per-msg
+  // timestamp, so this is non-zero only on UI fallback), and finally (b) the
+  // max mtime across the per-task files. The chain prevents events from being
+  // stamped with the Unix epoch when taskHistory.json is unavailable.
+  const firstMessageTs = messages[0]?.timestamp.getTime() ?? 0;
+  const tsMs =
     history?.ts && Number.isFinite(history.ts)
-      ? new Date(history.ts)
-      : (messages[0]?.timestamp ?? new Date(0));
+      ? history.ts
+      : firstMessageTs > 0
+        ? firstMessageTs
+        : fallbackMtime > 0
+          ? fallbackMtime
+          : 0;
+  const ts = new Date(tsMs);
 
   return {
     sourceUri: `cline-session://${ctx.storageHash}/${taskId}`,
@@ -232,6 +247,7 @@ export class ClineSessionsPlugin implements IngestPlugin {
     if (result.messages.length === 0) {
       return null;
     }
-    return buildEvent(taskId, ctx, result.messages);
+    const fallbackMtime = await maxTaskMtime(taskDir);
+    return buildEvent(taskId, ctx, result.messages, fallbackMtime);
   }
 }

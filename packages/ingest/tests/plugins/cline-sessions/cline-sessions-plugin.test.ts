@@ -187,4 +187,76 @@ describe("ClineSessionsPlugin", () => {
       await expect(plugin.dispose()).resolves.toBeUndefined();
     });
   });
+
+  describe("buildSummary boundary — messages between MAX_HEAD and MAX_HEAD+MAX_TAIL", () => {
+    it("emits a tail block (head 100 + tail 50) when messages > head budget but ≤ head+tail budget — no truncation needed", async () => {
+      const tmpRoot = await mkdtemp(join(tmpdir(), "cline-boundary-"));
+      try {
+        // Build a task with 150 messages: head 100 + tail 50, no overlap.
+        const taskDir = join(tmpRoot, "tasks", "task-150");
+        await mkdir(taskDir, { recursive: true });
+        const msgs: Array<{ role: string; content: string }> = [];
+        for (let i = 0; i < 150; i++) {
+          msgs.push({ role: i % 2 === 0 ? "user" : "assistant", content: `msg-${i}` });
+        }
+        await writeFile(join(taskDir, "api_conversation_history.json"), JSON.stringify(msgs));
+        const events = await collect(plugin.ingestAll(tmpRoot));
+        expect(events.length).toBe(1);
+        const content = events[0]!.content;
+        expect(content).toContain("msg-0");
+        expect(content).toContain("msg-99");
+        // Tail must include the most recent messages — bug fix M-1.
+        expect(content).toContain("msg-149");
+        // 150 ≤ 200 (head+tail budget), so no truncation marker is expected.
+        expect(content).not.toMatch(/\(\.\.\. \d+ messages truncated \.\.\.\)/);
+      } finally {
+        await rm(tmpRoot, { recursive: true, force: true });
+      }
+    });
+
+    it("includes a truncation marker when messages > head + tail budget (250 messages → head 100 + tail 100 + 50 truncated)", async () => {
+      const tmpRoot = await mkdtemp(join(tmpdir(), "cline-truncate-"));
+      try {
+        const taskDir = join(tmpRoot, "tasks", "task-250");
+        await mkdir(taskDir, { recursive: true });
+        const msgs: Array<{ role: string; content: string }> = [];
+        for (let i = 0; i < 250; i++) {
+          msgs.push({ role: i % 2 === 0 ? "user" : "assistant", content: `msg-${i}` });
+        }
+        await writeFile(join(taskDir, "api_conversation_history.json"), JSON.stringify(msgs));
+        const events = await collect(plugin.ingestAll(tmpRoot));
+        const content = events[0]!.content;
+        expect(content).toContain("msg-0");
+        expect(content).toContain("msg-99");
+        expect(content).toContain("msg-150");
+        expect(content).toContain("msg-249");
+        // 250 > 200 → 50 messages truncated in the middle.
+        expect(content).toMatch(/\(\.\.\. 50 messages truncated \.\.\.\)/);
+        // Excluded middle: msg-100 to msg-149 must NOT appear (they were truncated).
+        expect(content).not.toContain("msg-149");
+      } finally {
+        await rm(tmpRoot, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("timestamp fallback when taskHistory.json is absent", () => {
+    it("uses the per-task max mtime instead of epoch (1970) when no HistoryItem", async () => {
+      const tmpRoot = await mkdtemp(join(tmpdir(), "cline-ts-fallback-"));
+      try {
+        const taskDir = join(tmpRoot, "tasks", "task-no-history");
+        await mkdir(taskDir, { recursive: true });
+        const apiPath = join(taskDir, "api_conversation_history.json");
+        await writeFile(apiPath, JSON.stringify([{ role: "user", content: "hello" }]));
+        const beforeMs = Date.now() - 5_000;
+        const events = await collect(plugin.ingestAll(tmpRoot));
+        expect(events.length).toBe(1);
+        const ts = events[0]!.timestamp.getTime();
+        // Must NOT be epoch — bug fix M-3.
+        expect(ts).toBeGreaterThan(beforeMs);
+      } finally {
+        await rm(tmpRoot, { recursive: true, force: true });
+      }
+    });
+  });
 });
