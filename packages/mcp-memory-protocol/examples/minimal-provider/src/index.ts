@@ -75,7 +75,8 @@ export class MinimalInMemoryProvider implements MemoryProvider {
   }
 
   async recall(req: MemoryRecallRequest): Promise<MemoryRecallResponse> {
-    const limit = req.limit ?? 10;
+    // Spec §5.2: limit defaults to 10 and is capped at 100.
+    const limit = Math.min(Math.max(req.limit ?? 10, 1), 100);
     const includeHistory = req.includeVersionHistory === true;
     const live = [...this.rows.values()].filter((r) => !r.hardDeleted);
     let cands = includeHistory ? live : live.filter((r) => !r.deprecated);
@@ -86,6 +87,12 @@ export class MinimalInMemoryProvider implements MemoryProvider {
     if (req.filter?.layer) cands = cands.filter((r) => r.layer === req.filter!.layer);
     if (req.filter?.tags?.length) {
       cands = cands.filter((r) => req.filter!.tags!.every((t) => r.tags.includes(t)));
+    }
+    if (req.filter?.createdAfter) {
+      cands = cands.filter((r) => r.createdAt >= req.filter!.createdAfter!);
+    }
+    if (req.filter?.createdBefore) {
+      cands = cands.filter((r) => r.createdAt <= req.filter!.createdBefore!);
     }
     if (req.query) {
       const q = req.query.toLowerCase();
