@@ -110,9 +110,13 @@ Then `vitest run my-provider.conformance.test.ts`. The suite registers `describe
 
 Optional suites only run when `provider.capabilities()` declares the matching capability (`versioning`, `temporalQuery`, `ttl`). To force-skip an opt-in capability you've declared true, pass `skip: ["versioning"]` etc.
 
-## Using the kit with Jest
+## Test runner support
 
-The kit registers vitest's `describe`/`it`/`beforeEach`/`afterEach`. Jest exposes the same names with very similar semantics. For most projects, swapping `vitest` for `jest` in your dev dependencies and configuring Jest with ESM support is enough. If you hit issues, see `MIGRATION.md` for a worked Jest example.
+The conformance kit imports `describe`, `it`, `expect`, `beforeEach`, and `afterEach` directly from `vitest`, and uses the vitest-specific `ctx.skip()` API inside `beforeEach` to gate optional capability suites. **Jest is not a drop-in replacement** — swapping dev dependencies alone will break module resolution for `vitest` and the `ctx.skip()` calls.
+
+To run the kit as shipped, install `vitest` ≥ 3.
+
+If you must run it under Jest, you need to provide your own compatibility layer (for example, a `moduleNameMapper` that maps the `vitest` module to `@jest/globals`, plus a shim that translates `ctx.skip()` semantics). That setup is not covered here, so the supported path for the conformance kit is vitest.
 
 ## Documentation
 
