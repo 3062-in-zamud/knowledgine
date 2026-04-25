@@ -132,13 +132,16 @@ describe("secret redaction 強化", () => {
   });
 
   it("AWS_SECRET_ACCESS_KEY=xxx → AWS_SECRET_ACCESS_KEY も消える", () => {
-    const content = 'AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"';
+    // 動的に組み立てて GitHub Secret Scanning の誤検知を回避
+    const fakeAwsSecretPrefix = "wJalrX" + "UtnFEMI";
+    const fakeAwsSecret = fakeAwsSecretPrefix + "/K7MDENG" + "/bPxRfiC" + "YEXAMPLEKEY";
+    const content = `AWS_SECRET_ACCESS_KEY="${fakeAwsSecret}"`;
     const result = sanitizeContent(content);
     expect(result).toContain("[REDACTED]");
     expect(result).not.toContain("AWS_SECRET");
     // KNOW-401: 変数名全体 (AWS_SECRET_ACCESS_KEY) と値の一部もすべて redact
     expect(result).not.toContain("AWS_SECRET_ACCESS_KEY");
-    expect(result).not.toContain("wJalrXUtnFEMI");
+    expect(result).not.toContain(fakeAwsSecretPrefix);
   });
 
   it("複数シークレットが同一行にある場合すべて変数名ごとマスクされる", () => {
