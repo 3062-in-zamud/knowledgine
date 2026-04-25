@@ -1,73 +1,60 @@
-// Optional capability: versioning (createVersion: true)
-import type { ConformanceTestContext, ConformanceResult } from "./helpers.js";
-import { callTool, makeResult } from "./helpers.js";
+// Optional capability: versioning (§8 / createVersion: true, includeVersionHistory)
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { MemoryProvider } from "../provider.js";
+import { shouldRunCapability, type RunConformanceOptions } from "./helpers.js";
 
-export async function runVersioningTests(
-  ctx: ConformanceTestContext,
-): Promise<ConformanceResult[]> {
-  const results: ConformanceResult[] = [];
+export function registerVersioningTests(options: RunConformanceOptions): void {
+  describe("versioning (§8) [capability: versioning]", () => {
+    let provider: MemoryProvider;
+    let provisioned = false;
 
-  // Seed a memory to version
-  let seedId: string | undefined;
-  let seedVersion: number | undefined;
-  try {
-    const r = await callTool(ctx.client, "store_memory", {
-      content: "Original content for versioning test",
-      layer: "episodic",
+    beforeEach(async (ctx) => {
+      provider = await options.createProvider();
+      provisioned = true;
+      const caps = provider.capabilities();
+      if (!shouldRunCapability(caps, options, "versioning")) {
+        ctx.skip();
+      }
     });
-    const d = r.data as Record<string, unknown>;
-    seedId = d.id as string;
-    seedVersion = d.version as number;
-  } catch {
-    // will fail in later tests
-  }
 
-  // update_memory: createVersion=true creates new entry
-  if (seedId && seedVersion !== undefined) {
-    try {
-      const r = await callTool(ctx.client, "update_memory", {
-        id: seedId,
+    afterEach(async () => {
+      if (provisioned) {
+        await options.teardown?.(provider);
+        provisioned = false;
+      }
+    });
+
+    it("update with createVersion=true creates a new id with incremented version", async () => {
+      const seed = await provider.store({
+        content: "Original content for versioning test",
+        layer: "episodic",
+      });
+      const r = await provider.update({
+        id: seed.id,
         content: "Updated versioned content",
         createVersion: true,
       });
-      if (r.isError) throw new Error(`Unexpected error: ${r.text}`);
-      const d = r.data as Record<string, unknown>;
-      const newId = d.id as string;
-      const newVersion = d.version as number;
-      const prevVersion = d.previousVersion as number;
-      if (newId === seedId) throw new Error("New version should have a different id");
-      if (newVersion !== seedVersion + 1)
-        throw new Error(`Expected version=${seedVersion + 1}, got ${newVersion}`);
-      if (prevVersion !== seedVersion)
-        throw new Error(`Expected previousVersion=${seedVersion}, got ${prevVersion}`);
-      results.push(makeResult("versioning: update creates new id with incremented version", true));
-    } catch (e) {
-      results.push(
-        makeResult("versioning: update creates new id with incremented version", false, String(e)),
-      );
-    }
-  }
+      expect(r.id).not.toBe(seed.id);
+      expect(r.version).toBe(seed.version + 1);
+      expect(r.previousVersion).toBe(seed.version);
+    });
 
-  // recall_memory: includeVersionHistory=false excludes deprecated by default
-  if (seedId) {
-    try {
-      const r = await callTool(ctx.client, "recall_memory", {
-        filter: { memoryIds: [seedId] },
+    it("recall_memory excludes deprecated entries when includeVersionHistory=false", async () => {
+      const seed = await provider.store({
+        content: "Versioned recall — original",
+        layer: "episodic",
+      });
+      await provider.update({
+        id: seed.id,
+        content: "Versioned recall — updated",
+        createVersion: true,
+      });
+      const r = await provider.recall({
+        filter: { memoryIds: [seed.id] },
         includeVersionHistory: false,
       });
-      if (r.isError) throw new Error(`Unexpected error: ${r.text}`);
-      const d = r.data as Record<string, unknown>;
-      const memories = d.memories as Array<Record<string, unknown>>;
-      const deprecated = memories.filter((m) => m.deprecated === true);
-      if (deprecated.length > 0)
-        throw new Error("Deprecated entries should be excluded by default");
-      results.push(makeResult("versioning: includeVersionHistory=false excludes deprecated", true));
-    } catch (e) {
-      results.push(
-        makeResult("versioning: includeVersionHistory=false excludes deprecated", false, String(e)),
-      );
-    }
-  }
-
-  return results;
+      const deprecatedReturned = r.memories.filter((m) => m.deprecated === true);
+      expect(deprecatedReturned.length).toBe(0);
+    });
+  });
 }
