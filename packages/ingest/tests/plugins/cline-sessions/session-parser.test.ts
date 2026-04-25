@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { mkdtemp, mkdir, rm, writeFile, truncate } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import {
   parseClineTask,
   readTaskHistory,
@@ -78,5 +80,38 @@ describe("readTaskHistory", () => {
   it("returns empty array when storage dir itself is absent", async () => {
     const items = await readTaskHistory("/nonexistent/cline-storage");
     expect(items).toEqual([]);
+  });
+});
+
+describe("parseClineTask — heap protection (>10MB skip)", () => {
+  let tmpRoot: string | undefined;
+
+  afterEach(async () => {
+    if (tmpRoot) {
+      await rm(tmpRoot, { recursive: true, force: true });
+      tmpRoot = undefined;
+    }
+  });
+
+  it("skips api_conversation_history.json when its on-disk size exceeds 10MB and does NOT fall back to ui_messages.json", async () => {
+    tmpRoot = await mkdtemp(join(tmpdir(), "cline-oversized-"));
+    const taskDir = join(tmpRoot, "task-huge");
+    await mkdir(taskDir, { recursive: true });
+    const apiPath = join(taskDir, "api_conversation_history.json");
+    // Create an 11MB sparse file by truncate(); contents are zero bytes,
+    // larger than MAX_FILE_SIZE (10MB). This avoids actually allocating
+    // 11MB of test memory while still exercising the size guard.
+    await writeFile(apiPath, "[]");
+    await truncate(apiPath, 11 * 1024 * 1024);
+    // ui_messages.json with parseable content — must NOT be used because
+    // the api file's hard skip should short-circuit.
+    await writeFile(
+      join(taskDir, "ui_messages.json"),
+      JSON.stringify([{ ts: 1, type: "say", text: "should not be reached" }]),
+    );
+
+    const result = await parseClineTask(taskDir);
+    expect(result.messages).toEqual([]);
+    expect(result.skipReason).toMatch(/^api: file too large/);
   });
 });
