@@ -1,0 +1,4 @@
+[
+  { "ts": 1714000000000, "type": "say", "say": "task", "text": "Cline タスク開始" },
+  { "ts": 1714000010000, "type": "ask", "ask": "tool", "text": "tsconfig.json を編集して良いですか？" }
+]

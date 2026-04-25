@@ -1,5 +1,10 @@
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
+import { extractTextContent } from "../../shared/text-extractor.js";
+
+// Re-export for downstream callers (tests, other plugins) that import
+// extractTextContent through this module.
+export { extractTextContent } from "../../shared/text-extractor.js";
 
 export interface SessionMessage {
   type: "user" | "assistant" | "system";
@@ -21,27 +26,6 @@ function isValidEntry(
 
 export function isRelevantEntry(entry: { type: string }): boolean {
   return entry.type === "user" || entry.type === "assistant" || entry.type === "system";
-}
-
-export function extractTextContent(
-  content: string | Array<{ type: string; text?: string }>,
-): string {
-  if (typeof content === "string") {
-    return content;
-  }
-  if (!Array.isArray(content)) {
-    return "";
-  }
-  return content
-    .filter(
-      (block): block is { type: string; text: string } =>
-        block !== null &&
-        typeof block === "object" &&
-        block.type === "text" &&
-        typeof block.text === "string",
-    )
-    .map((block) => block.text)
-    .join("");
 }
 
 export async function* parseSessionFile(filePath: string): AsyncGenerator<SessionMessage> {

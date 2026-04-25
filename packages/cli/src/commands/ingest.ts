@@ -21,7 +21,7 @@ import {
   OnnxEmbeddingProvider,
   buildEmbeddingInput,
 } from "@knowledgine/core";
-import { IngestEngine, isRepositoryNotFoundError } from "@knowledgine/ingest";
+import { IngestEngine, isRepositoryNotFoundError, getClineStorageDir } from "@knowledgine/ingest";
 import { createDefaultRegistry, initializePlugins } from "../lib/plugin-loader.js";
 import { createProgress, formatDuration, createSummaryReport } from "../lib/progress.js";
 import { colors, symbols } from "../lib/ui/index.js";
@@ -198,6 +198,22 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
     } catch {
       // Project-specific dir doesn't exist — fall back to all projects
       sourcePath = join(homedir(), ".claude", "projects");
+    }
+  } else if (options.source === "cline-sessions") {
+    // Resolve the Cline storage directory eagerly so the cursor store keys
+    // checkpoints against the actual on-disk path. If we pass "" here, all
+    // cline-sessions runs share a single (pluginId, "") cursor — switching
+    // CLINE_STORAGE_PATH between OS-default and an Insiders/backup dir would
+    // then cause tasks in the new location to be skipped as "already
+    // ingested" because their mtimes are older than the previous location's
+    // checkpoint. Using the resolved path keeps each install isolated.
+    try {
+      sourcePath = getClineStorageDir();
+    } catch (err) {
+      console.error(colors.error(`Error: ${err instanceof Error ? err.message : String(err)}`));
+      process.exitCode = 1;
+      db.close();
+      return;
     }
   }
 

@@ -1,0 +1,15 @@
+[
+  {
+    "id": "task-abc12345",
+    "ulid": "01HFNFGYJ8X9KAYABCDE12345",
+    "ts": 1714000000000,
+    "task": "Cline で TypeScript の型エラーを修正してほしい。tsconfig.json で moduleResolution を bundler に変えるべきか？",
+    "tokensIn": 1234,
+    "tokensOut": 5678,
+    "totalCost": 0.0123,
+    "size": 4096,
+    "cwdOnTaskInitialization": "/Users/dev/projects/sample-app",
+    "modelId": "claude-3-5-sonnet-20241022",
+    "unknown_future_field": "intentionally unknown to verify drift tolerance"
+  }
+]

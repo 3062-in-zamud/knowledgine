@@ -22,6 +22,9 @@ const SECRET_PATTERNS: RegExp[] = [
   /(?<=^|[\s;&|])(?:export\s+)?[A-Z][A-Z0-9]*(?:_[A-Z0-9]+){0,8}_(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|KEY|URL|AUTH|DSN|URI)[A-Z0-9_]{0,32}\s{0,3}[:=]\s{0,3}(?:"[^"\n]{1,256}"|'[^'\n]{1,256}'|[^\s'"`;|&()\[\]{}<>]{4,256})/g,
   /(?<=^|[\s;&|])(?:(?:const|let|var|export)\s+)?[a-z][a-zA-Z0-9]{0,63}(?:[_-]|(?<=[a-z])(?=[A-Z]))(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Cc]redential|[Aa]pi[_-]?[Kk]ey|[Kk]ey|[Uu]rl|[Aa]uth|[Dd]sn|[Uu]ri|[Pp]wd|[Pp]asswd)(?![a-z])[a-zA-Z0-9_-]{0,32}\s{0,3}[:=]\s{0,3}(?:"[^"\n]{1,256}"|'[^'\n]{1,256}'|[^\s'"`;|&()\[\]{}<>]{4,256})/g,
   /(?:api[_-]?key|apikey|secret|token|password)['":\s]*[=:]\s*['"]?([a-zA-Z0-9_\-/.]{16,})/gi,
+  // Anthropic API keys: sk-ant-api03-... (segments separated by hyphens, 40+ chars after prefix).
+  // Must precede the generic sk-/pk- pattern below — this one does NOT bail at the internal hyphens.
+  /sk-ant-(?:api|admin)\d+-[A-Za-z0-9_-]{20,}/g,
   /(?:sk|pk|rk|ak)[-_][a-zA-Z0-9]{20,}/g,
   /gh[pousr]_[a-zA-Z0-9_]{36,}/g,
   /xoxb-[0-9]+-[a-zA-Z0-9]+/g,
@@ -84,6 +87,7 @@ const SOURCE_TYPE_MAP: Record<string, SourceType> = {
   notion: "notion",
   capture: "manual",
   "cursor-sessions": "cursor",
+  "cline-sessions": "cline",
 };
 
 export function normalizeToKnowledgeData(event: NormalizedEvent): KnowledgeData {

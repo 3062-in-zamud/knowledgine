@@ -133,6 +133,35 @@ Cursor AI の会話内容。
 
 ---
 
+## cline-sessions
+
+**Plugin ID**: \`cline-sessions\`
+**ソース**: Cline VS Code 拡張（saoudrizwan.claude-dev）のセッション履歴
+
+Cline の各タスクから 1 ノートを生成する pull 型プラグイン。
+
+\`\`\`bash
+# OS デフォルトの globalStorage を取り込み
+knowledgine ingest --source cline-sessions --path ~/project
+
+# 別インストール先を指定（VS Code Insiders、テスト用 fixture など）
+CLINE_STORAGE_PATH=/abs/path/to/saoudrizwan.claude-dev \\
+  knowledgine ingest --source cline-sessions --path ~/project
+\`\`\`
+
+**キャプチャ内容**: Cline の問題解決ループ、ツール使用結果、結論。タスクごとに
+1 ノート（先頭 100 + 末尾 100 メッセージを連結、API キーは redact）。
+
+**保存場所**:
+- macOS: \`~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/\`
+- Linux: \`~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/\`
+- Windows: \`%APPDATA%\\Code\\User\\globalStorage\\saoudrizwan.claude-dev\\\`
+
+**制限**: 10MB 超の \`api_conversation_history.json\` は skip。VS Code Insiders /
+Cursor / Windsurf 上の Cline は \`CLINE_STORAGE_PATH\` で回避。
+
+---
+
 ## cicd
 
 **Plugin ID**: \`cicd\`
@@ -168,6 +197,7 @@ GITHUB_TOKEN=<token> knowledgine ingest --source cicd --repo owner/repo --path ~
 | \`obsidian\` | \`--path\`（Vault ディレクトリ） | \`--full\` |
 | \`claude-sessions\` | \`--path\` | — |
 | \`cursor-sessions\` | \`--path\` | — |
+| \`cline-sessions\` | \`--path\` | \`CLINE_STORAGE_PATH\` (絶対パス、symlink 解決) |
 | \`cicd\` | \`GITHUB_TOKEN\`、\`--repo\` | \`--full\` |
 
 ---

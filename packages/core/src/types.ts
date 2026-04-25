@@ -195,6 +195,7 @@ export type SourceType =
   | "github"
   | "claude_code"
   | "cursor"
+  | "cline"
   | "slack"
   | "notion"
   | "markdown"
