@@ -234,9 +234,12 @@ export function extractTextContent(content: unknown): string;
 
 ### Decision 8: `task_metadata.json` (FileContextTracker) は副次扱い
 
-- **Chosen**: 存在すれば `metadata.extra.relatedFiles = files_in_context.map(f => f.path)` に格納、不在は無視
-- **Alternatives considered**: 主データソースとして使用 → 名前から想像される「タスク基本情報」ではなく context tracking ファイルだったため誤解
-- **Rationale**: 主データは `taskHistory.json` (HistoryItem) と `api_conversation_history.json`
+- **Chosen (v0.1.0)**: `task_metadata.json` は **incremental ingest の mtime 判定にのみ使用** する。`files_in_context` を `metadata.extra.relatedFiles` として取り込む処理は v0.1.0 では実装しない
+- **Alternatives considered**:
+  - 主データソースとして使用 → 名前から想像される「タスク基本情報」ではなく context tracking ファイルだったため誤解
+  - `files_in_context.map(f => f.path)` を `metadata.extra.relatedFiles` に格納 → graph extraction の入力として有用ではあるが、v0.1.0 のスコープを膨らませる
+- **Rationale**: 主データは `taskHistory.json` (HistoryItem) と `api_conversation_history.json` で完結する。`relatedFiles` 抽出は graph extraction 拡張と一緒に別チケットで対応するほうが Driver 単位として綺麗
+- **Future work**: `metadata.extra.relatedFiles` 抽出は別チケット (`context_history.json` 活用と合わせた context graph 拡張) で対応
 
 ### Decision 9: stderr 書式 = `⚠ Skipped (<basename>): <reason>` 固定
 
