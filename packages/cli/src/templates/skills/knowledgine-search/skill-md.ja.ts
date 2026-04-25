@@ -113,6 +113,11 @@ knowledgine search "<query>"                     # キーワード検索
 knowledgine search "<query>" --mode semantic     # セマンティック検索
 knowledgine search "<query>" --mode hybrid       # ハイブリッド検索
 knowledgine suggest --file src/commands/setup.ts  # ファイルパスによるコンテキストベース検索（suggest コマンド）
+
+# クロスプロジェクト検索: .knowledginerc に登録した名前、または任意のパス
+# （絶対 / 相対 / ~/）を直接渡せます。両方の混在も可能。
+knowledgine search "<query>" --projects backend,frontend
+knowledgine search "<query>" --projects ~/work/repo,/abs/path/to/repo
 \`\`\`
 
 ## 手順

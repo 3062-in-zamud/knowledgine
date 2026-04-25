@@ -42,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **`--source cline-sessions`**: Wires the new ingest plugin into the CLI and
   the `knowledgine-ingest` skill template (ja/en).
+- **`--projects` accepts dynamic paths**: `knowledgine search --projects` now
+  accepts absolute paths, relative paths, and `~/` paths in addition to
+  registered project names from `.knowledginerc`. Paths are detected by leading
+  `/`, `./`, `../`, `~/`, or `.`. Mixing names and paths in a single
+  comma-separated list is supported. Removes the prior requirement that every
+  cross-project target be pre-registered in `.knowledginerc`.
 
 ### Changed
 
