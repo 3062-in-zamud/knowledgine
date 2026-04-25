@@ -1,8 +1,8 @@
 # minimal-provider
 
-A ~50-line in-memory `MemoryProvider` implementation. Demonstrates the smallest possible compliant build of the MCP Memory Protocol — the four required operations plus the `versioning` capability so the conformance suite has a real chain to validate against.
+A ~50-line in-memory `MemoryProvider` implementation. Demonstrates a minimal MCP Memory Protocol example — the four required operations plus the `versioning` capability so the conformance suite has a real chain to validate against.
 
-> ⚠️ **Do not put production data through this example.** It stores everything in a `Map`, has no persistence, no concurrency control, and no authentication. It exists purely to teach the protocol shape.
+> ⚠️ **Do not put production data through this example.** It stores everything in a `Map`, has no persistence, no concurrency control, and no authentication. It is intentionally minimal, exists purely to teach the protocol shape, and should not be read as a complete implementation of every protocol semantic.
 
 ## What it covers
 
