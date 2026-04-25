@@ -199,6 +199,11 @@ export async function ingestCommand(options: IngestOptions): Promise<void> {
       // Project-specific dir doesn't exist — fall back to all projects
       sourcePath = join(homedir(), ".claude", "projects");
     }
+  } else if (options.source === "cline-sessions") {
+    // Cline plugin resolves its own storage location via getClineStorageDir()
+    // (env CLINE_STORAGE_PATH > OS default). Pass an empty sourceUri so the
+    // plugin uses its default. --path stays the knowledge-base destination.
+    sourcePath = "";
   }
 
   // Run ingest
