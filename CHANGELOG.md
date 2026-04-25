@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 #### MCP Memory Protocol (`@knowledgine/mcp-memory-protocol`)
 
-- **Reference implementation prep (KNOW-340)**: knowledgine is now the reference implementation of the MCP Memory Protocol. Adds gap-analysis (`docs/mcp-memory-protocol-proposal/gap-analysis.md`), a `MemoryProvider`-direct conformance test kit at `@knowledgine/mcp-memory-protocol/conformance`, full `temporal_query` (§8.2 Point-in-Time Recall) and `ttl` (§9.2 lazy-expire) implementation in `KnowledgineMemoryProvider`, expanded implementation guide, and publish metadata (`description`, `keywords`, `repository`, `homepage`, `bugs`, `files`) plus `LICENSE` / `CHANGELOG.md` / `MIGRATION.md` shipped in the tarball.
+- **Reference implementation prep**: knowledgine is now the reference implementation of the MCP Memory Protocol. Adds gap-analysis (`docs/mcp-memory-protocol-proposal/gap-analysis.md`), a `MemoryProvider`-direct conformance test kit at `@knowledgine/mcp-memory-protocol/conformance`, full `temporal_query` (§8.2 Point-in-Time Recall) and `ttl` (§9.2 lazy-expire) implementation in `KnowledgineMemoryProvider`, expanded implementation guide, and publish metadata (`description`, `keywords`, `repository`, `homepage`, `bugs`, `files`) plus `LICENSE` / `CHANGELOG.md` / `MIGRATION.md` shipped in the tarball.
 - **`RecalledMemory` fields**: `deprecated`, `deprecationReason`, `supersedes`, `validFrom` are now part of the public type (spec §6.1).
 - **Subpath export**: `@knowledgine/mcp-memory-protocol/conformance` provides `runConformanceSuite` separately from the main entry, keeping production imports lean.
 
