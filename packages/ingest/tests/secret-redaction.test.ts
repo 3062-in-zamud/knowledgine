@@ -274,6 +274,28 @@ describe("secret redaction 強化", () => {
     expect(twice).toBe(once);
   });
 
+  it("[KNOW-401] env-var 前の改行は redact 後も保持される", () => {
+    // 先頭境界を zero-width lookbehind にしたことで、preceding char を消費しない
+    const ghp = "ghp_" + "a".repeat(36);
+    const content = `foo\nGITHUB_TOKEN="${ghp}"`;
+    const result = sanitizeContent(content);
+    expect(result).toBe("foo\n[REDACTED]");
+  });
+
+  it("[KNOW-401] 区切り文字 (`;`) の前後の env-var が redact され区切りが保持される", () => {
+    const ghp = "ghp_" + "b".repeat(36);
+    const content = `before;GITHUB_TOKEN="${ghp}"`;
+    const result = sanitizeContent(content);
+    expect(result).toBe("before;[REDACTED]");
+  });
+
+  it("[KNOW-401] 行頭の env-var も lookbehind で正しく redact される", () => {
+    const ghp = "ghp_" + "c".repeat(36);
+    const content = `GITHUB_TOKEN="${ghp}"`;
+    const result = sanitizeContent(content);
+    expect(result).toBe("[REDACTED]");
+  });
+
   it("[KNOW-401 ReDoS] 10KB 長の敵対入力でも 200ms 以内に完了する", () => {
     const longName = "A".repeat(10000) + "_TOKEN";
     const content = `${longName}="${"x".repeat(100)}"`;

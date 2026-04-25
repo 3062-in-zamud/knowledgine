@@ -16,9 +16,11 @@ const SECRET_PATTERNS: RegExp[] = [
   // like `tokenizer` / `TOKEN_REGEX` don't match, and (ii) an assignment
   // operator `=` or `:`. Bounded quantifiers + negative char classes keep the
   // engine linear (ReDoS-safe). `/i` flag intentionally omitted so case-strict
-  // boundaries hold.
-  /(?:^|[\s;&|])(?:export\s+)?[A-Z][A-Z0-9]*(?:_[A-Z0-9]+){0,8}_(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|KEY|URL|AUTH|DSN|URI)[A-Z0-9_]{0,32}\s{0,3}[:=]\s{0,3}(?:"[^"\n]{1,256}"|'[^'\n]{1,256}'|[^\s'"`;|&()\[\]{}<>]{4,256})/g,
-  /(?:^|[\s;&|])(?:(?:const|let|var|export)\s+)?[a-z][a-zA-Z0-9]{0,63}(?:[_-]|(?<=[a-z0-9]))(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Cc]redential|[Aa]pi[_-]?[Kk]ey|[Kk]ey|[Uu]rl|[Aa]uth|[Dd]sn|[Uu]ri|[Pp]wd|[Pp]asswd)(?![a-z])[a-zA-Z0-9_-]{0,32}\s{0,3}[:=]\s{0,3}(?:"[^"\n]{1,256}"|'[^'\n]{1,256}'|[^\s'"`;|&()\[\]{}<>]{4,256})/g,
+  // boundaries hold. Leading boundary uses zero-width lookbehind so newlines
+  // and separator chars before the assignment are preserved (`"foo\nVAR=..."`
+  // becomes `"foo\n[REDACTED]"`, not `"foo[REDACTED]"`).
+  /(?<=^|[\s;&|])(?:export\s+)?[A-Z][A-Z0-9]*(?:_[A-Z0-9]+){0,8}_(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|KEY|URL|AUTH|DSN|URI)[A-Z0-9_]{0,32}\s{0,3}[:=]\s{0,3}(?:"[^"\n]{1,256}"|'[^'\n]{1,256}'|[^\s'"`;|&()\[\]{}<>]{4,256})/g,
+  /(?<=^|[\s;&|])(?:(?:const|let|var|export)\s+)?[a-z][a-zA-Z0-9]{0,63}(?:[_-]|(?<=[a-z0-9]))(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Cc]redential|[Aa]pi[_-]?[Kk]ey|[Kk]ey|[Uu]rl|[Aa]uth|[Dd]sn|[Uu]ri|[Pp]wd|[Pp]asswd)(?![a-z])[a-zA-Z0-9_-]{0,32}\s{0,3}[:=]\s{0,3}(?:"[^"\n]{1,256}"|'[^'\n]{1,256}'|[^\s'"`;|&()\[\]{}<>]{4,256})/g,
   /(?:api[_-]?key|apikey|secret|token|password)['":\s]*[=:]\s*['"]?([a-zA-Z0-9_\-/.]{16,})/gi,
   /(?:sk|pk|rk|ak)[-_][a-zA-Z0-9]{20,}/g,
   /gh[pousr]_[a-zA-Z0-9_]{36,}/g,
