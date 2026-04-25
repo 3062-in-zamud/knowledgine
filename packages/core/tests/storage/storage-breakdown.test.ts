@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { createTestDb, seedTestData } from "../helpers/test-db.js";
 import type { TestContext } from "../helpers/test-db.js";
+import { computeStorageBreakdown } from "../../src/storage/storage-breakdown.js";
 
 describe("KnowledgeRepository.getStorageBreakdown", () => {
   let ctx: TestContext | undefined;
@@ -83,5 +84,37 @@ describe("KnowledgeRepository.getStorageBreakdown", () => {
     expect(typeof breakdown.freelistBytes).toBe("number");
     expect(breakdown.walBytes).toBeGreaterThanOrEqual(0);
     expect(breakdown.freelistBytes).toBeGreaterThanOrEqual(0);
+  });
+
+  it("falls back to 'page-count-only' when the dbstat query fails", () => {
+    ctx = createTestDb();
+    seedTestData(ctx.repository);
+
+    // Wrap db.prepare so the dbstat statement throws, simulating a build
+    // of better-sqlite3 / SQLite where dbstat is not compiled in. We
+    // intentionally avoid mutating the real connection so that other
+    // tests in this suite remain independent.
+    const origPrepare = ctx.db.prepare.bind(ctx.db);
+    type Stmt = ReturnType<typeof origPrepare>;
+    const wrapped = {
+      ...ctx.db,
+      prepare(sql: string): Stmt {
+        if (/FROM\s+dbstat/i.test(sql)) {
+          throw new Error("no such table: dbstat");
+        }
+        return origPrepare(sql);
+      },
+    } as unknown as typeof ctx.db;
+
+    const breakdown = computeStorageBreakdown(wrapped);
+
+    expect(breakdown.fallback).toBe("page-count-only");
+    expect(breakdown.totalBytes).toBeGreaterThan(0);
+    expect(breakdown.pageSize).toBeGreaterThan(0);
+    // Category buckets are zero in the fallback path because dbstat is
+    // the only way we attribute bytes per table.
+    for (const [, value] of Object.entries(breakdown.byCategory)) {
+      expect(value).toBe(0);
+    }
   });
 });
