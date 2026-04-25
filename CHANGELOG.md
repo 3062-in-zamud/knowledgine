@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### MCP Memory Protocol (`@knowledgine/mcp-memory-protocol`)
+
+- **Reference implementation prep**: knowledgine is now the reference implementation of the MCP Memory Protocol. Adds gap-analysis (`docs/mcp-memory-protocol-proposal/gap-analysis.md`), a `MemoryProvider`-direct conformance test kit at `@knowledgine/mcp-memory-protocol/conformance`, full `temporal_query` (§8.2 Point-in-Time Recall) and `ttl` (§9.2 lazy-expire) implementation in `KnowledgineMemoryProvider`, expanded implementation guide, and publish metadata (`description`, `keywords`, `repository`, `homepage`, `bugs`, `files`) plus `LICENSE` / `CHANGELOG.md` / `MIGRATION.md` shipped in the tarball.
+- **`RecalledMemory` fields**: `deprecated`, `deprecationReason`, `supersedes`, `validFrom` are now part of the public type (spec §6.1).
+- **Subpath export**: `@knowledgine/mcp-memory-protocol/conformance` provides `runConformanceSuite` separately from the main entry, keeping production imports lean.
+
+#### Core (`@knowledgine/core`)
+
+- **Migration 019 / 020**: `memory_entries.valid_until` and `memory_entries.expires_at` columns added to support spec §8.2 chain reconstruction and §9.2 ttl. Default `NULL` keeps legacy rows backward-compatible.
+
+### Changed
+
+#### MCP Memory Protocol (`@knowledgine/mcp-memory-protocol`)
+
+- **BREAKING — Conformance API**: replaced `runConformanceSuite(ctx, options)` (MCP Client based) with `runConformanceSuite({ createProvider, teardown?, skip? })` (`MemoryProvider` direct injection). Migration steps in [`packages/mcp-memory-protocol/MIGRATION.md`](packages/mcp-memory-protocol/MIGRATION.md). The `version` field is held at `0.3.1` until a dedicated release PR.
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **`KnowledgineMemoryProvider` brought to full conformance**: fixed the `recall(includeVersionHistory)` / soft-delete filter, implemented §8.2 asOf branch with chain-collapse, and §9.2 ttl with versioned-update inheritance. Capabilities now include `versioning`, `temporalQuery`, `ttl`, `layerPromotion` (only `semanticSearch` remains deferred).
+
 ## [0.6.9] - 2026-04-09
 
 ### Added
