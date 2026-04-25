@@ -102,19 +102,40 @@ That single call registers `describe(...)` blocks for every required and capabil
 
 ### Using Jest instead of vitest
 
-The kit uses `describe`, `it`, `beforeEach`, `afterEach`, and `ctx.skip()`. Jest exposes all of these. Wire it up with:
+**The supported path is vitest.** The conformance test-suite files import `describe`, `it`, `beforeEach`, `afterEach`, and `expect` from `"vitest"` directly, and they call `ctx.skip()` from inside `beforeEach`. Setting `globalThis.describe = describeFromJest` does **not** affect those module-level imports, so a Jest-only environment will fail at module resolution for `vitest`.
 
-```ts
-// jest.setup.ts
-import { describe, it, beforeEach, afterEach } from "@jest/globals";
+If you must run the kit under Jest, you have to provide your own compatibility layer:
 
-(globalThis as any).describe = describe;
-(globalThis as any).it = it;
-(globalThis as any).beforeEach = beforeEach;
-(globalThis as any).afterEach = afterEach;
-```
+1. **Map the `vitest` module** to a Jest-equivalent via Jest `moduleNameMapper`:
 
-The fake-skip semantics differ: vitest's `ctx.skip()` becomes Jest's `it.skip()`. The kit calls `ctx.skip()` from `beforeEach`, which Jest 28+ supports via the test context argument. If you are stuck on an older Jest, the simplest workaround is to **opt out** of optional suites with `skip: ["versioning", "temporalQuery", "ttl"]` and run only the required suites.
+   ```js
+   // jest.config.js
+   export default {
+     moduleNameMapper: {
+       "^vitest$": "<rootDir>/jest-vitest-shim.ts",
+     },
+   };
+   ```
+
+2. **In the shim, re-export Jest's globals as the names the kit imports**:
+
+   ```ts
+   // jest-vitest-shim.ts
+   export { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+   ```
+
+3. **Translate `ctx.skip()` semantics**. The kit calls `ctx.skip()` from `beforeEach` to skip a whole spec body when a capability is gated off. Jest's `beforeEach` does not accept a `TestContext` parameter that supports `skip()`. The simplest workaround is to **explicitly opt out** of optional suites your provider does not implement:
+
+   ```ts
+   runConformanceSuite({
+     createProvider: () => new MyProvider(),
+     skip: ["versioning", "temporalQuery", "ttl"],
+   });
+   ```
+
+   This forces the gate closed at registration time so `beforeEach` never reaches the skip call.
+
+If maintaining that compatibility layer is more work than it's worth, the simplest path is to add `vitest` as a dev dependency dedicated to the conformance run — it can coexist with your existing Jest unit tests.
 
 ### Shape changes summary
 
