@@ -1,0 +1,25 @@
+{
+  "files_in_context": [
+    {
+      "path": "tsconfig.json",
+      "record_state": "active",
+      "record_source": "cline_edited",
+      "cline_read_date": 1714000005000,
+      "cline_edit_date": 1714000020000,
+      "user_edit_date": null
+    },
+    {
+      "path": "src/main.ts",
+      "record_state": "active",
+      "record_source": "read_tool",
+      "cline_read_date": 1714000008000,
+      "cline_edit_date": null
+    }
+  ],
+  "model_usage": [
+    { "ts": 1714000010000, "model_id": "claude-3-5-sonnet-20241022", "model_provider_id": "anthropic", "mode": "act" }
+  ],
+  "environment_history": [
+    { "ts": 1714000000000, "os_name": "darwin", "os_version": "25.3.0", "os_arch": "arm64", "host_name": "Code", "host_version": "1.92", "cline_version": "3.81.0" }
+  ]
+}
