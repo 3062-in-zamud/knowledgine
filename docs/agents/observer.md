@@ -2,21 +2,23 @@
 
 knowledgine の **Observer Agent** は ingest 直後にノートを観察し、6 ベクトル分類
 (personal_info / preferences / events / temporal_data / updates / assistant_info)、
-パターン (daily / ticket)、エンティティ (file paths / functions / etc.) を抽出する
-ポストプロセッサです。**Reflector Agent** はその出力から矛盾と失効候補を検出します。
+パターン (daily / ticket セクション内の problem / solution / learning / time)、
+エンティティ (frontmatter, imports, markdown links, inline code, mentions, org/repo)
+を抽出するポストプロセッサです。**Reflector Agent** はその出力から矛盾と失効候補
+を検出します。
 
 両エージェントは **opt-in** です: `--observe` フラグまたは
 `.knowledginerc.json` の `observer.enabled: true` を指定したときのみ起動します。
 
 ## 何が抽出されるか
 
-| Step             | 抽出内容                                                                     | 担当               |
-| ---------------- | ---------------------------------------------------------------------------- | ------------------ |
-| 1. Pattern       | デイリーパターン (日付・時間情報) / チケットパターン (`KNOW-XXX`, `#123` 等) | `PatternExtractor` |
-| 2. Entity        | ファイルパス / 関数名 / 識別子 / frontmatter エンティティ                    | `EntityExtractor`  |
-| 3. Rule classify | 上記から 6 ベクトル分類 (rule-based)                                         | Observer 内部      |
-| 4. LLM 補完      | LLM provider 設定時のみ; rule-based 分類を補強 / 修正                        | `LLMProvider`      |
-| 5. Reflection    | 出力から `contradictions` と `deprecationCandidates` を検出                  | `ReflectorAgent`   |
+| Step             | 抽出内容                                                                                                                                              | 担当               |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 1. Pattern       | daily / ticket セクション (`## Problem` / `## Solution` / `## Learning` 等) から problem / solution / learning / time の 4 種を抽出 (ID 抽出ではない) | `PatternExtractor` |
+| 2. Entity        | frontmatter (tags + 指定 fields) / imports / markdown links / inline code / mentions / org/repo (ファイルパスは entity 抽出前に strip)                | `EntityExtractor`  |
+| 3. Rule classify | 上記から 6 ベクトル分類 (rule-based)                                                                                                                  | Observer 内部      |
+| 4. LLM 補完      | LLM provider 設定時のみ; rule-based 分類を補強 / 修正                                                                                                 | `LLMProvider`      |
+| 5. Reflection    | 出力から `contradictions` と `deprecationCandidates` を検出                                                                                           | `ReflectorAgent`   |
 
 LLM が未設定なら **rule-based モード** で動作し、LLM が無くても主要パターンと
 エンティティは抽出されます。
