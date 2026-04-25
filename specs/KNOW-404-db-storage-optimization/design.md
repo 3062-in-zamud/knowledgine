@@ -118,30 +118,37 @@ MATCH vec_int8(?) AND k = ? ORDER BY distance` where the `k` rowid is
 
 ### Migration path: migration021
 
-1. Compute `dbSize = page_count * page_size`. If > 50 MB, skip the
-   `VACUUM` step and emit a warning so large-DB users don't block startup
-   for tens of seconds. `auto_vacuum=INCREMENTAL` is still set; it takes
-   effect on the next manual VACUUM.
-2. `DROP TABLE note_embeddings_vec` (any pre-existing FLOAT[384] mirror).
-3. `CREATE VIRTUAL TABLE note_embeddings_vec USING vec0(note_id INTEGER
-PRIMARY KEY, embedding INT8[384])`. The `note_embeddings` BLOB column
-   is left untouched — it remains float32 and is treated as canonical.
-4. For each row in `note_embeddings` (chunked, 500 rows at a time):
+1. Inspect the recorded DDL of `note_embeddings_vec` from
+   `sqlite_master.sql`. If the table doesn't exist (sqlite-vec wasn't
+   loaded when migration003 ran), the migration is a no-op — the
+   mirror will be created lazily by `KnowledgeRepository.ensureVectorIndexTable`
+   the first time semantic search runs.
+2. If the recorded DDL already contains `INT8[`, the migration is a
+   no-op (idempotent re-run).
+3. Probe the sqlite-vec extension by executing
+   `SELECT vec_int8(x'00')`. If it fails, the extension is not loaded
+   for this connection; skip the migration cleanly so that CLI
+   commands which don't enable semantic search (for example
+   `feedback`) do not abort.
+4. `DROP TABLE note_embeddings_vec` and recreate it as
+   `vec0(note_id INTEGER PRIMARY KEY, embedding INT8[384])`. The
+   `note_embeddings` BLOB column is left untouched — it remains
+   float32 and is treated as canonical.
+5. For each row in `note_embeddings`:
    - Read the float32 BLOB.
-   - Validate `length(embedding) = dimensions * 4` and `dimensions = 384`.
-     If not, emit a warning with the `note_id` and skip the row.
+   - Validate `length(embedding) = dimensions * 4` and
+     `dimensions = 384`. If not, emit a warning with the `note_id`
+     and skip the row.
    - Uniform-quantize and INSERT into `note_embeddings_vec` via
      `INSERT ... VALUES (CAST(? AS INTEGER), vec_int8(?))`.
-   - Track progress; emit `[migration021] quantizing: N/M (XX%)` every 10 %.
-5. `PRAGMA auto_vacuum=INCREMENTAL`. If the size guard allowed it, run
-   `VACUUM`. Then `PRAGMA wal_checkpoint(TRUNCATE)`.
-6. Emit `[migration021] done in Xs. before: A bytes, after: B bytes,
-reduction: C%`. Internal ticket IDs are NOT included.
+6. Emit `[migration021] quantized N/M embeddings to INT8[384]
+(K skipped)` to stderr. Internal ticket IDs are NOT included.
 
-The migration is idempotent: re-running it observes that
-`note_embeddings_vec` already has `INT8[384]` column type (probed via
-`pragma_table_info`) and skips the rebuild; the float32 BLOBs are never
-mutated.
+`Migrator.migrate()` wraps every migration in a single SQLite
+transaction, so `VACUUM` cannot run here — the vec0 mirror is fully
+rebuilt but the underlying database file may keep its previous size
+until SQLite reclaims pages on its own. Forcing a checkpoint or
+post-migration VACUUM is tracked as follow-up work.
 
 ## Key Design Decisions
 
