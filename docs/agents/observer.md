@@ -71,11 +71,20 @@ ingest plugin → IngestEngine.ingest() → uniqueIngestedNoteIds
 実装: [`packages/cli/src/commands/ingest.ts`](../../packages/cli/src/commands/ingest.ts)
 (行 522 〜) + [`packages/core/src/agents/observer-agent.ts`](../../packages/core/src/agents/observer-agent.ts)。
 
-## 出力先
+## 出力先 (重要 — 自動 persist されません)
 
-Observer / Reflector の出力は `KnowledgeRepository` 経由で同じ knowledgebase に
-書き込まれます (新規ノートではなく既存ノートのメタデータを補強する形)。
-詳細は [`observer-agent.ts`](../../packages/core/src/agents/observer-agent.ts) と
+Observer / Reflector の `observeBatch` / `reflectBatch` は **in-memory の解析
+結果** を返すだけで、knowledgebase への自動書き込みは行いません。CLI ingest
+ブロックは結果の件数を stderr に log するのみで、`KnowledgeRepository` 経由の
+書き込みは発生しません。
+
+DB を実際に変更するのは `ReflectorAgent.applyApprovedDeprecations(candidates)`
+のような **明示的な適用処理** が呼ばれた場合のみです (現状 CLI からはまだ自動
+呼び出しされていません)。Observer の 6 ベクトル分類やパターンを永続化したい
+場合は、別途 `KnowledgeRepository` 側に書き込みパスを実装する必要があります。
+
+実装の詳細は
+[`observer-agent.ts`](../../packages/core/src/agents/observer-agent.ts) と
 [`reflector-agent.ts`](../../packages/core/src/agents/reflector-agent.ts) を参照。
 
 ## トラブルシューティング
