@@ -24,13 +24,13 @@ KNOW-324
 
 ### Phase 2: User-facing docs
 
-- [ ] **Task 4**: `docs/agents/observer.md` を新規作成
+- [x] **Task 4**: `docs/agents/observer.md` を新規作成
   - Observer Agent / Reflector Agent の役割
   - PatternExtractor / EntityExtractor との関係
   - `--observe` opt-in と `rcConfig.observer.{enabled,limit}` の設定方法
   - rule-based vs LLM 連携の差異 (rule-based fallback の挙動)
   - `--observe-limit <n>` の意味とデフォルト 50
-- [ ] **Task 5**: `README.md` の使い方セクションに `--observe` の例を追加
+- [x] **Task 5**: `README.md` の使い方セクションに `--observe` の例を追加
 
 ### Phase 3: dev-butler 側のクロスリンク (本 PR スコープ外)
 
