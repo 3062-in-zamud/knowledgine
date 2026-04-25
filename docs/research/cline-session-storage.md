@@ -151,11 +151,12 @@ interface TaskMetadata {
 }
 ```
 
-**ingest plugin 利用方針 (v0.1.0)**:
+**ingest plugin 利用方針 (v0.1.0 — 実装ベース)**:
 
 - 必須ではない (主データは api_conversation_history.json と taskHistory.json で完結)
-- 存在すれば `metadata.extra.relatedFiles = files_in_context.map(f => f.path)` として relatedPaths に格納し、graph extraction の入力にする
+- v0.1.0 実装では **incremental ingest の mtime 判定にのみ使用**。`files_in_context` を `metadata.extra.relatedFiles` として取り込む処理は **未実装**
 - 不在 / 破損は無視 (skipReason に記録しない)
+- **将来拡張**: `metadata.extra.relatedFiles` 抽出 + graph extraction との連携は別チケットで対応 (`context_history.json` 活用と合わせる方針)
 
 ## Risks & Mitigations
 
