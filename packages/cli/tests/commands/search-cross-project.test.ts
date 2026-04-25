@@ -228,6 +228,26 @@ describe("searchCommand --projects (cross-project, KNOW-403)", () => {
     expect(stderr).toContain("--projects requires at least one name or path");
   });
 
+  // 追加: 一部不正 path 混在時の warning
+  it("emits stderr warning when some paths are unresolved but at least one resolves", async () => {
+    const rootDir = makeRcRoot(null);
+    const projOk = makeProject("partial-ok");
+    const plainDir = track(mkdtempSync(join(tmpdir(), "knowledgine-cli-partial-bad-")));
+
+    await searchCommand("TypeScript", {
+      projects: `${projOk},${plainDir}`,
+      path: rootDir,
+      format: "json",
+    });
+
+    expect(process.exitCode).toBeFalsy();
+    const stderr = stderrSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(stderr).toContain("Skipped 1 invalid path(s)");
+    expect(stderr).toContain(plainDir);
+    const stdout = stdoutSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(stdout).toContain('"crossProject":true');
+  });
+
   // 追加: Case D (truly empty string from --projects "")
   it("emits Case D error when --projects is an empty string", async () => {
     const rootDir = makeRcRoot(null);

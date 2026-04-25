@@ -82,6 +82,14 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       );
     }
 
+    if (result.unresolvedPaths.length > 0) {
+      console.error(
+        `${symbols.warning} ${colors.warning(
+          `Skipped ${result.unresolvedPaths.length} invalid path(s) (no .knowledgine/index.sqlite): ${result.unresolvedPaths.join(", ")}`,
+        )}`,
+      );
+    }
+
     const projectsToSearch = result.resolved;
     const format = (options.format as "json" | "table" | "plain") ?? "plain";
     const limit = options.limit ?? 20;
