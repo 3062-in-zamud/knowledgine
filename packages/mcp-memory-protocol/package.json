@@ -2,6 +2,28 @@
   "name": "@knowledgine/mcp-memory-protocol",
   "version": "0.3.1",
   "type": "module",
+  "description": "MCP Memory Protocol — specification, types, and conformance test kit for long-term memory providers (Mem0, Zep, knowledgine, …)",
+  "keywords": [
+    "mcp",
+    "memory",
+    "memory-protocol",
+    "conformance",
+    "llm",
+    "agent",
+    "knowledge",
+    "long-term-memory",
+    "knowledgine"
+  ],
+  "homepage": "https://github.com/3062-in-zamud/knowledgine/tree/main/packages/mcp-memory-protocol",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/3062-in-zamud/knowledgine.git",
+    "directory": "packages/mcp-memory-protocol"
+  },
+  "bugs": {
+    "url": "https://github.com/3062-in-zamud/knowledgine/issues"
+  },
+  "license": "MIT",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -13,7 +35,11 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "MIGRATION.md"
   ],
   "scripts": {
     "build": "tsc --build tsconfig.build.json",
@@ -40,6 +66,5 @@
     "@modelcontextprotocol/sdk": "^1.27.1",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
-  },
-  "license": "MIT"
+  }
 }
