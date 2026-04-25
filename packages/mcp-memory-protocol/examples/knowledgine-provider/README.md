@@ -8,7 +8,7 @@ A worked example showing how to compose `@knowledgine/core` modules into a `Memo
 
 - The four required operations (§5)
 - Full optional capability set: `versioning`, `temporalQuery`, `ttl`, `layerPromotion`
-- Real persistence via `better-sqlite3` + `@knowledgine/core` migrations
+- Real SQLite schema/migrations via `better-sqlite3` + `@knowledgine/core`
 - Per-test isolation: `createKnowledgineProvider()` builds a new database each call
 
 ## What it does NOT cover
