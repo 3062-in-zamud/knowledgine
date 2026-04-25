@@ -11,7 +11,7 @@ import type {
 } from "../../types.js";
 import { parseSessionFile } from "./session-parser.js";
 import { sanitizeContent } from "../../normalizer.js";
-import { isDecisionPoint } from "./decision-detector.js";
+import { isDecisionPoint } from "../../shared/decision-detector.js";
 
 /**
  * Maximum number of messages to include in a session summary.
