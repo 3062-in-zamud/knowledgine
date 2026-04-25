@@ -211,7 +211,9 @@ path として認識された引数は登録名検索を行いません（パス
 制約:
 
 - 各プロジェクトに `.knowledgine/index.sqlite`（schema_version >= 8）が必要。
-  ない場合は warning を stderr に出して skip します
+  少なくとも 1 件解決できる場合は、ファイルがない path のみ stderr に warning
+  を出して skip して検索を続行します。**全件解決できない場合**は
+  Case A/B/C/D のエラーメッセージを stderr に出して exit 1 で終了します
 - 同じ basename を持つパスを複数渡すと出力の `projectName` で識別できなく
   なります。`.knowledginerc` の登録名で disambiguate してください
 - glob パターン、リモート URL、MCP server `search_knowledge` 経由の
