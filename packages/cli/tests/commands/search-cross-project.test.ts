@@ -227,4 +227,18 @@ describe("searchCommand --projects (cross-project, KNOW-403)", () => {
     const stderr = stderrSpy.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(stderr).toContain("--projects requires at least one name or path");
   });
+
+  // 追加: Case D (truly empty string from --projects "")
+  it("emits Case D error when --projects is an empty string", async () => {
+    const rootDir = makeRcRoot(null);
+
+    await searchCommand("query", {
+      projects: "",
+      path: rootDir,
+    });
+
+    expect(process.exitCode).toBe(1);
+    const stderr = stderrSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(stderr).toContain("--projects requires at least one name or path");
+  });
 });

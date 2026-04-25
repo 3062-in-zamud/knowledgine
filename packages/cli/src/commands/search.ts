@@ -66,7 +66,7 @@ export async function searchCommand(query: string, options: SearchCommandOptions
   const rootPath = options.demo ? getDemoNotesPath() : resolveDefaultPath(options.path);
 
   // --projects: クロスプロジェクト横断検索
-  if (options.projects) {
+  if (options.projects !== undefined) {
     const rcConfig = loadRcFile(rootPath);
     const result = resolveProjectArgs(options.projects, rcConfig?.projects ?? []);
 
