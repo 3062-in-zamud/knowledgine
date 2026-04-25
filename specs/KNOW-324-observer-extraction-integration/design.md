@@ -17,18 +17,20 @@ KNOW-324
 └────────┬─────────────┘
          │  uniqueIngestedNoteIds
          ▼
-┌────────────────────────────────────────┐  (only when options.observe || rcConfig.observer.enabled)
+┌────────────────────────────────────────┐  (gate: options.observe ?? rcConfig.observer.enabled ?? false)
 │ ObserverAgent.observeBatch(notes)      │  ← deps: { patternExtractor, entityExtractor, llmProvider?, repository }
-│   for each note:                       │
+│   for each note (in-memory only):      │
 │     extractDailyPatterns(content)      │
 │     extractTicketPatterns(content)     │
 │     extractEntities(content, fm)       │
-│     persist via repository             │
+│     classify into 6 vectors            │
+│   ※ no DB writes from observeBatch    │
 └────────┬───────────────────────────────┘
          │  observerOutputs
          ▼
 ┌────────────────────────────────────────┐
-│ ReflectorAgent.reflectBatch(outputs)   │  ← contradictions / deprecation candidates
+│ ReflectorAgent.reflectBatch(outputs)   │  ← contradictions / deprecation candidates (read-only)
+│                                        │  ※ DB mutation only via explicit applyApprovedDeprecations()
 └────────────────────────────────────────┘
 ```
 
