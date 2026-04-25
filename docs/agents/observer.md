@@ -98,7 +98,9 @@ DB を実際に変更するのは `ReflectorAgent.applyApprovedDeprecations(cand
 
 ## 関連 spec
 
-- [KNOW-305: ingest 時パターン抽出と…](../../specs/_archived/) (元実装、Done)
-- [KNOW-323: Observer/Reflector opt-in 切替](../../specs/) (Done、`--observe` 導入)
-- [KNOW-324: Observer/Reflector integration](../../specs/KNOW-324-observer-extraction-integration/)
-  (本ドキュメント; spec 整合の housekeeping)
+- [Observer / Reflector 統合 spec](../../specs/) — 本ガイドの根拠 spec、抽出
+  経路と `--observe` opt-in の設計判断を記載
+- [Pattern Extractor 実装](../../packages/core/src/extraction/pattern-extractor.ts)
+- [Entity Extractor 実装](../../packages/core/src/graph/entity-extractor.ts)
+- [Observer Agent 実装](../../packages/core/src/agents/observer-agent.ts)
+- [Reflector Agent 実装](../../packages/core/src/agents/reflector-agent.ts)
