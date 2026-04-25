@@ -180,15 +180,27 @@ knowledgine capture add --content "セッションサマリー" --tags "ai-sessi
 
 ## Cline Storage Investigation Results
 
-macOS環境でClineのローカルストレージ（`~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/`）を調査しましたが、当該ディレクトリは存在しませんでした。
+2026-04 の再評価により、Cline 3.x の JSON ベースストレージレイアウトが安定していることを確認し、pull 型 ingest プラグインを実装しました。詳細は [`docs/research/cline-session-storage.md`](research/cline-session-storage.md) を参照してください。
 
-調査結果：
+### Pull 型 (推奨): `cline-sessions` プラグイン
 
-- Clineのセッションデータは公開APIを持たない
-- ストレージ形式はClineのバージョン依存で不安定
-- **結論: プッシュ型アプローチに全振り**
+```bash
+# OS デフォルトの globalStorage を取り込み
+knowledgine ingest --source cline-sessions --path ./my-notes
 
-プッシュ型の利点：
+# テスト用 fixture や別インストール先を指定する場合
+CLINE_STORAGE_PATH=/abs/path/to/saoudrizwan.claude-dev knowledgine ingest --source cline-sessions --path ./my-notes
+```
+
+- セッション履歴の遡及取り込みが可能
+- 1 タスク = 1 ノートとして検索可能
+- secret redaction (`sanitizeContent`) を経由
+
+### Push 型 (本ドキュメントの API): 引き続き有効
+
+push 型は Windsurf / Codex CLI / Copilot Chat など pull 未対応ツール、および手動キャプチャ用途で引き続き利用可能です。Pull / Push は併用関係であり相互排他ではありません。
+
+Push 型の利点：
 
 - AIツールに依存しない汎用的なインターフェース
 - セキュリティが明確（Bearer token認証）
