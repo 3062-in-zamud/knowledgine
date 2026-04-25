@@ -127,7 +127,12 @@ If you must run it under Jest, you need to provide your own compatibility layer 
 
 ## Examples
 
-Worked examples will be published in a follow-up release at [`packages/mcp-memory-protocol/examples/`](https://github.com/3062-in-zamud/knowledgine/tree/main/packages/mcp-memory-protocol/examples). They are intentionally **not** shipped in the npm tarball because they use `workspace:*` dependencies and won't install outside the monorepo. See the GitHub link once available.
+Worked examples live in the repo at [`packages/mcp-memory-protocol/examples/`](https://github.com/3062-in-zamud/knowledgine/tree/main/packages/mcp-memory-protocol/examples):
+
+- [`minimal-provider/`](https://github.com/3062-in-zamud/knowledgine/tree/main/packages/mcp-memory-protocol/examples/minimal-provider) — ~50-line in-memory `MemoryProvider` covering the required suite plus `versioning`. A starting template for new backends.
+- [`knowledgine-provider/`](https://github.com/3062-in-zamud/knowledgine/tree/main/packages/mcp-memory-protocol/examples/knowledgine-provider) — wires `@knowledgine/core` migrations + `KnowledgineMemoryProvider` from `@knowledgine/mcp-server` into a stand-alone `MemoryProvider`. Covers the full optional capability set (`versioning`, `temporalQuery`, `ttl`, `layerPromotion`).
+
+The examples are intentionally **not** shipped in the npm tarball because they use `workspace:*` dependencies and won't install outside the monorepo. Clone the repo and run `pnpm install` from the root to use them.
 
 ## License
 
