@@ -63,6 +63,10 @@ export function createDatabase(
     db.pragma("mmap_size = 67108864"); // 64MB mmap
   }
   db.pragma("temp_store = MEMORY");
+  // Reduced fsync cost; safe under journal_mode=WAL.
+  db.pragma("synchronous = NORMAL");
+  // 20 MB page cache (negative value = KiB).
+  db.pragma("cache_size = -20000");
 
   // Harden file permissions (owner-only access)
   if (dbPath !== ":memory:" && process.platform !== "win32") {
