@@ -89,8 +89,13 @@ function buildSummary(
 function deriveTitle(history: ClineHistoryItem | undefined, taskId: string): string {
   const taskText = history?.task?.trim();
   if (taskText) {
-    const oneLine = taskText.replace(/\s+/g, " ").trim();
-    return `Cline: ${oneLine.slice(0, 60)}`;
+    // Sanitise the user prompt before using it as a note title. Prompts can
+    // legitimately start with a leaked secret (Bearer token, sk-ant-..., DB
+    // URL); the body is already redacted via sanitizeContent, but the title
+    // is persisted to knowledge_notes.title and indexed by FTS, so it must
+    // be sanitised on the same path.
+    const oneLine = sanitizeContent(taskText).replace(/\s+/g, " ").trim();
+    if (oneLine) return `Cline: ${oneLine.slice(0, 60)}`;
   }
   return `Cline: ${taskId.slice(0, 8)}`;
 }
@@ -181,7 +186,12 @@ export class ClineSessionsPlugin implements IngestPlugin {
       } catch {
         // Visible side-effect — surface the misconfiguration without breaking
         // the ingest run (graceful skip downstream still produces 0 events).
-        process.stderr.write(`⚠ CLINE_STORAGE_PATH does not exist: ${override}\n`);
+        // Log only the basename so the user's home/absolute path does not
+        // leak to stderr (CI logs, bug reports, terminal scrollback).
+        const overrideLabel = basename(override);
+        process.stderr.write(
+          `⚠ CLINE_STORAGE_PATH does not exist (path redacted, basename: ${overrideLabel})\n`,
+        );
       }
     }
     return { ok: true };

@@ -188,6 +188,37 @@ describe("ClineSessionsPlugin", () => {
     });
   });
 
+  describe("title sanitization", () => {
+    it("redacts secrets from history.task before placing it in the title", async () => {
+      const tmpRoot = await mkdtemp(join(tmpdir(), "cline-title-secret-"));
+      try {
+        await mkdir(join(tmpRoot, "state"), { recursive: true });
+        const taskDir = join(tmpRoot, "tasks", "task-secret");
+        await mkdir(taskDir, { recursive: true });
+        const leaked = "sk-ant-" + "api03-" + "X".repeat(40);
+        const history = [
+          {
+            id: "task-secret",
+            ts: 1714000000000,
+            task: `${leaked} please debug this`,
+          },
+        ];
+        await writeFile(join(tmpRoot, "state", "taskHistory.json"), JSON.stringify(history));
+        await writeFile(
+          join(taskDir, "api_conversation_history.json"),
+          JSON.stringify([{ role: "user", content: "hi" }]),
+        );
+        const events = await collect(plugin.ingestAll(tmpRoot));
+        expect(events.length).toBe(1);
+        // The title must NOT contain the raw API key prefix.
+        expect(events[0]!.title).not.toContain("sk-ant-api03-");
+        expect(events[0]!.title).toContain("[REDACTED]");
+      } finally {
+        await rm(tmpRoot, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe("buildSummary boundary — messages between MAX_HEAD and MAX_HEAD+MAX_TAIL", () => {
     it("emits a tail block (head 100 + tail 50) when messages > head budget but ≤ head+tail budget — no truncation needed", async () => {
       const tmpRoot = await mkdtemp(join(tmpdir(), "cline-boundary-"));
