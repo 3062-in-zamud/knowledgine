@@ -183,6 +183,12 @@ knowledgine ingest --source github --repo owner/repo --path ./my-notes
 knowledgine ingest --source claude-sessions --path ./my-notes
 knowledgine ingest --source cline-sessions --path ./my-notes
 knowledgine ingest --all --path ./my-notes
+
+# Run the Observer/Reflector agents after ingestion to extract patterns,
+# entities and a 6-vector classification. Optional opt-in.
+# See docs/agents/observer.md for details.
+knowledgine ingest --source markdown --observe --path ./my-notes
+knowledgine ingest --source markdown --observe --observe-limit 200 --path ./my-notes
 ```
 
 ---
