@@ -1,0 +1,23 @@
+{
+  "name": "@knowledgine-examples/knowledgine-provider",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Worked example: how to wire @knowledgine/core into a MemoryProvider. Mirrors KnowledgineMemoryProvider in @knowledgine/mcp-server. Not published.",
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@knowledgine/core": "workspace:*",
+    "@knowledgine/mcp-memory-protocol": "workspace:*",
+    "@knowledgine/mcp-server": "workspace:*",
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
