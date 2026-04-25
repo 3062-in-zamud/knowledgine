@@ -110,6 +110,11 @@ knowledgine search "<query>"                     # keyword search
 knowledgine search "<query>" --mode semantic     # semantic search
 knowledgine search "<query>" --mode hybrid       # hybrid search
 knowledgine suggest --file src/commands/setup.ts  # context-based by file path (suggest command)
+
+# Cross-project search: pass registered names from .knowledginerc, or any
+# absolute / relative / ~/ path. Mixing both is supported.
+knowledgine search "<query>" --projects backend,frontend
+knowledgine search "<query>" --projects ~/work/repo,/abs/path/to/repo
 \`\`\`
 
 ## Step-by-Step Instructions

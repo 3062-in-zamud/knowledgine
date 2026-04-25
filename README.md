@@ -165,6 +165,59 @@ knowledgine search "debugging tips" --mode hybrid --path ./my-notes --format tab
 - `--limit <n>`: Maximum results. Default: 20
 - `--related <noteId>`: Find related notes by note ID
 - `--demo`: Search in demo notes
+- `--projects <names-or-paths>`: Search across multiple knowledgine projects
+  (comma-separated). See [Cross-Project Search](#cross-project-search) below.
+
+#### Cross-Project Search
+
+Search across multiple knowledgine projects in a single query. Results are
+ranked by FTS5 score (descending) and limited to 10 concurrent project
+databases.
+
+You can pass either registered names from `.knowledginerc` (when configured)
+or absolute / relative / `~/` paths directly:
+
+```bash
+# Registered names from .knowledginerc
+knowledgine search "auth flow" --projects backend,frontend
+
+# Dynamic paths — no rc registration required
+knowledgine search "auth flow" --projects ~/work/<your-repo>,./sibling-repo
+
+# Mixed
+knowledgine search "auth flow" --projects backend,/absolute/path/to/repo
+```
+
+Path detection: an argument is treated as a path if it begins with `/`, `./`,
+`../`, `~/`, or `.`. Otherwise it is looked up as a registered project name.
+When path-detected, registered name lookup is skipped (paths take precedence).
+
+`.knowledginerc` example:
+
+```jsonc
+{
+  "projects": [
+    { "name": "backend", "path": "/Users/me/code/backend" },
+    { "name": "frontend", "path": "/Users/me/code/frontend" },
+  ],
+}
+```
+
+When to use which:
+
+- **Registered names** when paths are stable, shared across team members, or
+  you want short CLI invocations.
+- **Dynamic paths** for ad-hoc exploration, CI/scripts with computed paths,
+  or one-off cross-project queries without modifying `.knowledginerc`.
+
+Constraints:
+
+- Each target project must contain `.knowledgine/index.sqlite` with
+  `schema_version >= 8`. Projects without it are skipped with a stderr warning.
+- Identical basenames across paths produce ambiguous `projectName` in output;
+  use registered names in `.knowledginerc` to disambiguate.
+- Glob patterns, remote URLs, and dynamic-path support via the MCP server's
+  `search_knowledge` tool are out of scope (future tickets).
 
 ### capture
 
