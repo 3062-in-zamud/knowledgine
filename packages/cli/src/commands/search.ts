@@ -25,7 +25,7 @@ import {
 } from "../lib/formatter.js";
 import type { OutputFormat } from "../lib/formatter.js";
 import { colors, symbols } from "../lib/ui/index.js";
-import { resolveProjectArgs } from "../lib/resolve-project-args.js";
+import { resolveProjectArgs, MAX_CONNECTIONS } from "../lib/resolve-project-args.js";
 import type { ResolveResult } from "../lib/resolve-project-args.js";
 
 export interface SearchCommandOptions {
@@ -78,7 +78,7 @@ export async function searchCommand(query: string, options: SearchCommandOptions
 
     if (result.truncatedCount > 0) {
       console.error(
-        `${symbols.warning} ${colors.warning(`Truncated ${result.truncatedCount} project(s); max 10 supported.`)}`,
+        `${symbols.warning} ${colors.warning(`Truncated ${result.truncatedCount} project(s); max ${MAX_CONNECTIONS} supported.`)}`,
       );
     }
 

@@ -3,7 +3,7 @@ import { homedir } from "os";
 import { isAbsolute, basename, resolve as resolvePath, join } from "path";
 import type { ProjectEntry } from "@knowledgine/core";
 
-const MAX_CONNECTIONS = 10;
+export const MAX_CONNECTIONS = 10;
 
 export interface ResolveResult {
   resolved: ProjectEntry[];
