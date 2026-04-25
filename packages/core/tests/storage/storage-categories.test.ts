@@ -66,4 +66,31 @@ describe("classifyTable", () => {
   it("classifies unknown tables as 'other'", () => {
     expect(classifyTable("definitely_not_a_real_table")).toBe("other");
   });
+
+  it("classifies idx_<table>_<column> indexes into the owning table's category", () => {
+    expect(classifyTable("idx_note_embeddings_model")).toBe("embeddings");
+    expect(classifyTable("idx_knowledge_notes_created_at")).toBe("notes");
+    expect(classifyTable("idx_knowledge_notes_deprecated")).toBe("notes");
+    expect(classifyTable("idx_entities_name")).toBe("graph");
+    expect(classifyTable("idx_entities_normalized")).toBe("graph");
+    expect(classifyTable("idx_relations_from")).toBe("graph");
+    expect(classifyTable("idx_observations_entity")).toBe("graph");
+    expect(classifyTable("idx_entity_note_links_note")).toBe("graph");
+    expect(classifyTable("idx_events_type")).toBe("events");
+    expect(classifyTable("idx_provenance_entity")).toBe("events");
+    expect(classifyTable("idx_file_timeline_path")).toBe("events");
+    expect(classifyTable("idx_memory_entries_layer")).toBe("memory");
+    expect(classifyTable("idx_extracted_patterns_note_id")).toBe("notes");
+  });
+
+  it("classifies sqlite_autoindex_<table>_<n> into the owning table's category", () => {
+    expect(classifyTable("sqlite_autoindex_knowledge_notes_1")).toBe("notes");
+    expect(classifyTable("sqlite_autoindex_note_embeddings_1")).toBe("embeddings");
+    expect(classifyTable("sqlite_autoindex_entities_1")).toBe("graph");
+  });
+
+  it("falls back to 'other' for index-shaped names with unknown table owners", () => {
+    expect(classifyTable("idx_some_unknown_table_col")).toBe("other");
+    expect(classifyTable("sqlite_autoindex_unknown_table_1")).toBe("other");
+  });
 });
