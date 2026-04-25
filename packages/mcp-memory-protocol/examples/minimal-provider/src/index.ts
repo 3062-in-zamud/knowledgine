@@ -31,6 +31,7 @@ interface Row {
   metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt?: string;
+  lastAccessedAt?: string;
   deprecated: boolean;
   deprecationReason?: string;
   supersedes?: string;
@@ -102,8 +103,10 @@ export class MinimalInMemoryProvider implements MemoryProvider {
     const sliced = cands.slice(0, limit);
     const now = new Date().toISOString();
     for (const r of sliced) {
+      // Spec §6.1: reads update lastAccessedAt; updatedAt only changes on
+      // actual writes (update/forget).
       r.accessCount += 1;
-      r.updatedAt = now;
+      r.lastAccessedAt = now;
     }
     return { memories: sliced.map(toRecalled), totalCount, hasMore: totalCount > sliced.length };
   }
@@ -167,6 +170,7 @@ function toRecalled(r: Row): RecalledMemory {
     metadata: r.metadata ? { ...r.metadata } : undefined,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
+    lastAccessedAt: r.lastAccessedAt,
     deprecated: r.deprecated,
     deprecationReason: r.deprecationReason,
     supersedes: r.supersedes,
