@@ -12,7 +12,7 @@ import {
   DEFAULT_MODEL_NAME,
   checkSemanticReadiness,
 } from "@knowledgine/core";
-import type { SemanticReadiness } from "@knowledgine/core";
+import type { SemanticReadiness, StorageBreakdown } from "@knowledgine/core";
 import { createBox, colors, symbols } from "../lib/ui/index.js";
 import { getConfigPath, TARGETS, PROJECT_CONFIG_SUPPORT } from "./setup.js";
 import * as TOML from "smol-toml";
@@ -75,6 +75,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   let totalPatterns = 0;
   let notesBySubType: Record<string, number> = {};
   let readiness: SemanticReadiness | undefined;
+  let breakdown: StorageBreakdown | undefined;
   try {
     const db = createDatabase(dbPath);
     if (config.embedding?.enabled) {
@@ -90,6 +91,13 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
     const modelManager = new ModelManager();
     readiness = checkSemanticReadiness(config, modelManager, repository);
+
+    try {
+      breakdown = repository.getStorageBreakdown();
+    } catch {
+      // Breakdown is best-effort; main status output should not fail.
+      breakdown = undefined;
+    }
 
     db.close();
   } catch (error) {
@@ -185,6 +193,38 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     return `    ${colors.dim(label.padEnd(16))}${count}`;
   });
 
+  // Per-category storage breakdown lines (skipped when dbstat is unavailable).
+  const breakdownLines: string[] = [];
+  if (breakdown && breakdown.fallback !== "page-count-only") {
+    const categoryOrder: Array<keyof StorageBreakdown["byCategory"]> = [
+      "notes",
+      "fts",
+      "embeddings",
+      "graph",
+      "events",
+      "memory",
+      "other",
+    ];
+    breakdownLines.push(`  ${pad("Breakdown:")}`);
+    for (const cat of categoryOrder) {
+      breakdownLines.push(
+        `    ${colors.dim(cat.padEnd(16))}${formatBytes(breakdown.byCategory[cat])}`,
+      );
+    }
+    if (breakdown.freelistBytes > 0) {
+      breakdownLines.push(
+        `    ${colors.dim("freelist".padEnd(16))}${formatBytes(breakdown.freelistBytes)}`,
+      );
+    }
+    if (breakdown.walBytes > 0) {
+      breakdownLines.push(`    ${colors.dim("wal".padEnd(16))}${formatBytes(breakdown.walBytes)}`);
+    }
+  } else if (breakdown && breakdown.fallback === "page-count-only") {
+    breakdownLines.push(
+      `  ${pad("Breakdown:")}${colors.hint("unavailable (dbstat not compiled)")}`,
+    );
+  }
+
   const contentParts = [
     `${colors.bold("Database")}`,
     `  ${pad("Path:")}${dbPath} (${sizeStr})`,
@@ -192,6 +232,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     ...(subTypeEntries.length > 1 ? subTypeLines : []),
     `  ${pad("Patterns:")}${colors.info(String(totalPatterns))} extracted`,
     `  ${pad("Embeddings:")}${colors.info(`${embeddingsGenerated}/${totalNotes} (${embeddingCoverage}%)`)} generated`,
+    ...breakdownLines,
     "",
     `${colors.bold("Model:")}  ${modelLine}`,
     `${colors.bold("Search:")} ${semanticMode ? "semantic + FTS5" : "FTS5 only"}`,
