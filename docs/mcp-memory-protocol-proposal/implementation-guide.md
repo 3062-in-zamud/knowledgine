@@ -96,21 +96,21 @@ The four required operations are the spec's §9.1 MUST set:
 - `update_memory` (with `createVersion: false` only)
 - `forget_memory` (with `hard: false` only)
 
-Optional capabilities are advertised through `capabilities()`:
+Optional capabilities are advertised through `capabilities()`. The names below are the actual `MemoryProviderCapabilities` property keys (camelCase); the spec refers to them in snake_case (`temporal_query`, `semantic_search`, `layer_promotion`) — both forms refer to the same capability.
 
 - **`versioning`** — `update_memory(createVersion: true)` creates a new
   immutable row, deprecating the old one. `recall_memory(includeVersionHistory:
 true)` returns deprecated rows alongside live ones.
-- **`temporal_query`** — `recall_memory(asOf: "<ISO timestamp>")` returns
+- **`temporalQuery`** (spec: `temporal_query`) — `recall_memory(asOf: "<ISO timestamp>")` returns
   the version of every chain that was current at that historical moment
   (spec §8.2). Soft-forgotten entries whose `deprecated_at > asOf` must be
   included.
 - **`ttl`** — `store_memory({ttl})` schedules an entry for lazy-expire.
   Expired entries are filtered out of recall, and update/forget on an
   expired entry returns `MEMORY_NOT_FOUND`.
-- **`semantic_search`** — recall ranks results by embedding similarity
+- **`semanticSearch`** (spec: `semantic_search`) — recall ranks results by embedding similarity
   (`relevanceScore` is populated).
-- **`layer_promotion`** — provider-internal automatic re-classification
+- **`layerPromotion`** (spec: `layer_promotion`) — provider-internal automatic re-classification
   between layers.
 
 You only have to implement the capabilities you declare `true`. The
