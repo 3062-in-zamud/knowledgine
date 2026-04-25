@@ -353,6 +353,24 @@ describe("secret redaction 強化", () => {
     expect(sanitizeContent(content)).toBe(content);
   });
 
+  it('[KNOW-401 negative] monkey="banana" は変更されない (key で終わるが camelCase 境界なし)', () => {
+    // pattern B の boundary を `(?<=[a-z])(?=[A-Z])` (camelCase) または `[_-]` separator に
+    // 限定したことで、`monkey` のような単に keyword で終わる単語は誤 redact されない。
+    const content = 'monkey="banana"';
+    expect(sanitizeContent(content)).toBe(content);
+  });
+
+  it("[KNOW-401 negative] donkey=value は変更されない", () => {
+    const content = "donkey=value";
+    expect(sanitizeContent(content)).toBe(content);
+  });
+
+  it("[KNOW-401 negative] passkey: 'short' は変更されない (key boundary)", () => {
+    // "passkey" は "key" を含むが、"pass" は小文字のみで camelCase 境界がない
+    const content = "passkey: 'short value here'";
+    expect(sanitizeContent(content)).toBe(content);
+  });
+
   it("[KNOW-401 negative] Markdown inline code `GITHUB_TOKEN=xxx` は変更されない", () => {
     // バッククォートで囲まれた inline code は先頭アンカー外なので原則 match しない
     const content = "Set the `GITHUB_TOKEN=example` env var before running.";
