@@ -21,6 +21,8 @@ import { registerForgetTests } from "./forget.test-suite.js";
 import { registerVersioningTests } from "./versioning.test-suite.js";
 import { registerErrorFormatTests } from "./error-format.test-suite.js";
 import { registerCapabilitiesTests } from "./capabilities.test-suite.js";
+import { registerTemporalQueryTests } from "./temporal-query.test-suite.js";
+import { registerTtlTests } from "./ttl.test-suite.js";
 
 export type { RunConformanceOptions, SkippableCapability } from "./helpers.js";
 export { shouldRunCapability } from "./helpers.js";
@@ -35,7 +37,9 @@ export function runConformanceSuite(options: import("./helpers.js").RunConforman
   registerCapabilitiesTests(options);
 
   // Optional capabilities — each suite self-gates on `provider.capabilities()`
-  // and `options.skip`. PR 3 will add registerTemporalQueryTests +
-  // registerTtlTests once the knowledgine adapter implements §8.2 / §9.2.
+  // and `options.skip`. semantic_search is deferred to a fast-follow ticket;
+  // layer_promotion is a provider-internal concern and has no spec assertion.
   registerVersioningTests(options);
+  registerTemporalQueryTests(options);
+  registerTtlTests(options);
 }
