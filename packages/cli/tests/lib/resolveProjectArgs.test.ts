@@ -152,6 +152,23 @@ describe("resolveProjectArgs", () => {
     expect(result.resolved[0].path).toBe(projDir);
   });
 
+  // 11b: 同一 registered name の CSV 重複 → dedupe
+  it("dedupes repeated registered names", () => {
+    const projDir = track(makeProjectDir("regdup"));
+    const rc: ProjectEntry[] = [{ name: "my-repo", path: projDir }];
+    const result = resolveProjectArgs("my-repo,my-repo,my-repo", rc);
+    expect(result.resolved).toHaveLength(1);
+    expect(result.resolved[0].name).toBe("my-repo");
+  });
+
+  // 11c: registered name と同じ実体を指す絶対 path 混在 → dedupe
+  it("dedupes registered name and absolute path pointing to the same dir", () => {
+    const projDir = track(makeProjectDir("samedir"));
+    const rc: ProjectEntry[] = [{ name: "alias", path: projDir }];
+    const result = resolveProjectArgs(`alias,${projDir}`, rc);
+    expect(result.resolved).toHaveLength(1);
+  });
+
   // 12: MAX_CONNECTIONS=10 超過
   it("truncates beyond MAX_CONNECTIONS=10 and reports truncatedCount", () => {
     const dirs = Array.from({ length: 11 }, (_, i) => track(makeProjectDir(`max${i}`)));

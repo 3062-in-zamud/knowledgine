@@ -74,6 +74,9 @@ export function resolveProjectArgs(
     } else {
       const match = rcProjects.find((p) => p.name === entry);
       if (match) {
+        const normalized = resolvePath(match.path);
+        if (seenPaths.has(normalized)) continue;
+        seenPaths.add(normalized);
         resolved.push({ name: match.name, path: match.path });
       } else {
         unresolvedNames.push(entry);
