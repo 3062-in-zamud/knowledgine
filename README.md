@@ -150,7 +150,7 @@ knowledgine setup --target cursor --path ./my-notes --write
 knowledgine status --path ./my-notes
 ```
 
-Shows database stats, model availability, MCP configuration status, and overall readiness.
+Shows database stats, model availability, MCP configuration status, and overall readiness. The Database section now also includes a per-category storage breakdown (`notes`, `fts`, `embeddings`, `graph`, `events`, `memory`, `other`, plus `freelist` and `wal` when non-zero) so it is easy to see which subsystem dominates the on-disk footprint.
 
 ### search
 

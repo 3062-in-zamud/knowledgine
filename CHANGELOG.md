@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Migration 019 / 020**: `memory_entries.valid_until` and `memory_entries.expires_at` columns added to support spec §8.2 chain reconstruction and §9.2 ttl. Default `NULL` keeps legacy rows backward-compatible.
 - **`SourceType: "cline"`**: Added `"cline"` to the `SourceType` union so the new `cline-sessions` ingest plugin maps to a dedicated source type rather than `"manual"`.
+- **Migration 021 — int8 vector mirror**: `note_embeddings_vec` is now declared as `INT8[384]` (was `FLOAT[384]`). The canonical float32 BLOB on `note_embeddings.embedding` is unchanged. `searchByVector` runs a coarse vec0 INT8 KNN with `k = 10 × topK` and reranks the candidate set against the float32 BLOBs to keep recall@10 within 5pp of the float32 baseline (synthetic Jaccard@10 = 1.000). Forward-only migration; downgrading the CLI requires re-embedding via `--embed-missing`. See `docs/benchmarks/db-storage-v2.md`.
+- **`KnowledgeRepository.getStorageBreakdown()`**: New API returning per-category storage usage (`notes`, `fts`, `embeddings`, `graph`, `events`, `memory`, `other`) plus freelist and WAL bytes. Backed by the SQLite `dbstat` virtual table; falls back to `PRAGMA page_count * page_size` when `dbstat` is unavailable.
+- **PRAGMA tuning**: `createDatabase()` now sets `synchronous=NORMAL` (safe under WAL) and `cache_size=-20000` (20 MiB page cache). The existing `journal_mode=WAL`, `mmap_size=64 MiB`, and `temp_store=MEMORY` are unchanged.
 
 #### Ingest (`@knowledgine/ingest`)
 
@@ -48,6 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `/`, `./`, `../`, `~/`, or `.`. Mixing names and paths in a single
   comma-separated list is supported. Removes the prior requirement that every
   cross-project target be pre-registered in `.knowledginerc`.
+- **`status` per-category storage breakdown**: The Database section now
+  shows a `Breakdown` block listing bytes for `notes`, `fts`, `embeddings`,
+  `graph`, `events`, `memory`, and `other`, plus `freelist` and `wal` when
+  non-zero. When `dbstat` is unavailable the breakdown is hidden with
+  `unavailable (dbstat not compiled)` rather than failing the command.
 
 ### Changed
 
