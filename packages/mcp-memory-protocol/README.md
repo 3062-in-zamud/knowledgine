@@ -5,7 +5,7 @@
 This package is the one-stop reference for the protocol:
 
 - **Types & schemas** — TypeScript interfaces and Zod validators for every wire shape (§5 Operations, §6 Data Types, §7 Errors)
-- **Provider interface** — the [`MemoryProvider`](./src/provider.ts) contract every compliant implementation fulfils
+- **Provider interface** — the `MemoryProvider` contract every compliant implementation fulfils
 - **Conformance test kit** — drop a factory in, get a vitest spec that validates §3-§11 against your provider
 - **Reference implementation** — `@knowledgine/mcp-server` ships a `KnowledgineMemoryProvider` that satisfies the full kit
 
