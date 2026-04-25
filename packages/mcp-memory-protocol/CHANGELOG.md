@@ -6,7 +6,7 @@ All notable changes to this package are documented here. The format follows [Kee
 
 ### Added
 
-- **Reference implementation prep (KNOW-340)**: gap-analysis aligning knowledgine's adapter to spec §3-§11; conformance test kit redesigned around `MemoryProvider` direct injection so external implementations (Mem0, Zep, …) can validate without standing up an MCP server; new `temporal_query` (§8.2) and `ttl` (§9.2) test-suites.
+- **Reference implementation prep**: gap-analysis aligning knowledgine's adapter to spec §3-§11; conformance test kit redesigned around `MemoryProvider` direct injection so external implementations (Mem0, Zep, …) can validate without standing up an MCP server; new `temporal_query` (§8.2) and `ttl` (§9.2) test-suites.
 - **`./conformance` subpath export**: import the kit via `@knowledgine/mcp-memory-protocol/conformance`. The main entry stays minimal for production providers.
 - **`RecalledMemory` fields**: `deprecated`, `deprecationReason`, `supersedes`, `validFrom` are now part of the public type (spec §6.1), so versioning and temporal_query consumers can read state directly off recall responses.
 - **Publish metadata**: `description`, `keywords`, `repository`, `homepage`, `bugs`, `files` populated; `LICENSE`, `CHANGELOG.md`, `MIGRATION.md` shipped in the tarball.
