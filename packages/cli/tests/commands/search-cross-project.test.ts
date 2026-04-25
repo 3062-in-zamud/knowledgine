@@ -121,6 +121,8 @@ describe("searchCommand --projects (cross-project, KNOW-403)", () => {
     expect(stderr).toContain("No matching registered projects");
     expect(stderr).toContain("Available: known");
     expect(stderr).toContain("Register a project");
+    // Case B 文言は absolute だけでなく relative / ~/ も案内する
+    expect(stderr).toMatch(/absolute, relative, or ~\//);
   });
 
   // 20b: Case C (混在) → exitCode=1

@@ -334,8 +334,8 @@ function buildUnresolvedError(
     return (
       `No matching registered projects found for: ${rawArg}.\n` +
       `Available: ${availStr}.\n` +
-      `Register a project in .knowledginerc, or pass an absolute path ` +
-      `like --projects /abs/path/to/repo.`
+      `Register a project in .knowledginerc, or pass a path ` +
+      `(absolute, relative, or ~/) — e.g. --projects /abs/path,~/work/repo,./sibling.`
     );
   }
 
