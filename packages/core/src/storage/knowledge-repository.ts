@@ -3,6 +3,21 @@ import type { KnowledgeData, ExtractedPattern } from "../types.js";
 import { ValidationError, DatabaseError, KnowledgeNotFoundError } from "../errors.js";
 import { createHash } from "crypto";
 import { hasCjk as hasCjkChars } from "../utils/cjk.js";
+import { computeStorageBreakdown } from "./storage-breakdown.js";
+import type { StorageBreakdown } from "./storage-breakdown.js";
+import { quantizeFloat32ToInt8 } from "./quantization.js";
+
+// Coarse-to-fine rerank settings for searchByVector. The vec0 INT8[384]
+// mirror returns approximate KNN; we oversample by a factor and rerank the
+// candidate set against the canonical float32 BLOBs to recover float32
+// precision (recall@10 = 1.0 in spike measurements).
+const SEARCH_BY_VECTOR_OVERSAMPLE = 10;
+const SEARCH_BY_VECTOR_MAX_K = 100;
+
+function quantizedBufferOf(vec: Float32Array): Buffer {
+  const int8 = quantizeFloat32ToInt8(vec);
+  return Buffer.from(int8.buffer, int8.byteOffset, int8.byteLength);
+}
 
 export interface KnowledgeNote {
   id: number;
@@ -575,13 +590,14 @@ export class KnowledgeRepository {
 
         // note_embeddings_vec (vec0) が存在する場合は手動で同期
         // vec0 は ON CONFLICT をサポートしないため DELETE + INSERT を使う
+        // INT8[384] 仮想テーブルへは vec_int8(?) ラッパーで bind する必要がある
         if (vec0Available) {
           this.stmt("DELETE FROM note_embeddings_vec WHERE note_id = CAST(? AS INTEGER)").run(
             noteId,
           );
           this.stmt(
-            "INSERT INTO note_embeddings_vec(note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
-          ).run(noteId, embBuf);
+            "INSERT INTO note_embeddings_vec(note_id, embedding) VALUES (CAST(? AS INTEGER), vec_int8(?))",
+          ).run(noteId, quantizedBufferOf(embedding));
         }
       });
       saveEmbeddingTransaction();
@@ -622,7 +638,7 @@ export class KnowledgeRepository {
       : null;
     const vecInsertStmt = vec0Available
       ? this.stmt(
-          "INSERT INTO note_embeddings_vec(note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
+          "INSERT INTO note_embeddings_vec(note_id, embedding) VALUES (CAST(? AS INTEGER), vec_int8(?))",
         )
       : null;
 
@@ -640,7 +656,7 @@ export class KnowledgeRepository {
       if (vec0Available && vecDeleteStmt && vecInsertStmt) {
         try {
           vecDeleteStmt.run(item.noteId);
-          vecInsertStmt.run(item.noteId, embBuf);
+          vecInsertStmt.run(item.noteId, quantizedBufferOf(item.embedding));
         } catch {
           // vec0 操作失敗は無視（graceful degradation）
         }
@@ -740,7 +756,7 @@ export class KnowledgeRepository {
       `,
     );
     const insert = this.db.prepare(
-      "INSERT INTO note_embeddings_vec (note_id, embedding) VALUES (CAST(? AS INTEGER), ?)",
+      "INSERT INTO note_embeddings_vec (note_id, embedding) VALUES (CAST(? AS INTEGER), vec_int8(?))",
     );
     let synced = 0;
 
@@ -756,7 +772,14 @@ export class KnowledgeRepository {
       const tx = this.db.transaction(() => {
         for (const row of chunk) {
           try {
-            insert.run(row.note_id, row.embedding);
+            // Float32 BLOB → Float32Array view → uniform int8 quantization → vec_int8
+            if (row.embedding.length % 4 !== 0) continue;
+            const f32 = new Float32Array(
+              row.embedding.buffer,
+              row.embedding.byteOffset,
+              row.embedding.length / 4,
+            );
+            insert.run(row.note_id, quantizedBufferOf(f32));
             synced++;
           } catch {
             // Skip rows with invalid embedding data rather than aborting the entire backfill
@@ -771,40 +794,69 @@ export class KnowledgeRepository {
 
   /**
    * ベクトル類似度検索（note_embeddings_vec を使用）
-   * sqlite-vec が利用できない場合は空配列を返す
+   *
+   * - vec0 INT8[384] mirror で粗い KNN を取得（k = limit * OVERSAMPLE）
+   * - 候補集合の float32 BLOB を読み出して厳密 L2 距離で再ランク
+   * - confidence <= 0.1 のノートを除外し、上位 `limit` 件を返す
+   *
+   * sqlite-vec が利用できない場合は空配列を返す。
    */
   searchByVector(
     embedding: Float32Array,
     limit: number = 10,
   ): Array<{ note_id: number; distance: number }> {
     try {
-      const buf = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
-      // 高ノイズリポでバッファ不足を防ぐため limit * 3 で多めに取得
-      const raw = this.stmt(
+      const k = Math.min(Math.max(limit, 1) * SEARCH_BY_VECTOR_OVERSAMPLE, SEARCH_BY_VECTOR_MAX_K);
+      const queryInt8 = quantizedBufferOf(embedding);
+
+      const coarse = this.stmt(
         `
-        SELECT note_id, distance
+        SELECT note_id
         FROM note_embeddings_vec
-        WHERE embedding MATCH ?
+        WHERE embedding MATCH vec_int8(?) AND k = ?
         ORDER BY distance
-        LIMIT ?
       `,
-      ).all(buf, limit * 3) as Array<{ note_id: number; distance: number }>;
+      ).all(queryInt8, k) as Array<{ note_id: number }>;
 
-      if (raw.length === 0) return raw;
+      if (coarse.length === 0) return [];
 
-      // Filter out notes with confidence <= 0.1 (post-query because sqlite-vec
-      // vec0 tables do not support JOIN). Use a lightweight query that fetches
-      // only id + confidence instead of full note summaries to avoid a redundant
-      // DB read — callers (SemanticSearcher, HybridSearcher) already fetch full
-      // summaries downstream.
-      const noteIds = raw.map((r) => r.note_id);
+      const noteIds = coarse.map((r) => r.note_id);
       const placeholders = noteIds.map(() => "?").join(",");
+
+      // Rerank candidates using exact L2 on the canonical float32 BLOBs.
+      const blobRows = this.db
+        .prepare(
+          `SELECT note_id, embedding, dimensions FROM note_embeddings WHERE note_id IN (${placeholders})`,
+        )
+        .all(...noteIds) as Array<{
+        note_id: number;
+        embedding: Buffer;
+        dimensions: number | null;
+      }>;
+
+      const reranked: Array<{ note_id: number; distance: number }> = [];
+      for (const row of blobRows) {
+        const dim = row.dimensions ?? embedding.length;
+        if (dim !== embedding.length) continue;
+        if (row.embedding.length !== dim * 4) continue;
+        const f32 = new Float32Array(row.embedding.buffer, row.embedding.byteOffset, dim);
+        let l2sq = 0;
+        for (let i = 0; i < dim; i++) {
+          const d = embedding[i] - f32[i];
+          l2sq += d * d;
+        }
+        reranked.push({ note_id: row.note_id, distance: Math.sqrt(l2sq) });
+      }
+      reranked.sort((a, b) => a.distance - b.distance);
+
+      // Confidence filter (<= 0.1 excluded). Done last so reranking decides
+      // which candidates we even consider.
       const confRows = this.db
         .prepare(`SELECT id, confidence FROM knowledge_notes WHERE id IN (${placeholders})`)
         .all(...noteIds) as Array<{ id: number; confidence: number | null }>;
       const confMap = new Map(confRows.map((r) => [r.id, r.confidence]));
 
-      return raw
+      return reranked
         .filter((r) => {
           const conf = confMap.get(r.note_id);
           return conf === null || conf === undefined || conf > 0.1;
@@ -1424,6 +1476,15 @@ export class KnowledgeRepository {
     return info.changes;
   }
 
+  /**
+   * Per-category storage breakdown of the underlying SQLite database.
+   * Uses the `dbstat` virtual table when available; falls back to
+   * `PRAGMA page_count * page_size` otherwise.
+   */
+  getStorageBreakdown(): StorageBreakdown {
+    return computeStorageBreakdown(this.db);
+  }
+
   close(): void {
     this._stmtCache.clear();
     this.db.close();
@@ -1435,7 +1496,7 @@ export class KnowledgeRepository {
       this.db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS note_embeddings_vec USING vec0(
           note_id INTEGER PRIMARY KEY,
-          embedding FLOAT[384]
+          embedding INT8[384]
         );
         CREATE TRIGGER IF NOT EXISTS note_embeddings_ad AFTER DELETE ON note_embeddings BEGIN
           DELETE FROM note_embeddings_vec WHERE note_id = old.note_id;

@@ -72,6 +72,10 @@ export type {
   KnowledgeNoteSummary,
   ExtractedPatternRow,
 } from "./storage/knowledge-repository.js";
+export { computeStorageBreakdown } from "./storage/storage-breakdown.js";
+export type { StorageBreakdown } from "./storage/storage-breakdown.js";
+export { classifyTable, STORAGE_CATEGORIES } from "./storage/storage-categories.js";
+export type { StorageCategory } from "./storage/storage-categories.js";
 export { Migrator } from "./storage/migrator.js";
 export type { Migration, MigrationStatus } from "./storage/migrator.js";
 export { SCHEMA_SQL } from "./storage/schema.js";
@@ -95,6 +99,12 @@ export { migration015 } from "./storage/migrations/015_embedding_format_version.
 export { migration016 } from "./storage/migrations/016_note_confidence.js";
 export { migration019 } from "./storage/migrations/019_memory_valid_until.js";
 export { migration020 } from "./storage/migrations/020_memory_expires_at.js";
+export { migration021 } from "./storage/migrations/021_embedding_int8_quantization.js";
+export {
+  quantizeFloat32ToInt8,
+  dequantizeInt8,
+  QUANTIZATION_SCALE,
+} from "./storage/quantization.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -126,6 +136,7 @@ import { migration015 } from "./storage/migrations/015_embedding_format_version.
 import { migration016 } from "./storage/migrations/016_note_confidence.js";
 import { migration019 } from "./storage/migrations/019_memory_valid_until.js";
 import { migration020 } from "./storage/migrations/020_memory_expires_at.js";
+import { migration021 } from "./storage/migrations/021_embedding_int8_quantization.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -148,6 +159,7 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration016,
   migration019,
   migration020,
+  migration021,
 ];
 
 // Provenance
