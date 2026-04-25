@@ -214,7 +214,10 @@ When to use which:
 Constraints:
 
 - Each target project must contain `.knowledgine/index.sqlite` with
-  `schema_version >= 8`. Projects without it are skipped with a stderr warning.
+  `schema_version >= 8`. When at least one project resolves, any path that
+  lacks the database file is skipped with a stderr warning and the search
+  continues. When **none** of the supplied entries resolves, the command exits
+  with status `1` and a Case A/B/C/D error message explaining what was wrong.
 - Identical basenames across paths produce ambiguous `projectName` in output;
   use registered names in `.knowledginerc` to disambiguate.
 - Glob patterns, remote URLs, and dynamic-path support via the MCP server's
