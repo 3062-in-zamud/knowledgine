@@ -171,8 +171,9 @@ knowledgine search "debugging tips" --mode hybrid --path ./my-notes --format tab
 #### Cross-Project Search
 
 Search across multiple knowledgine projects in a single query. Results are
-ranked by FTS5 score (descending) and limited to 10 concurrent project
-databases.
+ranked by FTS5 score (descending). At most 10 projects are searched per query
+(any extras are dropped with a stderr warning). Project databases are opened
+sequentially, not in parallel.
 
 You can pass either registered names from `.knowledginerc` (when configured)
 or absolute / relative / `~/` paths directly:
