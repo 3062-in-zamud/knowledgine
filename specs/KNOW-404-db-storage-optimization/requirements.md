@@ -103,8 +103,13 @@ SQLite PRAGMAs, and exposing per-category storage breakdown on `status`.
   remains text.)
 - Index pruning. May be added in Phase 1.5 if breakdown data shows index
   bloat is the dominant cost; otherwise deferred.
-- Asymmetric (zero-point) quantization. Symmetric `scale = max(|v|)` is shown
-  to be sufficient for AC-4 in the design phase.
+- Asymmetric (zero-point) quantization. The chosen design — uniform
+  symmetric `scale = 1/127` shared across all vectors — is sufficient
+  for AC-4 because the embeddings are L2-normalized; per-vector scales
+  are explicitly out because sqlite-vec's `INT8[N]` virtual table does
+  not use them when computing distance. See design.md "Decision 1" and
+  "Decision 2" for the chosen approach (`note_embeddings_vec` int8 with
+  rerank-from-BLOB).
 - Automatic DB backup before migration021. Documented as a recommendation,
   not implemented.
 
