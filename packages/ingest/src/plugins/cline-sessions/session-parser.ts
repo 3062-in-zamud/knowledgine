@@ -43,6 +43,13 @@ async function readJsonFile(filePath: string): Promise<{ data?: unknown; skipRea
     const code = (err as NodeJS.ErrnoException).code;
     return { skipReason: `read: ${code ?? "unknown"}` };
   }
+  // Re-check size after the read in case the file grew between stat() and
+  // readFile() (TOCTOU). Cline writes via temp + rename, so growth is rare,
+  // but a defensive bound here protects Node heap and satisfies CodeQL's
+  // file-system race detector.
+  if (Buffer.byteLength(raw, "utf8") > MAX_FILE_SIZE) {
+    return { skipReason: `file too large (>${MAX_FILE_SIZE / 1024 / 1024}MB)` };
+  }
   try {
     return { data: JSON.parse(raw) };
   } catch {
@@ -83,6 +90,15 @@ function normaliseUiMessages(parsed: unknown): ClineNormalizedMessage[] {
   return out;
 }
 
+/** Skip reasons that indicate the api file should be treated as a hard
+ * stop (no ui fallback). Heap-protection skip is the canonical example: if
+ * the api file is oversized we must not also load the ui file, which is
+ * frequently larger and would defeat the >10MB guard. */
+function isHardSkipReason(reason: string | undefined): boolean {
+  if (!reason) return false;
+  return reason.startsWith("file too large");
+}
+
 /**
  * Parse the per-task JSON files produced by Cline 3.x.
  *
@@ -90,11 +106,17 @@ function normaliseUiMessages(parsed: unknown): ClineNormalizedMessage[] {
  *   1. Prefer `api_conversation_history.json` (Anthropic standard format).
  *   2. Fall back to `ui_messages.json` only when the api file is missing or
  *      malformed. UI messages drop tool details but preserve the conversation.
- *   3. If both are unavailable/malformed/oversized, return `{ messages: [],
- *      skipReason }` so the caller can emit a single stderr warning.
+ *   3. Hard-stop skip reasons (e.g. >10MB heap protection) short-circuit
+ *      without touching ui — falling back to a similarly large ui file would
+ *      defeat the guard.
+ *   4. If both are unavailable/malformed, return `{ messages: [], skipReason }`
+ *      so the caller can emit a single stderr warning.
  */
 export async function parseClineTask(taskDir: string): Promise<ParseResult> {
   const apiResult = await readJsonFile(join(taskDir, FILE_NAMES.api));
+  if (isHardSkipReason(apiResult.skipReason)) {
+    return { messages: [], skipReason: `api: ${apiResult.skipReason}` };
+  }
   if (apiResult.data !== undefined) {
     const messages = normaliseApiMessages(apiResult.data);
     if (messages.length > 0) return { messages };
