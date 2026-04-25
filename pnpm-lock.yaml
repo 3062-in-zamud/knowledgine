@@ -143,6 +143,44 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@25.5.0)(yaml@2.8.3)
 
+  packages/mcp-memory-protocol/examples/knowledgine-provider:
+    dependencies:
+      '@knowledgine/core':
+        specifier: workspace:*
+        version: link:../../../core
+      '@knowledgine/mcp-memory-protocol':
+        specifier: workspace:*
+        version: link:../..
+      '@knowledgine/mcp-server':
+        specifier: workspace:*
+        version: link:../../../mcp-server
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.0
+        version: 7.6.13
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.5.0)(yaml@2.8.3)
+
+  packages/mcp-memory-protocol/examples/minimal-provider:
+    dependencies:
+      '@knowledgine/mcp-memory-protocol':
+        specifier: workspace:*
+        version: link:../..
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.5.0)(yaml@2.8.3)
+
   packages/mcp-server:
     dependencies:
       '@hono/node-server':
