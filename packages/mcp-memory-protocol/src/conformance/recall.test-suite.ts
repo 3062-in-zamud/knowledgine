@@ -1,119 +1,85 @@
-import type { ConformanceTestContext, ConformanceResult } from "./helpers.js";
-import { callTool, makeResult } from "./helpers.js";
+// Conformance: recall_memory (§5.2)
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { MemoryProvider } from "../provider.js";
+import type { RunConformanceOptions } from "./helpers.js";
 
-export async function runRecallTests(ctx: ConformanceTestContext): Promise<ConformanceResult[]> {
-  const results: ConformanceResult[] = [];
+export function registerRecallTests(options: RunConformanceOptions): void {
+  describe("recall_memory (§5.2)", () => {
+    let provider: MemoryProvider;
 
-  // Seed a memory first
-  let seedId: string | undefined;
-  try {
-    const r = await callTool(ctx.client, "store_memory", {
-      content: "Recall conformance test seed",
-      layer: "episodic",
-      tags: ["conformance"],
+    beforeEach(async () => {
+      provider = await options.createProvider();
     });
-    seedId = (r.data as Record<string, unknown>).id as string;
-  } catch {
-    // will fail in later tests
-  }
 
-  // recall_memory: no query returns memories array
-  try {
-    const r = await callTool(ctx.client, "recall_memory", {});
-    if (r.isError) throw new Error(`Unexpected error: ${r.text}`);
-    const d = r.data as Record<string, unknown>;
-    if (!Array.isArray(d.memories)) throw new Error("Response missing memories array");
-    if (typeof d.totalCount !== "number") throw new Error("Missing totalCount");
-    if (typeof d.hasMore !== "boolean") throw new Error("Missing hasMore");
-    results.push(makeResult("recall_memory: returns memories/totalCount/hasMore", true));
-  } catch (e) {
-    results.push(
-      makeResult("recall_memory: returns memories/totalCount/hasMore", false, String(e)),
-    );
-  }
-
-  // recall_memory: with query
-  try {
-    const r = await callTool(ctx.client, "recall_memory", { query: "conformance test seed" });
-    if (r.isError) throw new Error(`Unexpected error: ${r.text}`);
-    const d = r.data as Record<string, unknown>;
-    if (!Array.isArray(d.memories)) throw new Error("Missing memories array");
-    results.push(makeResult("recall_memory: with query", true));
-  } catch (e) {
-    results.push(makeResult("recall_memory: with query", false, String(e)));
-  }
-
-  // recall_memory: each memory has required fields
-  try {
-    const r = await callTool(ctx.client, "recall_memory", { query: "conformance test seed" });
-    if (r.isError) throw new Error(`Unexpected error: ${r.text}`);
-    const d = r.data as Record<string, unknown>;
-    const memories = d.memories as Array<Record<string, unknown>>;
-    if (memories.length === 0) throw new Error("Expected at least one result");
-    const m = memories[0];
-    if (!m.id || typeof m.id !== "string") throw new Error("Missing string id");
-    if (!m.content || typeof m.content !== "string") throw new Error("Missing content");
-    if (!m.layer) throw new Error("Missing layer");
-    if (typeof m.version !== "number") throw new Error("Missing version");
-    if (typeof m.accessCount !== "number") throw new Error("Missing accessCount");
-    if (!Array.isArray(m.tags)) throw new Error("Missing tags array");
-    if (!m.createdAt) throw new Error("Missing createdAt");
-    results.push(makeResult("recall_memory: memory has required fields", true));
-  } catch (e) {
-    results.push(makeResult("recall_memory: memory has required fields", false, String(e)));
-  }
-
-  // recall_memory: filter by layer
-  try {
-    const r = await callTool(ctx.client, "recall_memory", {
-      filter: { layer: "episodic" },
+    afterEach(async () => {
+      await options.teardown?.(provider);
     });
-    if (r.isError) throw new Error(`Unexpected error: ${r.text}`);
-    const d = r.data as Record<string, unknown>;
-    const memories = d.memories as Array<Record<string, unknown>>;
-    for (const m of memories) {
-      if (m.layer !== "episodic") throw new Error(`Expected episodic, got ${String(m.layer)}`);
-    }
-    results.push(makeResult("recall_memory: filter by layer", true));
-  } catch (e) {
-    results.push(makeResult("recall_memory: filter by layer", false, String(e)));
-  }
 
-  // recall_memory: limit respected
-  try {
-    const r = await callTool(ctx.client, "recall_memory", { limit: 1 });
-    if (r.isError) throw new Error(`Unexpected error: ${r.text}`);
-    const d = r.data as Record<string, unknown>;
-    const memories = d.memories as unknown[];
-    if (memories.length > 1) throw new Error(`Expected at most 1 result, got ${memories.length}`);
-    results.push(makeResult("recall_memory: limit respected", true));
-  } catch (e) {
-    results.push(makeResult("recall_memory: limit respected", false, String(e)));
-  }
+    it("returns memories array plus totalCount/hasMore", async () => {
+      await provider.store({ content: "Recall conformance test seed", layer: "episodic" });
+      const r = await provider.recall({});
+      expect(Array.isArray(r.memories)).toBe(true);
+      expect(typeof r.totalCount).toBe("number");
+      expect(typeof r.hasMore).toBe("boolean");
+    });
 
-  // recall_memory: accessCount incremented on recall (SHOULD)
-  if (seedId) {
-    try {
-      const r1 = await callTool(ctx.client, "recall_memory", {
-        filter: { memoryIds: [seedId] },
+    it("supports query string", async () => {
+      await provider.store({
+        content: "Recall conformance test seed about TypeScript",
+        layer: "episodic",
       });
-      const before = (
-        (r1.data as Record<string, unknown>).memories as Array<Record<string, unknown>>
-      )[0]?.accessCount as number;
-      await callTool(ctx.client, "recall_memory", { filter: { memoryIds: [seedId] } });
-      const r2 = await callTool(ctx.client, "recall_memory", {
-        filter: { memoryIds: [seedId] },
-      });
-      const after = (
-        (r2.data as Record<string, unknown>).memories as Array<Record<string, unknown>>
-      )[0]?.accessCount as number;
-      if (after <= before)
-        throw new Error(`accessCount not incremented: before=${before}, after=${after}`);
-      results.push(makeResult("recall_memory: accessCount incremented (SHOULD)", true));
-    } catch (e) {
-      results.push(makeResult("recall_memory: accessCount incremented (SHOULD)", false, String(e)));
-    }
-  }
+      const r = await provider.recall({ query: "TypeScript" });
+      expect(Array.isArray(r.memories)).toBe(true);
+    });
 
-  return results;
+    it("each memory exposes the spec-required fields", async () => {
+      await provider.store({
+        content: "Recall conformance test seed about TypeScript",
+        layer: "episodic",
+        tags: ["conformance"],
+      });
+      const r = await provider.recall({ query: "TypeScript" });
+      expect(r.memories.length).toBeGreaterThan(0);
+      const m = r.memories[0];
+      expect(typeof m.id).toBe("string");
+      expect(typeof m.content).toBe("string");
+      expect(typeof m.layer).toBe("string");
+      expect(typeof m.version).toBe("number");
+      expect(typeof m.accessCount).toBe("number");
+      expect(Array.isArray(m.tags)).toBe(true);
+      expect(typeof m.createdAt).toBe("string");
+      expect(typeof m.deprecated).toBe("boolean");
+      expect(typeof m.validFrom).toBe("string");
+    });
+
+    it("filters by layer", async () => {
+      await provider.store({ content: "alpha", layer: "episodic" });
+      await provider.store({ content: "beta", layer: "semantic" });
+      const r = await provider.recall({ filter: { layer: "episodic" } });
+      for (const m of r.memories) {
+        expect(m.layer).toBe("episodic");
+      }
+    });
+
+    it("respects the limit parameter", async () => {
+      await provider.store({ content: "one", layer: "episodic" });
+      await provider.store({ content: "two", layer: "episodic" });
+      await provider.store({ content: "three", layer: "episodic" });
+      const r = await provider.recall({ limit: 1 });
+      expect(r.memories.length).toBeLessThanOrEqual(1);
+    });
+
+    it("increments accessCount on subsequent recall (SHOULD)", async () => {
+      const stored = await provider.store({
+        content: "AccessCount test seed",
+        layer: "episodic",
+      });
+      const r1 = await provider.recall({ filter: { memoryIds: [stored.id] } });
+      const before = r1.memories[0]?.accessCount ?? 0;
+      await provider.recall({ filter: { memoryIds: [stored.id] } });
+      const r2 = await provider.recall({ filter: { memoryIds: [stored.id] } });
+      const after = r2.memories[0]?.accessCount ?? 0;
+      expect(after).toBeGreaterThan(before);
+    });
+  });
 }

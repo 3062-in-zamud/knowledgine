@@ -93,6 +93,8 @@ export { migration013 } from "./storage/migrations/013_unknown_entity_type.js";
 export { migration014 } from "./storage/migrations/014_entity_normalization.js";
 export { migration015 } from "./storage/migrations/015_embedding_format_version.js";
 export { migration016 } from "./storage/migrations/016_note_confidence.js";
+export { migration019 } from "./storage/migrations/019_memory_valid_until.js";
+export { migration020 } from "./storage/migrations/020_memory_expires_at.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -122,6 +124,8 @@ import { migration013 } from "./storage/migrations/013_unknown_entity_type.js";
 import { migration014 } from "./storage/migrations/014_entity_normalization.js";
 import { migration015 } from "./storage/migrations/015_embedding_format_version.js";
 import { migration016 } from "./storage/migrations/016_note_confidence.js";
+import { migration019 } from "./storage/migrations/019_memory_valid_until.js";
+import { migration020 } from "./storage/migrations/020_memory_expires_at.js";
 import type { Migration } from "./storage/migrator.js";
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
@@ -142,6 +146,8 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration014,
   migration015,
   migration016,
+  migration019,
+  migration020,
 ];
 
 // Provenance
