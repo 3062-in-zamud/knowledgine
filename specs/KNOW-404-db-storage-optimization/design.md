@@ -81,9 +81,9 @@ KnowledgeRepository.prototype.getStorageBreakdown(): StorageBreakdown;
 
 1. CLI `status.ts` calls `KnowledgeRepository.getStats()` (existing) and
    `getStorageBreakdown()` (new).
-2. `getStorageBreakdown()` runs `SELECT name, SUM(payload + unused) FROM dbstat
-GROUP BY name`. If `dbstat` is unavailable, falls back to `PRAGMA page_count
-   - page_size`and reports`fallback: 'page-count-only'`.
+2. `getStorageBreakdown()` runs `SELECT name, SUM(payload + unused) FROM
+dbstat GROUP BY name`. If `dbstat` is unavailable, falls back to
+   `PRAGMA page_count * page_size` and reports `fallback: 'page-count-only'`.
 3. Each table name is classified via `classifyTable()` (prefix-aware: `memory_*`
    → `memory`, `*_fts*` → `fts` unless prefix matched first).
 4. Result rendered alongside the existing Database section in stderr-printed
