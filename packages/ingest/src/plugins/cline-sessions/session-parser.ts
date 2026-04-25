@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { open, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { extractTextContent } from "../../shared/text-extractor.js";
 import {
@@ -24,36 +24,52 @@ const FILE_NAMES = {
   metadata: "task_metadata.json",
 } as const;
 
+/**
+ * Read and JSON-parse a file with TOCTOU-safe size enforcement.
+ *
+ * Strategy: open() once and operate exclusively on the resulting file
+ * handle. fh.stat() and fh.read() share the same inode, so the size
+ * check and the read cannot race against an external rename/grow
+ * (CodeQL js/file-system-race compliant). After reading, re-check the
+ * actual byte length as a belt-and-suspenders bound.
+ */
 async function readJsonFile(filePath: string): Promise<{ data?: unknown; skipReason?: string }> {
-  let s: Awaited<ReturnType<typeof stat>>;
+  let fh: Awaited<ReturnType<typeof open>>;
   try {
-    s = await stat(filePath);
+    fh = await open(filePath, "r");
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return { skipReason: "missing" };
-    return { skipReason: `stat: ${code ?? "unknown"}` };
+    return { skipReason: `open: ${code ?? "unknown"}` };
   }
-  if (s.size > MAX_FILE_SIZE) {
-    return { skipReason: `file too large (>${MAX_FILE_SIZE / 1024 / 1024}MB)` };
-  }
-  let raw: string;
   try {
-    raw = await readFile(filePath, "utf8");
+    const s = await fh.stat();
+    if (s.size > MAX_FILE_SIZE) {
+      return { skipReason: `file too large (>${MAX_FILE_SIZE / 1024 / 1024}MB)` };
+    }
+    const buffer = Buffer.alloc(s.size);
+    if (s.size > 0) {
+      await fh.read(buffer, 0, s.size, 0);
+    }
+    // Defensive: if anything went wrong with the size accounting (sparse
+    // files, races during open() before we got the handle), still bound
+    // the materialised string.
+    if (buffer.byteLength > MAX_FILE_SIZE) {
+      return { skipReason: `file too large (>${MAX_FILE_SIZE / 1024 / 1024}MB)` };
+    }
+    const raw = buffer.toString("utf8");
+    try {
+      return { data: JSON.parse(raw) };
+    } catch {
+      return { skipReason: "parse error" };
+    }
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     return { skipReason: `read: ${code ?? "unknown"}` };
-  }
-  // Re-check size after the read in case the file grew between stat() and
-  // readFile() (TOCTOU). Cline writes via temp + rename, so growth is rare,
-  // but a defensive bound here protects Node heap and satisfies CodeQL's
-  // file-system race detector.
-  if (Buffer.byteLength(raw, "utf8") > MAX_FILE_SIZE) {
-    return { skipReason: `file too large (>${MAX_FILE_SIZE / 1024 / 1024}MB)` };
-  }
-  try {
-    return { data: JSON.parse(raw) };
-  } catch {
-    return { skipReason: "parse error" };
+  } finally {
+    await fh.close().catch(() => {
+      /* ignore close errors */
+    });
   }
 }
 
