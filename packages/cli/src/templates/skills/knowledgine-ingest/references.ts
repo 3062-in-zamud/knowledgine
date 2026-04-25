@@ -133,6 +133,36 @@ bug fixes, and architectural discussions.
 
 ---
 
+## cline-sessions
+
+**Plugin ID**: \`cline-sessions\`
+**Source**: Cline VS Code extension (saoudrizwan.claude-dev) session history
+
+Pull-type plugin that emits one note per Cline task.
+
+\`\`\`bash
+# OS-default Cline globalStorage
+knowledgine ingest --source cline-sessions --path ~/project
+
+# Alternate location (VS Code Insiders, fixtures, backups)
+CLINE_STORAGE_PATH=/abs/path/to/saoudrizwan.claude-dev \\
+  knowledgine ingest --source cline-sessions --path ~/project
+\`\`\`
+
+**What it captures**: Cline's iterative problem-solving loops, tool invocations,
+and conclusions. One note per task (head 100 + tail 100 messages, API keys redacted).
+
+**Storage location**:
+- macOS: \`~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/\`
+- Linux: \`~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/\`
+- Windows: \`%APPDATA%\\Code\\User\\globalStorage\\saoudrizwan.claude-dev\\\`
+
+**Limitations**: \`api_conversation_history.json\` files larger than 10MB are
+skipped. For Cline running inside VS Code Insiders / Cursor / Windsurf, set
+\`CLINE_STORAGE_PATH\` explicitly.
+
+---
+
 ## cicd
 
 **Plugin ID**: \`cicd\`
@@ -168,6 +198,7 @@ Configuration requirements and environment variables for each ingest source.
 | \`obsidian\` | \`--path\` (vault dir) | \`--full\` |
 | \`claude-sessions\` | \`--path\` | — |
 | \`cursor-sessions\` | \`--path\` | — |
+| \`cline-sessions\` | \`--path\` | \`CLINE_STORAGE_PATH\` (absolute, symlink-resolved) |
 | \`cicd\` | \`GITHUB_TOKEN\`, \`--repo\` | \`--full\` |
 
 ---

@@ -18,6 +18,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 #### Core (`@knowledgine/core`)
 
 - **Migration 019 / 020**: `memory_entries.valid_until` and `memory_entries.expires_at` columns added to support spec §8.2 chain reconstruction and §9.2 ttl. Default `NULL` keeps legacy rows backward-compatible.
+- **`SourceType: "cline"`**: Added `"cline"` to the `SourceType` union so the new `cline-sessions` ingest plugin maps to a dedicated source type rather than `"manual"`.
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **`cline-sessions` plugin**: Pull-type ingest for the Cline VS Code extension
+  (`saoudrizwan.claude-dev`). Reads `state/taskHistory.json` (HistoryItem index)
+  plus `tasks/<id>/api_conversation_history.json` (Anthropic message format) and
+  emits one `capture` note per task with secret redaction. Override storage path
+  via `CLINE_STORAGE_PATH` (absolute path; symlinks resolved). Long tasks keep
+  head 100 + tail 100 messages with a `(... N truncated ...)` marker. Files
+  larger than 10MB are skipped with a stderr warning. Source pinned at Cline
+  `v3.81.0`; see `docs/research/cline-session-storage.md` for schema details
+  and drift mitigation.
+- **`shared/decision-detector` and `shared/text-extractor`**: Promoted from
+  `plugins/claude-sessions/` so both `claude-sessions` and `cline-sessions` can
+  reuse them without cross-plugin relative imports.
+- **Anthropic-key redaction pattern**: `sanitizeContent` now redacts
+  `sk-ant-(api|admin)NN-…` Anthropic key formats whose internal hyphens
+  previously broke the generic `sk-…` pattern.
+
+#### CLI (`@knowledgine/cli`)
+
+- **`--source cline-sessions`**: Wires the new ingest plugin into the CLI and
+  the `knowledgine-ingest` skill template (ja/en).
 
 ### Changed
 
@@ -28,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 #### MCP Server (`@knowledgine/mcp-server`)
 
 - **`KnowledgineMemoryProvider` brought to full conformance**: fixed the `recall(includeVersionHistory)` / soft-delete filter, implemented §8.2 asOf branch with chain-collapse, and §9.2 ttl with versioned-update inheritance. Capabilities now include `versioning`, `temporalQuery`, `ttl`, `layerPromotion` (only `semanticSearch` remains deferred).
+
+#### Docs
+
+- **`docs/push-based-capture.md`**: The "Cline Storage Investigation Results"
+  section is updated. Pull-type ingest is now the recommended approach for
+  Cline; push-type capture remains valid for tools without pull adapters
+  (Windsurf, Codex CLI, Copilot Chat).
 
 ## [0.6.9] - 2026-04-09
 

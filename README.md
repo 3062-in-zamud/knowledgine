@@ -181,6 +181,7 @@ knowledgine capture delete <id> --path ./my-notes
 knowledgine ingest --source markdown --path ./my-notes
 knowledgine ingest --source github --repo owner/repo --path ./my-notes
 knowledgine ingest --source claude-sessions --path ./my-notes
+knowledgine ingest --source cline-sessions --path ./my-notes
 knowledgine ingest --all --path ./my-notes
 ```
 

@@ -61,6 +61,22 @@ describe("sanitizeContent", () => {
     expect(result).not.toContain("sk-abcdefghijklmnopqrstuvwxyz1234567890abcd");
   });
 
+  it("Anthropic API キー (sk-ant-api03-...) をマスクする", () => {
+    const anthKey = "sk-ant-" + "api03-" + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const content = `auth: ${anthKey}`;
+    const result = sanitizeContent(content);
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain(anthKey);
+  });
+
+  it("Anthropic admin キー (sk-ant-admin01-...) もマスクする", () => {
+    const admin = "sk-ant-" + "admin01-" + "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+    const content = `header: ${admin}`;
+    const result = sanitizeContent(content);
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain(admin);
+  });
+
   it("GitLab PAT (glpat-) をマスクする", () => {
     const content = "gitlab: glpat-abcdefghijklmnopqrst";
     const result = sanitizeContent(content);
