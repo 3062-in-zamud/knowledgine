@@ -58,6 +58,14 @@ export interface RecalledMemory {
   createdAt: string;
   updatedAt?: string;
   lastAccessedAt?: string;
+  /** Soft-forget flag (Section 6.1). True when the entry has been deprecated via forget_memory(soft) or update_memory(createVersion: true). */
+  deprecated: boolean;
+  /** Reason recorded at deprecation time (forget_memory.reason or update_memory rationale). */
+  deprecationReason?: string;
+  /** Id of the previous version this entry supersedes, when versioning capability is in use. */
+  supersedes?: string;
+  /** Time at which this version became valid. Equals createdAt for v1, equals new row's createdAt for subsequent versions. */
+  validFrom: string;
 }
 
 export interface MemoryRecallResponse {

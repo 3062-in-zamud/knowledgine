@@ -1,45 +1,46 @@
-import type { ConformanceTestContext, ConformanceResult } from "./helpers.js";
-import { callTool, makeResult } from "./helpers.js";
+// Conformance: error format (§7)
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { MemoryProtocolError } from "../errors.js";
+import type { MemoryProvider } from "../provider.js";
+import type { RunConformanceOptions } from "./helpers.js";
 
-export async function runErrorFormatTests(
-  ctx: ConformanceTestContext,
-): Promise<ConformanceResult[]> {
-  const results: ConformanceResult[] = [];
+export function registerErrorFormatTests(options: RunConformanceOptions): void {
+  describe("error format (§7)", () => {
+    let provider: MemoryProvider;
 
-  // Error format: MEMORY_NOT_FOUND returns isError: true
-  try {
-    const r = await callTool(ctx.client, "forget_memory", { id: "nonexistent-id-for-conformance" });
-    if (!r.isError) throw new Error("Expected isError: true for MEMORY_NOT_FOUND");
-    results.push(makeResult("error format: MEMORY_NOT_FOUND returns isError: true", true));
-  } catch (e) {
-    results.push(
-      makeResult("error format: MEMORY_NOT_FOUND returns isError: true", false, String(e)),
-    );
-  }
+    beforeEach(async () => {
+      provider = await options.createProvider();
+    });
 
-  // Error format: error code is present in text content
-  try {
-    const r = await callTool(ctx.client, "forget_memory", { id: "nonexistent-id-for-conformance" });
-    if (!r.isError) throw new Error("Expected error response");
-    if (!r.text.includes("MEMORY_NOT_FOUND"))
-      throw new Error(`Expected error code in text, got: ${r.text}`);
-    results.push(makeResult("error format: error code present in text content", true));
-  } catch (e) {
-    results.push(makeResult("error format: error code present in text content", false, String(e)));
-  }
+    afterEach(async () => {
+      await options.teardown?.(provider);
+    });
 
-  // Error format: INVALID_CONTENT returns isError: true
-  try {
-    const r = await callTool(ctx.client, "store_memory", { content: "" });
-    if (!r.isError) throw new Error("Expected isError: true for INVALID_CONTENT");
-    if (!r.text.includes("INVALID_CONTENT"))
-      throw new Error(`Expected INVALID_CONTENT code in text, got: ${r.text}`);
-    results.push(makeResult("error format: INVALID_CONTENT returns isError: true", true));
-  } catch (e) {
-    results.push(
-      makeResult("error format: INVALID_CONTENT returns isError: true", false, String(e)),
-    );
-  }
+    it("throws MemoryProtocolError with code MEMORY_NOT_FOUND when forgetting a non-existent id", async () => {
+      let caught: unknown;
+      try {
+        await provider.forget({ id: "nonexistent-id-for-conformance" });
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toBeInstanceOf(MemoryProtocolError);
+      const err = caught as MemoryProtocolError;
+      expect(err.code).toBe("MEMORY_NOT_FOUND");
+      // The serialized message must be present and non-empty so MCP-layer
+      // adapters can include it in the textual error response (§7.2).
+      expect(typeof err.message).toBe("string");
+      expect(err.message.length).toBeGreaterThan(0);
+    });
 
-  return results;
+    it("throws MemoryProtocolError with code INVALID_CONTENT for empty content", async () => {
+      let caught: unknown;
+      try {
+        await provider.store({ content: "" });
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toBeInstanceOf(MemoryProtocolError);
+      expect((caught as MemoryProtocolError).code).toBe("INVALID_CONTENT");
+    });
+  });
 }

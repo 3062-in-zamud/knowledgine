@@ -1,3 +1,7 @@
+// Main entry — types, schemas, errors, and the MemoryProvider interface.
+// The conformance test kit is exported separately under `./conformance` to
+// keep the runtime cost of the main entry minimal for production providers.
+
 export type {
   MemoryLayer,
   MemoryMetadata,
@@ -39,19 +43,3 @@ export {
   MemoryUpdateRequestSchema,
   MemoryForgetRequestSchema,
 } from "./schema.js";
-
-export {
-  runConformanceSuite,
-  runStoreTests,
-  runRecallTests,
-  runUpdateTests,
-  runForgetTests,
-  runVersioningTests,
-  runErrorFormatTests,
-  runCapabilitiesTests,
-} from "./conformance/index.js";
-export type {
-  ConformanceTestContext,
-  ConformanceResult,
-  ConformanceSuiteOptions,
-} from "./conformance/index.js";

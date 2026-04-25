@@ -61,6 +61,10 @@ function rowToRecalled(row: MemoryEntryRow): RecalledMemory {
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? undefined,
     lastAccessedAt: row.last_accessed_at ?? undefined,
+    deprecated: row.deleted === 1,
+    deprecationReason: row.deprecation_reason ?? row.delete_reason ?? undefined,
+    supersedes: row.supersedes != null ? String(row.supersedes) : undefined,
+    validFrom: row.valid_from ?? row.created_at,
   };
 }
 
