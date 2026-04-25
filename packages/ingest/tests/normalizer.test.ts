@@ -199,4 +199,16 @@ describe("normalizeToKnowledgeEvent", () => {
     expect(result.content).toContain("[REDACTED]");
     expect(result.contentHash).toBe(computeContentHash(result.content));
   });
+
+  it("[KNOW-401] env-var 形式の secret は変数名ごと redact され、contentHash に secret は含まれない", () => {
+    const ghpToken = "ghp_" + "f".repeat(36);
+    const event = createMockEvent({ content: `GITHUB_TOKEN="${ghpToken}"` });
+    const result = normalizeToKnowledgeEvent(event);
+    // 変数名ごと redact され、結果は "[REDACTED]" のみ
+    expect(result.content).toBe("[REDACTED]");
+    expect(result.content).not.toContain("GITHUB_");
+    expect(result.content).not.toContain(ghpToken);
+    // contentHash は redact 後の hash（secret を含まない）
+    expect(result.contentHash).toBe(computeContentHash("[REDACTED]"));
+  });
 });
