@@ -67,7 +67,7 @@ KNOW-403
 
 ### Phase 4: PR 作成前ゲート（G1-G3）
 
-- [x] **Task G1.1**: `tasks.md` の未完了 `- [ ]` が 0 件
+- [x] **Task G1.1**: Phase 1-4 の未完了 `- [ ]` が 0 件（Phase 5 は PR 提出 / CI watch 用に残置）
 - [x] **Task G1.2**: requirements.md Status を "draft" → "in progress"（実装中）→ "ready" 最終更新
 - [x] **Task G2.1**: Node 20 で `pnpm install --frozen-lockfile`、`build`, `typecheck`, `lint`, `format:check`, `test:run` 全て exit 0
 - [x] **Task G2.2**: Node 22 で同上 + `test:coverage` + `pnpm audit --audit-level=moderate --prod` も exit 0
@@ -78,12 +78,13 @@ KNOW-403
 
 ### Phase 5: Commit & Push & PR & CI watch
 
-- [ ] **Task 17**: 3 commit 構成（test → feat → docs）
-- [ ] **Task 18**: KNOW-404 が先行マージなら `git rebase origin/develop`、CHANGELOG 衝突は両エントリ残し
-- [ ] **Task 19**: `git push -u origin feat/know-403-cross-project-search`
-- [ ] **Task 20**: `gh pr create --base develop` で PR 作成（PR description は plan のテンプレート準拠、内部チケット ID 含めない）
-- [ ] **Task 21**: `gh run watch` で Node 20/22 matrix 全ジョブ緑を確認
-- [ ] **Task 22**: 失敗時は新規コミット（`--amend` / `--force` 禁止）
+- [x] **Task 17**: 3 commit 構成（test → feat → docs）で初回 push
+- [x] **Task 18**: 並行 KNOW-404 が未マージのため rebase 不要を確認
+- [x] **Task 19**: `git push -u origin feat/know-403-cross-project-search`
+- [x] **Task 20**: `gh pr create --base develop` で PR #79 を作成
+- [x] **Task 21**: `gh pr checks --watch` で Node 20/22 matrix + CodeQL + analyze + label 緑を確認
+- [ ] **Task 22**: レビュー指摘対応 (`/git-pr-fix`) 後、CI 緑を再確認してマージ可
+      （失敗時は新規コミットで対応、`--amend` / `--force` 禁止）
 
 ## Verification Checklist
 
