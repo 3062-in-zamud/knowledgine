@@ -40,4 +40,5 @@ export {
 export { ObsidianPlugin } from "./plugins/obsidian/index.js";
 export { CursorSessionsPlugin } from "./plugins/cursor-sessions/index.js";
 export { ClineSessionsPlugin } from "./plugins/cline-sessions/index.js";
+export { getClineStorageDir } from "./plugins/cline-sessions/storage-locator.js";
 export { CicdPlugin } from "./plugins/cicd/index.js";
