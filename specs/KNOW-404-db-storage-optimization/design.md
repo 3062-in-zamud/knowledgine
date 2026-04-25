@@ -28,10 +28,10 @@ KNOW-404
 │ storage-categories.ts  (NEW)                         │
 │   └─ Record<table_name, Category> mapping            │
 │ migrations/021_embedding_int8_quantization.ts (NEW)  │
-│   ├─ ALTER note_embeddings ADD embedding_scale       │
-│   ├─ chunked re-quantize of float32 rows             │
+│   ├─ probe sqlite-vec; no-op if extension missing    │
 │   ├─ DROP/CREATE note_embeddings_vec as INT8[384]    │
-│   └─ guarded auto_vacuum + VACUUM (skip > 50 MB)     │
+│   └─ re-INSERT each row via vec_int8(?), reading the │
+│      canonical float32 BLOB from note_embeddings     │
 └──────────────────────────────────────────────────────┘
 ```
 
