@@ -89,12 +89,12 @@ DB を実際に変更するのは `ReflectorAgent.applyApprovedDeprecations(cand
 
 ## トラブルシューティング
 
-| 症状                                                                 | 原因 / 対処                                                                                                      |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `Observer running in rule-based mode (no LLM configured)` と出る     | 想定動作。LLM プロバイダ未設定時のフォールバック                                                                 |
-| `Observer: processed 0 notes`                                        | ingest 自体が 0 件か、`--observe-limit` がノート数より少ない可能性。再 ingest 時は `--full` で cursor をリセット |
-| 処理時間が長い                                                       | `--observe-limit` を絞る / LLM を無効化する / そもそも `--observe` を外す                                        |
-| Reflector が `0 contradictions, 0 deprecation candidates` ばかり返す | 知識量が少ないと検出されないのが正常。蓄積後に再評価可能                                                         |
+| 症状                                                                 | 原因 / 対処                                                                                                                                               |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Observer running in rule-based mode (no LLM configured)` と出る     | 想定動作。LLM プロバイダ未設定時のフォールバック                                                                                                          |
+| `Observer: processed 0 notes`                                        | 新規 ingest 対象が 0 件 (= 既に取り込み済み)、または `--observe-limit 0` で空スライスになった可能性。再取り込みしたい場合は `--full` で cursor をリセット |
+| 処理時間が長い                                                       | `--observe-limit` を絞る / LLM を無効化する / そもそも `--observe` を外す                                                                                 |
+| Reflector が `0 contradictions, 0 deprecation candidates` ばかり返す | 知識量が少ないと検出されないのが正常。蓄積後に再評価可能                                                                                                  |
 
 ## 関連 spec
 
