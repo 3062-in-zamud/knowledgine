@@ -31,6 +31,23 @@ function vecMirrorIsAlreadyInt8(ddl: string): boolean {
 }
 
 /**
+ * Probe whether the sqlite-vec extension is loaded for this connection.
+ * The vec0 virtual table requires the extension to be loaded for both
+ * `DROP TABLE` (xDestroy) and `CREATE VIRTUAL TABLE`. CLI paths that do
+ * not enable semantic search (e.g. `feedback`) skip
+ * `loadSqliteVecExtension`, so we must detect this state and skip the
+ * migration instead of failing the whole `Migrator.migrate()` transaction.
+ */
+function sqliteVecIsLoaded(db: Database.Database): boolean {
+  try {
+    db.prepare("SELECT vec_int8(x'00') AS x").get();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Migration 021: Embedding int8 quantization (Case A).
  *
  * Replaces the `note_embeddings_vec` virtual table from `FLOAT[384]` to
@@ -57,6 +74,15 @@ export const migration021: Migration = {
     const ddl = getVecMirrorDdl(db);
     if (!ddl) return; // sqlite-vec was not loaded at create-time; nothing to migrate.
     if (vecMirrorIsAlreadyInt8(ddl)) return; // Idempotent.
+
+    // The mirror is FLOAT[384] and needs to be rebuilt as INT8[384].
+    // Both DROP and CREATE require the sqlite-vec extension to be loaded
+    // for this connection. CLI commands that don't enable semantic search
+    // (e.g. `feedback`) reach this migrator without loading the extension.
+    // In that case we must skip the migration cleanly — the next process
+    // that loads the extension will rebuild the mirror as INT8[384] via
+    // KnowledgeRepository.ensureVectorIndexTable.
+    if (!sqliteVecIsLoaded(db)) return;
 
     db.exec("DROP TABLE note_embeddings_vec;");
     try {

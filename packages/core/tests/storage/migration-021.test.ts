@@ -161,3 +161,30 @@ describe("migration021 is included in ALL_MIGRATIONS", () => {
     db.close();
   });
 });
+
+describe("migration021 — sqlite-vec unavailable", () => {
+  // Regression guard for the codex P1 finding: if a CLI path runs
+  // Migrator.migrate() against an upgraded database that already has a
+  // FLOAT[384] note_embeddings_vec mirror, but does NOT load sqlite-vec
+  // first, migration021 must skip cleanly instead of aborting the whole
+  // migration transaction with `no such module: vec0`.
+  it("does not throw when the sqlite-vec extension is not loaded", async () => {
+    // Step 1: prepare a database that has the FLOAT[384] mirror (i.e. an
+    // older install that ran migration003 with sqlite-vec available).
+    const db1 = createDatabase(":memory:");
+    await loadSqliteVecExtension(db1);
+    new Migrator(db1, migrationsBefore21()).migrate();
+    // Serialize so we can re-open the same DB content without the extension.
+    const buf = db1.serialize();
+    db1.close();
+
+    // Step 2: re-open the DB but DON'T load sqlite-vec, then run migrate.
+    // The previously-applied migration003 created note_embeddings_vec
+    // (FLOAT[384]) and recorded itself in schema_version, so migrate()
+    // sees migration021 as the only pending migration and runs it.
+    const Database = (await import("better-sqlite3")).default;
+    const db2 = new Database(buf);
+    expect(() => new Migrator(db2, [migration021]).migrate()).not.toThrow();
+    db2.close();
+  });
+});
