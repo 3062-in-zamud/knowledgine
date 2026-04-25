@@ -55,7 +55,11 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
         projects: z
           .array(z.string())
           .optional()
-          .describe("Project names to search across (cross-project search)"),
+          .describe(
+            "Project names to search across (cross-project search). " +
+              "Registered names from .knowledginerc only; dynamic paths are " +
+              "supported on the CLI but not yet via MCP.",
+          ),
       },
     },
     async (input) => {

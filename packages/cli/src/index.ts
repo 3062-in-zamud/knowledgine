@@ -278,7 +278,13 @@ const searchCmd = program
   )
   .option("--agentic", "Include deprecated notes in search results (agentic mode)")
   .option("--include-deprecated", "Include deprecated notes in search results")
-  .option("--projects <names>", "Search across projects (comma-separated project names)")
+  .option(
+    "--projects <names-or-paths>",
+    "Cross-project search. Comma-separated list of registered project names " +
+      "(.knowledginerc) and/or absolute / relative / ~/ paths " +
+      "(e.g. 'backend,~/work/repo,/abs/path'). Paths are detected by leading " +
+      "'/', './', '../', '~/', or '.'.",
+  )
   .action(
     (
       positionalQuery: string | undefined,

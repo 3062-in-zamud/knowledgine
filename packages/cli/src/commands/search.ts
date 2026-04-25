@@ -25,6 +25,8 @@ import {
 } from "../lib/formatter.js";
 import type { OutputFormat } from "../lib/formatter.js";
 import { colors, symbols } from "../lib/ui/index.js";
+import { resolveProjectArgs } from "../lib/resolve-project-args.js";
+import type { ResolveResult } from "../lib/resolve-project-args.js";
 
 export interface SearchCommandOptions {
   demo?: boolean;
@@ -66,23 +68,21 @@ export async function searchCommand(query: string, options: SearchCommandOptions
   // --projects: クロスプロジェクト横断検索
   if (options.projects) {
     const rcConfig = loadRcFile(rootPath);
-    const requestedNames = new Set(
-      options.projects
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    );
-    const projectsConfig = rcConfig?.projects ?? [];
-    const projectsToSearch = projectsConfig.filter((p) => requestedNames.has(p.name));
+    const result = resolveProjectArgs(options.projects, rcConfig?.projects ?? []);
 
-    if (projectsToSearch.length === 0) {
-      console.error(
-        `No matching projects found for: ${options.projects}. Check your .knowledginerc projects config.`,
-      );
+    if (result.resolved.length === 0) {
+      console.error(buildUnresolvedError(options.projects, result, rcConfig?.projects ?? []));
       process.exitCode = 1;
       return;
     }
 
+    if (result.truncatedCount > 0) {
+      console.error(
+        `${symbols.warning} ${colors.warning(`Truncated ${result.truncatedCount} project(s); max 10 supported.`)}`,
+      );
+    }
+
+    const projectsToSearch = result.resolved;
     const format = (options.format as "json" | "table" | "plain") ?? "plain";
     const limit = options.limit ?? 20;
     const searcher = new CrossProjectSearcher(projectsToSearch);
@@ -298,6 +298,44 @@ function formatLegacySearchResults(
     }
     console.error("");
   }
+}
+
+function buildUnresolvedError(
+  rawArg: string,
+  result: ResolveResult,
+  rcProjects: ReadonlyArray<{ name: string; path: string }>,
+): string {
+  const hasNames = result.unresolvedNames.length > 0;
+  const hasPaths = result.unresolvedPaths.length > 0;
+
+  if (!hasNames && !hasPaths) {
+    return "--projects requires at least one name or path.";
+  }
+
+  if (hasPaths && !hasNames) {
+    return (
+      `No projects could be resolved from: ${rawArg}.\n` +
+      `Each path must contain '.knowledgine/index.sqlite'.\n` +
+      `Run 'knowledgine init --path <dir>' to create one.`
+    );
+  }
+
+  if (hasNames && !hasPaths) {
+    const available = rcProjects.map((p) => p.name);
+    const availStr = available.length > 0 ? available.join(", ") : "(none)";
+    return (
+      `No matching registered projects found for: ${rawArg}.\n` +
+      `Available: ${availStr}.\n` +
+      `Register a project in .knowledginerc, or pass an absolute path ` +
+      `like --projects /abs/path/to/repo.`
+    );
+  }
+
+  return (
+    `Could not resolve any projects.\n` +
+    `Unregistered names: ${result.unresolvedNames.join(", ")}.\n` +
+    `Invalid paths: ${result.unresolvedPaths.join(", ")}.`
+  );
 }
 
 /** @deprecated Use searchCommand with format option instead */
