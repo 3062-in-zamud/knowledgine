@@ -24,8 +24,12 @@ interface ResolvedFailure {
 function resolveSingleProject(
   rawArg: string,
   rcProjects: ReadonlyArray<{ name: string; path: string }>,
+  cwd: string,
 ): ResolvedSingle | ResolvedFailure {
-  const result = resolveProjectArgs(rawArg, rcProjects);
+  // Resolve relative paths against the rc-root (passed as cwd) so that
+  // `--path <dir>` selects a consistent reference frame for both the rc
+  // file and any path-style --from/--to/--source/--into args.
+  const result = resolveProjectArgs(rawArg, rcProjects, { cwd });
   if (result.resolved.length === 0) {
     if (result.unresolvedNames.length > 0) {
       return {
@@ -53,13 +57,13 @@ export async function transferCommand(options: TransferCommandOptions): Promise<
   const rcProjects = rcConfig?.projects ?? [];
   const callerSelfName = rcConfig?.selfName ?? null;
 
-  const fromResolved = resolveSingleProject(options.from, rcProjects);
+  const fromResolved = resolveSingleProject(options.from, rcProjects, rootPath);
   if (!fromResolved.ok) {
     emitError(`--from: ${fromResolved.message}`, isJson);
     process.exitCode = 1;
     return;
   }
-  const toResolved = resolveSingleProject(options.to, rcProjects);
+  const toResolved = resolveSingleProject(options.to, rcProjects, rootPath);
   if (!toResolved.ok) {
     emitError(`--to: ${toResolved.message}`, isJson);
     process.exitCode = 1;
