@@ -49,25 +49,6 @@ function resolveSingleProject(
   return { ok: true, project: result.resolved[0] };
 }
 
-function mergeRcMetadata(
-  resolved: ProjectEntry,
-  rcProjects: ReadonlyArray<{
-    name: string;
-    path: string;
-    visibility?: "private" | "public";
-    allowFrom?: string[];
-  }>,
-): ProjectEntry {
-  const matched = rcProjects.find((p) => p.name === resolved.name);
-  if (!matched) return resolved;
-  return {
-    name: resolved.name,
-    path: resolved.path,
-    visibility: matched.visibility,
-    allowFrom: matched.allowFrom,
-  };
-}
-
 function emitError(command: string, message: string, isJson: boolean): void {
   if (isJson) {
     console.log(JSON.stringify({ ok: false, command, error: message }));
@@ -98,8 +79,10 @@ export async function linkCommand(options: LinkCommandOptions): Promise<void> {
     return;
   }
 
-  const sourceProject = mergeRcMetadata(sourceResolved.project, rcProjects);
-  const intoProject = mergeRcMetadata(intoResolved.project, rcProjects);
+  // resolveProjectArgs already attaches visibility / allowFrom from the rc
+  // entry whether the input was a registered name or a filesystem path.
+  const sourceProject = sourceResolved.project;
+  const intoProject = intoResolved.project;
 
   const noteId = Number(options.noteId);
   if (!Number.isInteger(noteId) || noteId <= 0) {

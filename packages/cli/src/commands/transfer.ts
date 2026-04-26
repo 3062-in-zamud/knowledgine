@@ -66,8 +66,11 @@ export async function transferCommand(options: TransferCommandOptions): Promise<
     return;
   }
 
-  const fromProject = mergeRcMetadata(fromResolved.project, rcProjects);
-  const toProject = mergeRcMetadata(toResolved.project, rcProjects);
+  // resolveProjectArgs already attaches visibility / allowFrom from the rc
+  // entry whether the input was a registered name or a filesystem path, so
+  // both `from` and `to` carry the correct VisibilityGate metadata here.
+  const fromProject = fromResolved.project;
+  const toProject = toResolved.project;
 
   const noteId = Number(options.noteId);
   if (!Number.isInteger(noteId) || noteId <= 0) {
@@ -123,25 +126,4 @@ function emitError(message: string, isJson: boolean): void {
   } else {
     console.error(`${symbols.error} ${colors.error(message)}`);
   }
-}
-
-function mergeRcMetadata(
-  resolved: ProjectEntry,
-  rcProjects: ReadonlyArray<{
-    name: string;
-    path: string;
-    visibility?: "private" | "public";
-    allowFrom?: string[];
-  }>,
-): ProjectEntry {
-  // resolveProjectArgs returns { name, path } only; copy visibility/allowFrom
-  // from the rc entry (when matched by name) so VisibilityGate sees them.
-  const matched = rcProjects.find((p) => p.name === resolved.name);
-  if (!matched) return resolved;
-  return {
-    name: resolved.name,
-    path: resolved.path,
-    visibility: matched.visibility,
-    allowFrom: matched.allowFrom,
-  };
 }
