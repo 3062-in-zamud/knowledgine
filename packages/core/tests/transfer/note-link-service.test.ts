@@ -87,7 +87,7 @@ describe("NoteLinkService.linkNote", () => {
     expect(fm.linked_from.sourceProjectName).toBe("src");
   });
 
-  it("UNIQUE collision: linking the same source twice into the same stub fails", async () => {
+  it("two consecutive links of the same source create two distinct stubs (UNIQUE is per-stub, not per-source)", async () => {
     const src = makeSource("u.md", "Unique");
     const tgt = makeTarget();
     cleanup.push(src.dir, tgt.dir);
