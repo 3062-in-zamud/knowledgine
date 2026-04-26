@@ -6,7 +6,13 @@ KNOW-404
 
 ## Status
 
-draft
+completed
+
+## Completed
+
+- **Date**: 2026-04-25
+- **PR**: [#81](https://github.com/3062-in-zamud/knowledgine/pull/81) — merged as `a4468121`
+- **Release**: pending (next minor release)
 
 ## Problem Statement
 
