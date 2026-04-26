@@ -100,6 +100,7 @@ export { migration016 } from "./storage/migrations/016_note_confidence.js";
 export { migration019 } from "./storage/migrations/019_memory_valid_until.js";
 export { migration020 } from "./storage/migrations/020_memory_expires_at.js";
 export { migration021 } from "./storage/migrations/021_embedding_int8_quantization.js";
+export { migration022 } from "./storage/migrations/022_cross_project_links.js";
 export {
   quantizeFloat32ToInt8,
   dequantizeInt8,
@@ -137,7 +138,12 @@ import { migration016 } from "./storage/migrations/016_note_confidence.js";
 import { migration019 } from "./storage/migrations/019_memory_valid_until.js";
 import { migration020 } from "./storage/migrations/020_memory_expires_at.js";
 import { migration021 } from "./storage/migrations/021_embedding_int8_quantization.js";
+import { migration022 } from "./storage/migrations/022_cross_project_links.js";
 import type { Migration } from "./storage/migrator.js";
+// Migrator sorts by `version`, so order in this array does not affect
+// execution order; new migrations are appended at the end for readability.
+// Note: versions 017 and 018 are intentionally absent (gaps preserved).
+// Current max version: 22 (cross_project_links).
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
   migration002,
@@ -160,6 +166,7 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration019,
   migration020,
   migration021,
+  migration022,
 ];
 
 // Provenance
@@ -275,6 +282,8 @@ export {
 } from "./access/visibility-gate.js";
 export { NoteTransferService } from "./transfer/note-transfer-service.js";
 export type { TransferOptions, TransferResult } from "./transfer/note-transfer-service.js";
+export { NoteLinkService } from "./transfer/note-link-service.js";
+export type { LinkResult, ResolveResult } from "./transfer/note-link-service.js";
 export { ReasoningReranker } from "./search/reasoning-reranker.js";
 export type {
   RerankInput,

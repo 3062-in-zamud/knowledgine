@@ -18,6 +18,7 @@ import {
 import { demoCommand } from "./commands/demo.js";
 import { searchCommand } from "./commands/search.js";
 import { transferCommand } from "./commands/transfer.js";
+import { linkCommand, showLinkCommand } from "./commands/link.js";
 import { captureAddCommand, captureListCommand, captureDeleteCommand } from "./commands/capture.js";
 import { registerToolCommands } from "./commands/tool.js";
 import { registerRecallCommand } from "./commands/recall.js";
@@ -372,6 +373,54 @@ Notes:
         format: opts.format,
         path: opts.path,
       }),
+  );
+
+program
+  .command("link")
+  .description(
+    "Create a lightweight link stub in the target project that points at a note in another project",
+  )
+  .requiredOption(
+    "--source <project>",
+    "Source project: registered name in .knowledginerc OR absolute / relative / ~/ path",
+  )
+  .requiredOption("--note-id <id>", "Source note id (positive integer)")
+  .requiredOption(
+    "--into <project>",
+    "Target project: registered name in .knowledginerc OR absolute / relative / ~/ path",
+  )
+  .option("--format <format>", "Output format: json, plain", "plain")
+  .option("--path <dir>", "Root directory whose .knowledginerc identifies the caller")
+  .addHelpText(
+    "after",
+    `
+Notes:
+  - The stub note has an empty body; resolve it later with 'knowledgine show-link <stub-id>'.
+  - Private source projects require the caller selfName to be in their allowFrom list.
+`,
+  )
+  .action(
+    (opts: { source: string; noteId: string; into: string; format?: string; path?: string }) =>
+      linkCommand({
+        source: opts.source,
+        noteId: opts.noteId,
+        into: opts.into,
+        format: opts.format,
+        path: opts.path,
+      }),
+  );
+
+program
+  .command("show-link <stub-id>")
+  .description("Resolve a cross-project link stub and print the source note body")
+  .option("--format <format>", "Output format: json, plain", "plain")
+  .option("--path <dir>", "Project root containing the link stub")
+  .action((stubId: string, opts: { format?: string; path?: string }) =>
+    showLinkCommand({
+      stubId,
+      format: opts.format,
+      path: opts.path,
+    }),
   );
 
 const captureCmd = program.command("capture").description("Capture and manage knowledge snippets");
