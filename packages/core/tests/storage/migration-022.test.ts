@@ -6,7 +6,9 @@ import { ALL_MIGRATIONS } from "../../src/index.js";
 import { migration022 } from "../../src/storage/migrations/022_cross_project_links.js";
 
 function migrationsBefore22() {
-  return ALL_MIGRATIONS.filter((m) => m.version !== 22);
+  // Strictly older than 22 — see the matching note in migration-021.test.ts
+  // for why `!== 22` is unsafe once a 23+ migration lands.
+  return ALL_MIGRATIONS.filter((m) => m.version < 22);
 }
 
 describe("migration022: cross_project_links", () => {

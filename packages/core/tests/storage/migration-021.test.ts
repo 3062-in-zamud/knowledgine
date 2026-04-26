@@ -7,7 +7,11 @@ import { migration021 } from "../../src/storage/migrations/021_embedding_int8_qu
 import { quantizeFloat32ToInt8 } from "../../src/storage/quantization.js";
 
 function migrationsBefore21() {
-  return ALL_MIGRATIONS.filter((m) => m.version !== 21);
+  // Only migrations strictly older than 21. Filtering by `!== 21` was
+  // safe while 21 was the latest; with 22+ in the array, that filter
+  // would let later migrations run first and the Migrator would then
+  // skip migration021 (its version is below the current max).
+  return ALL_MIGRATIONS.filter((m) => m.version < 21);
 }
 
 function makeF32(seed: number, dim = 384): Float32Array {

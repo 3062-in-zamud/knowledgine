@@ -184,12 +184,30 @@ describe("openProjectDb", () => {
     });
 
     it("rejects a target at version 21 (cross_project_links not yet present)", () => {
-      const p = makeProject(); // freshly migrated → at most version 21 today
-      const r = openProjectDb(p, { mode: "writeLink" });
+      // Build a v21-only DB explicitly (fresh-migrated DBs now reach v22).
+      const dir = mkdtempSync(join(tmpdir(), "knowledgine-v21-"));
+      tmpDirs.push(dir);
+      mkdirSync(join(dir, ".knowledgine"), { recursive: true });
+      const db = new BetterSqlite3(join(dir, ".knowledgine", "index.sqlite"));
+      db.exec(
+        "CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL); " +
+          "INSERT INTO schema_version VALUES (21, 'pre_22', datetime('now'));",
+      );
+      db.close();
+
+      const r = openProjectDb({ name: "v21", path: dir }, { mode: "writeLink" });
       expect(r.ok).toBe(false);
       if (!r.ok && r.error.kind === "version_too_low") {
         expect(r.error.floor).toBe(22);
+        expect(r.error.version).toBe(21);
       }
+    });
+
+    it("opens RW when target schema is fully migrated (current head)", () => {
+      const p = makeProject();
+      const r = openProjectDb(p, { mode: "writeLink" });
+      expect(r.ok).toBe(true);
+      if (r.ok) r.db.close();
     });
   });
 });
