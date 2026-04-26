@@ -395,7 +395,7 @@ program
     "after",
     `
 Notes:
-  - The stub note has an empty body; resolve it later with 'knowledgine show-link <stub-id>'.
+  - The stub note is created with placeholder content; resolve it later with 'knowledgine show-link <stub-id>'.
   - Private source projects require the caller selfName to be in their allowFrom list.
 `,
   )
