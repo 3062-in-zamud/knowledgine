@@ -4,6 +4,8 @@ All notable changes to this package are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-26
+
 ### Added
 
 - **Reference implementation prep**: gap-analysis aligning knowledgine's adapter to spec §3-§11; conformance test kit redesigned around `MemoryProvider` direct injection so external implementations (Mem0, Zep, …) can validate without standing up an MCP server; new `temporal_query` (§8.2) and `ttl` (§9.2) test-suites.
@@ -14,7 +16,7 @@ All notable changes to this package are documented here. The format follows [Kee
 
 ### Changed
 
-- **BREAKING — Conformance API**: the prior shape `runConformanceSuite(ctx, options)` (with an MCP `Client`) is replaced by `runConformanceSuite({ createProvider, teardown?, skip? })`. The new entry point lives at `@knowledgine/mcp-memory-protocol/conformance`. See [`MIGRATION.md`](./MIGRATION.md) for the diff. This change ships in the next minor release; the npm `version` field is held until then.
+- **BREAKING — Conformance API**: the prior shape `runConformanceSuite(ctx, options)` (with an MCP `Client`) is replaced by `runConformanceSuite({ createProvider, teardown?, skip? })`. The new entry point lives at `@knowledgine/mcp-memory-protocol/conformance`. See [`MIGRATION.md`](./MIGRATION.md) for the diff.
 
 ## [0.3.1] - 2026-03-29
 

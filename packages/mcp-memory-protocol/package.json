@@ -1,6 +1,6 @@
 {
   "name": "@knowledgine/mcp-memory-protocol",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "description": "MCP Memory Protocol — specification, types, and conformance test kit for long-term memory providers (Mem0, Zep, knowledgine, …)",
   "keywords": [

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-26
+
 ### Added
 
 #### MCP Memory Protocol (`@knowledgine/mcp-memory-protocol`)
@@ -17,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 #### Core (`@knowledgine/core`)
 
+- **Cross-project link / show-link**: New `NoteLinkService`. Linking inserts a stub note in the destination project (with backlink frontmatter) and returns a `linkId` for later resolution. Stub notes carry only the destination-side metadata (`source`, `linkedFromProject`, `linkedFromNoteId`, `linkId`); origin file paths are intentionally not embedded. See `docs/cross-project.md`.
+- **Cross-project transfer (copy)**: New `NoteTransferService`. Copies a note (optionally with linked problem/solution pairs and pattern metadata) from one project to another. Pattern IDs are remapped on the destination side so transfers across projects do not collide.
+- **Project-level visibility gate**: Visibility metadata on projects controls whether notes can be linked or transferred out. Path-based `--projects` arguments (and `--from`/`--to`/`--source`/`--into` in transfer/link) preserve the registered visibility flag rather than treating ad-hoc paths as fully public.
 - **Migration 019 / 020**: `memory_entries.valid_until` and `memory_entries.expires_at` columns added to support spec §8.2 chain reconstruction and §9.2 ttl. Default `NULL` keeps legacy rows backward-compatible.
 - **`SourceType: "cline"`**: Added `"cline"` to the `SourceType` union so the new `cline-sessions` ingest plugin maps to a dedicated source type rather than `"manual"`.
 - **Migration 021 — int8 vector mirror**: `note_embeddings_vec` is now declared as `INT8[384]` (was `FLOAT[384]`). The canonical float32 BLOB on `note_embeddings.embedding` is unchanged. `searchByVector` runs a coarse vec0 INT8 KNN with `k = 10 × topK` and reranks the candidate set against the float32 BLOBs to keep recall@10 within 5pp of the float32 baseline (synthetic Jaccard@10 = 1.000). Forward-only migration; downgrading the CLI requires re-embedding via `--embed-missing`. See `docs/benchmarks/db-storage-v2.md`.
@@ -43,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 #### CLI (`@knowledgine/cli`)
 
+- **`knowledgine link` / `knowledgine show-link`**: New cross-project linking commands. `link` inserts a backlink stub in the destination project; `show-link` resolves a `linkId` back to the source-side note metadata.
+- **`knowledgine transfer`**: New cross-project copy command with `--from`, `--to`, `--note-id`, `--dry-run`, and `--format` options. Copies the note plus its linked problem/solution pairs and pattern metadata to the destination project.
 - **`--source cline-sessions`**: Wires the new ingest plugin into the CLI and
   the `knowledgine-ingest` skill template (ja/en).
 - **`--projects` accepts dynamic paths**: `knowledgine search --projects` now
@@ -61,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 #### MCP Memory Protocol (`@knowledgine/mcp-memory-protocol`)
 
-- **BREAKING — Conformance API**: replaced `runConformanceSuite(ctx, options)` (MCP Client based) with `runConformanceSuite({ createProvider, teardown?, skip? })` (`MemoryProvider` direct injection). Migration steps in [`packages/mcp-memory-protocol/MIGRATION.md`](packages/mcp-memory-protocol/MIGRATION.md). The `version` field is held at `0.3.1` until a dedicated release PR.
+- **BREAKING — Conformance API**: replaced `runConformanceSuite(ctx, options)` (MCP Client based) with `runConformanceSuite({ createProvider, teardown?, skip? })` (`MemoryProvider` direct injection). Migration steps in [`packages/mcp-memory-protocol/MIGRATION.md`](packages/mcp-memory-protocol/MIGRATION.md). Released as `@knowledgine/mcp-memory-protocol@0.4.0`.
 
 #### MCP Server (`@knowledgine/mcp-server`)
 
@@ -746,7 +753,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Configurable watch patterns and ignore patterns
 - Graceful shutdown handling (SIGINT/SIGTERM)
 
-[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.9...HEAD
+[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.9...v0.7.0
 [0.6.9]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.6...v0.6.7
