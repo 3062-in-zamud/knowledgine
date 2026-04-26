@@ -137,7 +137,7 @@ programmatic consumers.
 
 ## What does NOT cross projects
 
-The following are intentionally project-local (out of scope for KNOW-338):
+The following are intentionally project-local:
 
 - Knowledge graph entities, relations, observations, and events.
 - Memory entries.
