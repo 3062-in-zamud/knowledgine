@@ -17,6 +17,7 @@ import {
 } from "./commands/feedback.js";
 import { demoCommand } from "./commands/demo.js";
 import { searchCommand } from "./commands/search.js";
+import { transferCommand } from "./commands/transfer.js";
 import { captureAddCommand, captureListCommand, captureDeleteCommand } from "./commands/capture.js";
 import { registerToolCommands } from "./commands/tool.js";
 import { registerRecallCommand } from "./commands/recall.js";
@@ -329,6 +330,49 @@ const searchCmd = program
     },
   );
 searchCmd.showHelpAfterError(true);
+
+program
+  .command("transfer")
+  .description("Copy a note (with its patterns and embedding) from one project into another")
+  .requiredOption(
+    "--from <project>",
+    "Source project: registered name in .knowledginerc OR absolute / relative / ~/ path",
+  )
+  .requiredOption(
+    "--to <project>",
+    "Target project: registered name in .knowledginerc OR absolute / relative / ~/ path",
+  )
+  .requiredOption("--note-id <id>", "Source note id (positive integer)")
+  .option("--dry-run", "Print what would be transferred without modifying the target", false)
+  .option("--format <format>", "Output format: json, plain", "plain")
+  .option("--path <dir>", "Root directory whose .knowledginerc identifies the caller")
+  .addHelpText(
+    "after",
+    `
+Notes:
+  - Two consecutive transfers of the same source produce DIFFERENT target ids.
+  - File-path collisions are rejected; remove the duplicate or use a different target first.
+  - Private source projects require the caller selfName to be in their allowFrom list.
+`,
+  )
+  .action(
+    (opts: {
+      from: string;
+      to: string;
+      noteId: string;
+      dryRun?: boolean;
+      format?: string;
+      path?: string;
+    }) =>
+      transferCommand({
+        from: opts.from,
+        to: opts.to,
+        noteId: opts.noteId,
+        dryRun: opts.dryRun,
+        format: opts.format,
+        path: opts.path,
+      }),
+  );
 
 const captureCmd = program.command("capture").description("Capture and manage knowledge snippets");
 captureCmd

@@ -323,14 +323,22 @@ ROLLBACK` and check whether `note_embeddings_vec` row count returns
   via `KnowledgeRepository.ensureVectorIndexTable`** so partial
   failures cannot leave a half-populated mirror.
 
-  **Spike result** (filled in at Phase 4 start, before AC-3 implementation
-  begins; do not skip):
+  **Spike result** (verified by
+  `packages/core/tests/storage/vec0-rollback-spike.test.ts`):
 
   ```
-  Date:
-  Result: [transactional / non-transactional]
-  Implementation choice: [in-transaction / post-commit reconstruction]
+  Date: 2026-04-26
+  Setup: fully migrated DB (incl. migration 021 INT8 mirror), 100 notes
+         pre-loaded, then BEGIN; 50 more notes + saveEmbedding; ROLLBACK
+  Observation: notes=100/100, vec=100/100 → vec0 HONORS ROLLBACK
+  Implementation choice: in-transaction (single db.transaction() wraps
+                          both knowledge_notes AND note_embeddings_vec
+                          writes; partial failure rolls both back)
   ```
+
+  The spike test is committed as a regression pin: if the assertion ever
+  flips (sqlite-vec changes its semantics), the test will fail and force
+  us to revisit the design.
 
 ### Decision 6: link is one-way and may break
 

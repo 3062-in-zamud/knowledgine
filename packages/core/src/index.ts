@@ -273,6 +273,8 @@ export {
   ALLOW_PRIVATE_ENV_VAR,
   PRIVATE_BYPASS_WARNING,
 } from "./access/visibility-gate.js";
+export { NoteTransferService } from "./transfer/note-transfer-service.js";
+export type { TransferOptions, TransferResult } from "./transfer/note-transfer-service.js";
 export { ReasoningReranker } from "./search/reasoning-reranker.js";
 export type {
   RerankInput,
