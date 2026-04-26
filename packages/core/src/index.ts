@@ -254,7 +254,25 @@ export type {
 export { KnowledgeSearcher } from "./search/knowledge-searcher.js";
 export type { SearchOptions } from "./search/knowledge-searcher.js";
 export { CrossProjectSearcher } from "./search/cross-project-searcher.js";
-export type { ProjectEntry, CrossProjectResult } from "./search/cross-project-searcher.js";
+export type { CrossProjectResult } from "./search/cross-project-searcher.js";
+export type {
+  ProjectEntry,
+  ProjectDbMode,
+  ProjectDbHandle,
+  OpenProjectDbResult,
+  OpenProjectDbError,
+} from "./storage/project-db.js";
+export {
+  openProjectDb,
+  PROJECT_DB_FLOORS,
+  describeOpenProjectDbError,
+} from "./storage/project-db.js";
+export {
+  filterReadableProjects,
+  canTransferFrom,
+  ALLOW_PRIVATE_ENV_VAR,
+  PRIVATE_BYPASS_WARNING,
+} from "./access/visibility-gate.js";
 export { ReasoningReranker } from "./search/reasoning-reranker.js";
 export type {
   RerankInput,

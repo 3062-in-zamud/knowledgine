@@ -127,3 +127,90 @@ describe("MCP search_knowledge — cross-project branch", () => {
     expect(data.results).toEqual([]);
   });
 });
+
+describe("MCP search_knowledge — visibility filter", () => {
+  let ctx: TestContext;
+  let projectDirs: string[];
+
+  beforeEach(() => {
+    projectDirs = [];
+    ctx = createTestDb();
+  });
+
+  afterEach(() => {
+    ctx.db.close();
+    for (const d of projectDirs) {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  async function buildClient(opts: {
+    callerSelfName?: string | null;
+    projects: ProjectEntry[];
+  }): Promise<Client> {
+    const server = createKnowledgineMcpServer({
+      repository: ctx.repository,
+      projects: opts.projects,
+      callerSelfName: opts.callerSelfName,
+    });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const c = new Client({ name: "vis-client", version: "0.0.1" });
+    await server.connect(serverTransport);
+    await c.connect(clientTransport);
+    return c;
+  }
+
+  it("excludes a private project when caller is not in allowFrom", async () => {
+    const dirA = createProjectDir({
+      title: "Public Note",
+      content: "The keyword: telescope appears in the public project",
+    });
+    const dirB = createProjectDir({
+      title: "Private Note",
+      content: "The keyword: telescope appears in the private project too",
+    });
+    projectDirs.push(dirA, dirB);
+    const client = await buildClient({
+      callerSelfName: "intruder",
+      projects: [
+        { name: "open", path: dirA },
+        { name: "secret", path: dirB, visibility: "private", allowFrom: ["webapp"] },
+      ],
+    });
+    const result = await client.callTool({
+      name: "search_knowledge",
+      arguments: { query: "telescope", projects: ["open", "secret"] },
+    });
+    const content = result.content as Array<{ type: string; text: string }>;
+    const data = JSON.parse(content[0].text);
+    expect(data.crossProject).toBe(true);
+    const projectNames = new Set(
+      (data.results as Array<{ projectName: string }>).map((r) => r.projectName),
+    );
+    expect(projectNames.has("open")).toBe(true);
+    expect(projectNames.has("secret")).toBe(false);
+  });
+
+  it("includes a private project when caller is in allowFrom", async () => {
+    const dirA = createProjectDir({
+      title: "Private Note",
+      content: "The keyword: telescope appears in the private project",
+    });
+    projectDirs.push(dirA);
+    const client = await buildClient({
+      callerSelfName: "webapp",
+      projects: [{ name: "secret", path: dirA, visibility: "private", allowFrom: ["webapp"] }],
+    });
+    const result = await client.callTool({
+      name: "search_knowledge",
+      arguments: { query: "telescope", projects: ["secret"] },
+    });
+    const content = result.content as Array<{ type: string; text: string }>;
+    const data = JSON.parse(content[0].text);
+    expect(data.crossProject).toBe(true);
+    const projectNames = new Set(
+      (data.results as Array<{ projectName: string }>).map((r) => r.projectName),
+    );
+    expect(projectNames.has("secret")).toBe(true);
+  });
+});

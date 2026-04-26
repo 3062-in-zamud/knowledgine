@@ -7,6 +7,10 @@ export type ProjectDbMode = "readSource" | "writeCopy" | "writeLink";
 export interface ProjectEntry {
   name: string;
   path: string;
+  /** "public" (default) or "private". Private projects are read/transfer-gated by VisibilityGate. */
+  visibility?: "private" | "public";
+  /** Caller `selfName`s allowed to read or transfer-from this project when visibility is "private". */
+  allowFrom?: string[];
 }
 
 export interface ProjectDbHandle {

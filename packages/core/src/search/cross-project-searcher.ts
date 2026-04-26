@@ -1,10 +1,7 @@
 import { KnowledgeRepository } from "../storage/knowledge-repository.js";
-import { openProjectDb, PROJECT_DB_FLOORS } from "../storage/project-db.js";
+import { openProjectDb, PROJECT_DB_FLOORS, type ProjectEntry } from "../storage/project-db.js";
 
-export interface ProjectEntry {
-  name: string;
-  path: string;
-}
+export type { ProjectEntry } from "../storage/project-db.js";
 
 export interface CrossProjectResult {
   noteId: number;

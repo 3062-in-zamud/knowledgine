@@ -16,6 +16,7 @@ import {
   DEFAULT_MODEL_NAME,
   checkSemanticReadiness,
   CrossProjectSearcher,
+  filterReadableProjects,
 } from "@knowledgine/core";
 import type { EmbeddingProvider } from "@knowledgine/core";
 import { getDemoNotesPath } from "./demo.js";
@@ -90,7 +91,18 @@ export async function searchCommand(query: string, options: SearchCommandOptions
       );
     }
 
-    const projectsToSearch = result.resolved;
+    // Visibility filter runs *before* the MAX_CONNECTIONS slice inside the
+    // searcher so private projects never crowd visible ones out of the cap.
+    const callerSelfName = rcConfig?.selfName ?? null;
+    const projectsToSearch = filterReadableProjects(callerSelfName, result.resolved);
+    const filteredOutCount = result.resolved.length - projectsToSearch.length;
+    if (filteredOutCount > 0) {
+      console.error(
+        `${symbols.info} ${colors.hint(
+          `Excluded ${filteredOutCount} private project(s) the caller cannot read.`,
+        )}`,
+      );
+    }
     const format = (options.format as "json" | "table" | "plain") ?? "plain";
     const limit = options.limit ?? 20;
     const searcher = new CrossProjectSearcher(projectsToSearch);

@@ -13,7 +13,7 @@ import type Database from "better-sqlite3";
 import { formatToolResult, formatToolError } from "./helpers.js";
 import { KnowledgineMemoryProvider } from "./memory-adapter.js";
 import { registerMemoryTools } from "./memory-tools.js";
-import { CrossProjectSearcher } from "@knowledgine/core";
+import { CrossProjectSearcher, filterReadableProjects } from "@knowledgine/core";
 import type { ProjectEntry } from "@knowledgine/core";
 
 export interface McpServerOptions {
@@ -25,6 +25,12 @@ export interface McpServerOptions {
   db?: Database.Database;
   memoryManager?: MemoryManager;
   projects?: ProjectEntry[];
+  /**
+   * Caller identifier read from the active `.knowledginerc`'s `selfName`.
+   * Used by VisibilityGate to gate cross-project search against private
+   * projects. When omitted, the caller is treated as anonymous (public-only).
+   */
+  callerSelfName?: string | null;
 }
 
 export function createKnowledgineMcpServer(options: McpServerOptions): McpServer {
@@ -36,7 +42,7 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
     "search_knowledge",
     {
       description:
-        "Full-text and semantic search across notes in the knowledge base. Use mode='keyword' for exact matches, 'semantic' for conceptual similarity, or 'hybrid' to combine both. Set agentic=true (or includeDeprecated=true) to include deprecated notes. Specify projects to search across multiple project databases.",
+        "Full-text and semantic search across notes in the knowledge base. Use mode='keyword' for exact matches, 'semantic' for conceptual similarity, or 'hybrid' to combine both. Set agentic=true (or includeDeprecated=true) to include deprecated notes. Specify projects to search across multiple project databases. Private projects are excluded unless the caller's selfName is in their allowFrom list.",
       inputSchema: {
         query: z.string().min(1, "Query cannot be empty").describe("Search query"),
         limit: z.number().int().positive().optional().describe("Maximum number of results"),
@@ -66,7 +72,11 @@ export function createKnowledgineMcpServer(options: McpServerOptions): McpServer
       try {
         if (input.projects && input.projects.length > 0 && options.projects) {
           const projectFilter = new Set(input.projects);
-          const projectsToSearch = options.projects.filter((p) => projectFilter.has(p.name));
+          const named = options.projects.filter((p) => projectFilter.has(p.name));
+          // Apply VisibilityGate before constructing the searcher so private
+          // projects the caller can't read are silently dropped from the cap.
+          const callerSelfName = options.callerSelfName ?? null;
+          const projectsToSearch = filterReadableProjects(callerSelfName, named);
           const searcher = new CrossProjectSearcher(projectsToSearch);
           const results = await searcher.search(input.query, { limit: input.limit ?? 20 });
           return formatToolResult({ results, query: input.query, crossProject: true });
