@@ -221,13 +221,34 @@ export class NoteTransferService {
           copiedTables.push(`extracted_patterns (n=${sourcePatterns.length})`);
         }
 
-        // Pass 1c: note_embeddings (float32 BLOB) + note_embeddings_vec (INT8 mirror)
+        // Pass 1c: note_embeddings (float32 BLOB) + note_embeddings_vec (INT8 mirror).
+        // Defensively validate the BLOB shape — a corrupt source can have
+        // a wrong `dimensions` field, the wrong byte length, or an unaligned
+        // byteOffset that would otherwise throw deep inside Float32Array.
         if (sourceEmbedding && sourceEmbedding.embedding) {
           const buf = sourceEmbedding.embedding;
-          const dim = sourceEmbedding.dimensions ?? buf.length / FLOAT32_BYTES_PER_DIM;
-          const f32 = new Float32Array(buf.buffer, buf.byteOffset, dim);
-          tgtRepo.saveEmbedding(newTargetNoteId, f32, sourceEmbedding.model_name);
-          copiedTables.push("note_embeddings");
+          const dim = sourceEmbedding.dimensions;
+          const expectedByteLength = dim * FLOAT32_BYTES_PER_DIM;
+          if (!Number.isInteger(dim) || dim <= 0) {
+            skipped.push("note_embeddings (malformed source embedding)");
+            warnings.push(
+              `skipped note_embeddings (invalid dimensions: ${String(sourceEmbedding.dimensions)})`,
+            );
+          } else if (buf.length !== expectedByteLength) {
+            skipped.push("note_embeddings (malformed source embedding)");
+            warnings.push(
+              `skipped note_embeddings (byte length ${buf.length} does not match expected ${expectedByteLength} for ${dim} dimension(s))`,
+            );
+          } else if (buf.byteOffset % FLOAT32_BYTES_PER_DIM !== 0) {
+            skipped.push("note_embeddings (malformed source embedding)");
+            warnings.push(
+              `skipped note_embeddings (byte offset ${buf.byteOffset} is not aligned to ${FLOAT32_BYTES_PER_DIM} bytes)`,
+            );
+          } else {
+            const f32 = new Float32Array(buf.buffer, buf.byteOffset, dim);
+            tgtRepo.saveEmbedding(newTargetNoteId, f32, sourceEmbedding.model_name);
+            copiedTables.push("note_embeddings");
+          }
         } else {
           skipped.push("note_embeddings (source has no embedding)");
         }
