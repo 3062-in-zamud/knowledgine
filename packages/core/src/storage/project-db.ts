@@ -1,4 +1,4 @@
-import { join } from "path";
+import { join, resolve as resolvePath, sep } from "path";
 import { existsSync } from "fs";
 import Database from "better-sqlite3";
 
@@ -29,7 +29,8 @@ export type OpenProjectDbError =
       version: number;
       floor: number;
       mode: ProjectDbMode;
-    };
+    }
+  | { kind: "path_traversal"; suppliedPath: string; resolvedDbPath: string };
 
 export type OpenProjectDbResult =
   | { ok: true; db: Database.Database; schemaVersion: number; path: string }
@@ -44,8 +45,33 @@ export const PROJECT_DB_FLOORS: Record<ProjectDbMode, number> = {
   writeLink: 22,
 };
 
+interface ResolvedDbPaths {
+  projectRoot: string;
+  dbPath: string;
+}
+
+/**
+ * Build the absolute, canonical paths for a project root and its
+ * `.knowledgine/index.sqlite`. Returns null when the supplied path
+ * resolves to a database location that is *not* inside the supplied
+ * project root — that can only happen when callers bypass
+ * `resolveProjectArgs` and pass an unnormalized string with `..`
+ * segments. Resolving up front also stops `existsSync` from falling
+ * through to the process CWD when a relative path is supplied.
+ */
+function resolveDbPaths(projectPath: string): ResolvedDbPaths | null {
+  const projectRoot = resolvePath(projectPath);
+  const dbPath = resolvePath(projectRoot, ".knowledgine", "index.sqlite");
+  if (!dbPath.startsWith(projectRoot + sep)) {
+    return null;
+  }
+  return { projectRoot, dbPath };
+}
+
+// Kept as a tiny shim so external callers that imported dbPathFor in tests
+// continue to work; new code should call resolveDbPaths instead.
 function dbPathFor(projectPath: string): string {
-  return join(projectPath, ".knowledgine", "index.sqlite");
+  return join(resolvePath(projectPath), ".knowledgine", "index.sqlite");
 }
 
 function readSchemaVersion(db: Database.Database): number | null {
@@ -74,7 +100,18 @@ export function openProjectDb(
   project: ProjectEntry,
   opts: { mode: ProjectDbMode },
 ): OpenProjectDbResult {
-  const path = dbPathFor(project.path);
+  const resolved = resolveDbPaths(project.path);
+  if (!resolved) {
+    return {
+      ok: false,
+      error: {
+        kind: "path_traversal",
+        suppliedPath: project.path,
+        resolvedDbPath: dbPathFor(project.path),
+      },
+    };
+  }
+  const { dbPath: path } = resolved;
 
   if (!existsSync(path)) {
     return { ok: false, error: { kind: "missing_path", expectedDbPath: path } };
@@ -125,6 +162,11 @@ export function describeOpenProjectDbError(
         `project "${project.name}" at ${error.path} requires schema_version >= ${error.floor} ` +
         `for mode "${error.mode}" (current: ${error.version}); ` +
         `run 'knowledgine migrate --path <path>' on that project first`
+      );
+    case "path_traversal":
+      return (
+        `project "${project.name}" rejected: path "${error.suppliedPath}" ` +
+        `resolves outside its own root (got dbPath ${error.resolvedDbPath})`
       );
   }
 }

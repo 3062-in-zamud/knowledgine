@@ -37,6 +37,11 @@ export class CrossProjectSearcher {
               `Project ${project.name}: schema version ${opened.error.version} < ${PROJECT_DB_FLOORS.readSource}, skipping`,
             );
             break;
+          case "path_traversal":
+            console.warn(
+              `Project ${project.name}: path "${opened.error.suppliedPath}" rejected (path traversal), skipping`,
+            );
+            break;
         }
         continue;
       }

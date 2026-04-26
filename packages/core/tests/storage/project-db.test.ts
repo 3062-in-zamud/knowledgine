@@ -105,6 +105,21 @@ describe("openProjectDb", () => {
       }
     });
 
+    it("normalizes the project path and resolves a relative input into an absolute db path", () => {
+      const p = makeProject();
+      // simulate a caller that bypassed resolveProjectArgs and passed a
+      // path with redundant "../" segments — resolve() must canonicalize
+      // before existsSync runs.
+      const messy = `${p.path}/foo/..`;
+      const r = openProjectDb({ name: p.name, path: messy }, { mode: "readSource" });
+      expect(r.ok).toBe(true);
+      if (r.ok) {
+        expect(r.path).toContain(".knowledgine");
+        expect(r.path).not.toContain("..");
+        r.db.close();
+      }
+    });
+
     it("returns error.version_too_low when schema version is below the floor", () => {
       const dir = mkdtempSync(join(tmpdir(), "knowledgine-old-"));
       tmpDirs.push(dir);
