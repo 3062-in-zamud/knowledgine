@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force re-run even if tag already exists (recovery from failed publish)"
+        type: boolean
+        default: false
 
 jobs:
   release:
@@ -33,30 +39,42 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Decide whether to release
+        id: gate
+        env:
+          TAG_EXISTS: ${{ steps.tag_check.outputs.exists }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          if [ "$TAG_EXISTS" = "false" ] || [ "$FORCE" = "true" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Skip if already released
-        if: steps.tag_check.outputs.exists == 'true'
-        run: echo "Tag ${{ steps.version.outputs.version }} already exists. Skipping release."
+        if: steps.gate.outputs.release == 'false'
+        run: echo "Tag ${{ steps.version.outputs.version }} already exists and force is not set. Skipping release."
 
       - uses: pnpm/action-setup@v5
-        if: steps.tag_check.outputs.exists == 'false'
+        if: steps.gate.outputs.release == 'true'
 
       - uses: actions/setup-node@v6
-        if: steps.tag_check.outputs.exists == 'false'
+        if: steps.gate.outputs.release == 'true'
         with:
           node-version: 22
           cache: pnpm
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        if: steps.tag_check.outputs.exists == 'false'
+        if: steps.gate.outputs.release == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Verify
-        if: steps.tag_check.outputs.exists == 'false'
+        if: steps.gate.outputs.release == 'true'
         run: pnpm run verify
 
       - name: Create git tag
-        if: steps.tag_check.outputs.exists == 'false'
+        if: steps.gate.outputs.release == 'true' && steps.tag_check.outputs.exists == 'false'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -64,37 +82,77 @@ jobs:
           git push origin "${{ steps.version.outputs.version }}"
 
       - name: Publish @knowledgine/mcp-memory-protocol
-        if: steps.tag_check.outputs.exists == 'false'
-        run: pnpm --filter @knowledgine/mcp-memory-protocol publish --provenance --no-git-checks --access public
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          PKG=@knowledgine/mcp-memory-protocol
+          VER=$(node -p "require('./packages/mcp-memory-protocol/package.json').version")
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then
+            echo "$PKG@$VER already published; skipping."
+          else
+            pnpm --filter "$PKG" publish --provenance --no-git-checks --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @knowledgine/core
-        if: steps.tag_check.outputs.exists == 'false'
-        run: pnpm --filter @knowledgine/core publish --provenance --no-git-checks --access public
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          PKG=@knowledgine/core
+          VER=$(node -p "require('./packages/core/package.json').version")
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then
+            echo "$PKG@$VER already published; skipping."
+          else
+            pnpm --filter "$PKG" publish --provenance --no-git-checks --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @knowledgine/ingest
-        if: steps.tag_check.outputs.exists == 'false'
-        run: pnpm --filter @knowledgine/ingest publish --provenance --no-git-checks --access public
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          PKG=@knowledgine/ingest
+          VER=$(node -p "require('./packages/ingest/package.json').version")
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then
+            echo "$PKG@$VER already published; skipping."
+          else
+            pnpm --filter "$PKG" publish --provenance --no-git-checks --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @knowledgine/mcp-server
-        if: steps.tag_check.outputs.exists == 'false'
-        run: pnpm --filter @knowledgine/mcp-server publish --provenance --no-git-checks --access public
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          PKG=@knowledgine/mcp-server
+          VER=$(node -p "require('./packages/mcp-server/package.json').version")
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then
+            echo "$PKG@$VER already published; skipping."
+          else
+            pnpm --filter "$PKG" publish --provenance --no-git-checks --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @knowledgine/cli
-        if: steps.tag_check.outputs.exists == 'false'
-        run: pnpm --filter @knowledgine/cli publish --provenance --no-git-checks --access public
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          PKG=@knowledgine/cli
+          VER=$(node -p "require('./packages/cli/package.json').version")
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then
+            echo "$PKG@$VER already published; skipping."
+          else
+            pnpm --filter "$PKG" publish --provenance --no-git-checks --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
-        if: steps.tag_check.outputs.exists == 'false'
-        run: gh release create "${{ steps.version.outputs.version }}" --generate-notes
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          if gh release view "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "Release ${{ steps.version.outputs.version }} already exists; skipping create."
+          else
+            gh release create "${{ steps.version.outputs.version }}" --generate-notes
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
