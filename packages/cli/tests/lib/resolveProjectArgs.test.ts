@@ -240,4 +240,38 @@ describe("resolveProjectArgs", () => {
     expect(result.unresolvedNames).toEqual(["~someoneelse/foo"]);
     expect(result.unresolvedPaths).toEqual([]);
   });
+
+  // 18: 名前マッチで visibility/allowFrom を carry する
+  it("carries visibility + allowFrom from rc when matched by name", () => {
+    const dir = track(makeProjectDir("vname"));
+    const rc: ProjectEntry[] = [
+      { name: "secret", path: dir, visibility: "private", allowFrom: ["webapp"] },
+    ];
+    const result = resolveProjectArgs("secret", rc);
+    expect(result.resolved).toHaveLength(1);
+    expect(result.resolved[0].visibility).toBe("private");
+    expect(result.resolved[0].allowFrom).toEqual(["webapp"]);
+  });
+
+  // 19: パス引数でも rc に登録された path に一致すれば visibility/allowFrom を carry
+  it("carries visibility + allowFrom from rc when matched by absolute path", () => {
+    const dir = track(makeProjectDir("vpath"));
+    const rc: ProjectEntry[] = [
+      { name: "secret", path: dir, visibility: "private", allowFrom: ["webapp"] },
+    ];
+    const result = resolveProjectArgs(dir, rc);
+    expect(result.resolved).toHaveLength(1);
+    expect(result.resolved[0].name).toBe("secret"); // rc name wins, not basename
+    expect(result.resolved[0].visibility).toBe("private");
+    expect(result.resolved[0].allowFrom).toEqual(["webapp"]);
+  });
+
+  // 20: rc に未登録のパス → metadata なし（従来通り basename）
+  it("falls back to basename + no visibility metadata when path is not in rc", () => {
+    const dir = track(makeProjectDir("voffrc"));
+    const result = resolveProjectArgs(dir, []);
+    expect(result.resolved).toHaveLength(1);
+    expect(result.resolved[0].visibility).toBeUndefined();
+    expect(result.resolved[0].allowFrom).toBeUndefined();
+  });
 });

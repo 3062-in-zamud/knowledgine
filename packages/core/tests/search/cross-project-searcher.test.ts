@@ -3,7 +3,12 @@ import { mkdtempSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import BetterSqlite3 from "better-sqlite3";
-import { Migrator, KnowledgeRepository, ALL_MIGRATIONS } from "../../src/index.js";
+import {
+  Migrator,
+  KnowledgeRepository,
+  ALL_MIGRATIONS,
+  filterReadableProjects,
+} from "../../src/index.js";
 import { CrossProjectSearcher } from "../../src/search/cross-project-searcher.js";
 
 function createProjectDb(projectDir: string): void {
@@ -135,5 +140,44 @@ describe("CrossProjectSearcher", () => {
     const searcher = new CrossProjectSearcher(projects);
     const results = await searcher.search("TypeScript", { limit: 3 });
     expect(results.length).toBeLessThanOrEqual(3);
+  });
+
+  it("filter-then-slice: visibility filter must run before MAX_CONNECTIONS cap so private projects do not crowd visible ones out", async () => {
+    // 12 visible + 3 private (mixed). After filterReadableProjects with a
+    // caller who cannot see any private, all 12 visible should remain.
+    // CrossProjectSearcher's internal MAX_CONNECTIONS cap (10) would then
+    // hit the visible 12, not the original 15. This is the architectural
+    // invariant CLI/MCP wiring must preserve.
+    const visibleProjects = Array.from({ length: 12 }, (_, i) => makeProject(`v${i}`));
+    const privateProjects = Array.from({ length: 3 }, (_, i) => ({
+      ...makeProject(`secret${i}`),
+      visibility: "private" as const,
+      allowFrom: [],
+    }));
+    // Interleave them so naive "take first 10" without filtering would mix
+    const mixed = [
+      privateProjects[0],
+      ...visibleProjects.slice(0, 5),
+      privateProjects[1],
+      ...visibleProjects.slice(5, 10),
+      privateProjects[2],
+      ...visibleProjects.slice(10),
+    ];
+
+    // Filter first (caller "alice" sees no private)
+    const visible = filterReadableProjects("alice", mixed);
+    expect(visible.length).toBe(12);
+    expect(visible.every((p) => p.visibility !== "private")).toBe(true);
+
+    // Then construct searcher — it caps at MAX_CONNECTIONS=10 internally
+    const searcher = new CrossProjectSearcher(visible);
+    const results = await searcher.search("TypeScript");
+    const projectNames = new Set(results.map((r) => r.projectName));
+    // None of the private project names should appear
+    for (let i = 0; i < 3; i++) {
+      expect(projectNames.has(`secret${i}`)).toBe(false);
+    }
+    // At least some visible projects (10 of the 12) should be there
+    expect(projectNames.size).toBeGreaterThanOrEqual(1);
   });
 });

@@ -1,12 +1,7 @@
-import { join } from "path";
-import { existsSync } from "fs";
-import Database from "better-sqlite3";
 import { KnowledgeRepository } from "../storage/knowledge-repository.js";
+import { openProjectDb, PROJECT_DB_FLOORS, type ProjectEntry } from "../storage/project-db.js";
 
-export interface ProjectEntry {
-  name: string;
-  path: string;
-}
+export type { ProjectEntry } from "../storage/project-db.js";
 
 export interface CrossProjectResult {
   noteId: number;
@@ -16,7 +11,6 @@ export interface CrossProjectResult {
   projectName: string;
 }
 
-const MINIMUM_COMPATIBLE_VERSION = 8; // migration 008 (knowledge_versioning) 以降
 const MAX_CONNECTIONS = 10;
 
 export class CrossProjectSearcher {
@@ -28,36 +22,32 @@ export class CrossProjectSearcher {
     const projectsToSearch = this.projects.slice(0, MAX_CONNECTIONS);
 
     for (const project of projectsToSearch) {
-      let db: Database.Database | undefined;
+      const opened = openProjectDb(project, { mode: "readSource" });
+
+      if (!opened.ok) {
+        switch (opened.error.kind) {
+          case "missing_path":
+            console.warn(`Project ${project.name}: database not found, skipping`);
+            break;
+          case "invalid_schema_version":
+            console.warn(`Project ${project.name}: cannot read schema_version, skipping`);
+            break;
+          case "version_too_low":
+            console.warn(
+              `Project ${project.name}: schema version ${opened.error.version} < ${PROJECT_DB_FLOORS.readSource}, skipping`,
+            );
+            break;
+          case "path_traversal":
+            console.warn(
+              `Project ${project.name}: path "${opened.error.suppliedPath}" rejected (path traversal), skipping`,
+            );
+            break;
+        }
+        continue;
+      }
+
       try {
-        const dbPath = join(project.path, ".knowledgine", "index.sqlite");
-        if (!existsSync(dbPath)) {
-          console.warn(`Project ${project.name}: database not found, skipping`);
-          continue;
-        }
-
-        db = new Database(dbPath, { readonly: true });
-
-        // schema_version テーブルの最大バージョンを確認
-        let version = 0;
-        try {
-          const row = db.prepare("SELECT MAX(version) as version FROM schema_version").get() as
-            | { version: number | null }
-            | undefined;
-          version = row?.version ?? 0;
-        } catch {
-          console.warn(`Project ${project.name}: cannot read schema_version, skipping`);
-          continue;
-        }
-
-        if (version < MINIMUM_COMPATIBLE_VERSION) {
-          console.warn(
-            `Project ${project.name}: schema version ${version} < ${MINIMUM_COMPATIBLE_VERSION}, skipping`,
-          );
-          continue;
-        }
-
-        const repo = new KnowledgeRepository(db);
+        const repo = new KnowledgeRepository(opened.db);
         const rows = repo.searchNotesWithRank(query, limit);
 
         for (const { note, rank } of rows) {
@@ -75,7 +65,7 @@ export class CrossProjectSearcher {
           `Project ${project.name}: search failed - ${err instanceof Error ? err.message : String(err)}`,
         );
       } finally {
-        db?.close();
+        opened.db.close();
       }
     }
 

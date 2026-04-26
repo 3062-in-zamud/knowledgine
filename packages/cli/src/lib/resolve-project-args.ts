@@ -50,6 +50,19 @@ export function resolveProjectArgs(
   const unresolvedPaths: string[] = [];
   const seenPaths = new Set<string>();
 
+  // Pre-index rc entries by their normalized absolute paths so that path-
+  // based inputs can recover visibility/allowFrom from the registry. Without
+  // this, a private project addressed by `--from /abs/path` would silently
+  // become public-by-default and bypass the visibility gate.
+  const rcByPath = new Map<string, ProjectEntry>();
+  for (const p of rcProjects) {
+    try {
+      rcByPath.set(resolvePath(cwd, p.path), p);
+    } catch {
+      // ignore non-resolvable rc entries; they cannot be matched anyway
+    }
+  }
+
   for (const entry of entries) {
     if (isPathLike(entry)) {
       let absPath: string;
@@ -69,15 +82,32 @@ export function resolveProjectArgs(
       if (seenPaths.has(absPath)) continue;
       seenPaths.add(absPath);
 
-      const name = basename(absPath) || absPath;
-      resolved.push({ name, path: absPath });
+      // Inherit name + visibility metadata from the rc entry if the path
+      // matches an entry by absolute path. Otherwise fall back to basename.
+      const rcMatch = rcByPath.get(absPath);
+      if (rcMatch) {
+        resolved.push({
+          name: rcMatch.name,
+          path: absPath,
+          visibility: rcMatch.visibility,
+          allowFrom: rcMatch.allowFrom,
+        });
+      } else {
+        const name = basename(absPath) || absPath;
+        resolved.push({ name, path: absPath });
+      }
     } else {
       const match = rcProjects.find((p) => p.name === entry);
       if (match) {
-        const normalized = resolvePath(match.path);
+        const normalized = resolvePath(cwd, match.path);
         if (seenPaths.has(normalized)) continue;
         seenPaths.add(normalized);
-        resolved.push({ name: match.name, path: match.path });
+        resolved.push({
+          name: match.name,
+          path: match.path,
+          visibility: match.visibility,
+          allowFrom: match.allowFrom,
+        });
       } else {
         unresolvedNames.push(entry);
       }
