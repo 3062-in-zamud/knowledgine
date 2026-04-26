@@ -116,6 +116,9 @@ export class NoteTransferService {
         )
         .get(input.sourceNoteId, input.sourceNoteId) as { c: number } | undefined;
 
+      // Total psp involving this note (either endpoint), and the in-note
+      // subset (both endpoints in this note) which is the part we can
+      // safely copy in a single-note transfer.
       const sourcePspCount = source.db
         .prepare(
           `SELECT COUNT(*) AS c
@@ -125,6 +128,20 @@ export class NoteTransferService {
            WHERE ep1.note_id = ? OR ep2.note_id = ?`,
         )
         .get(input.sourceNoteId, input.sourceNoteId) as { c: number } | undefined;
+
+      const sourceInNotePsps = source.db
+        .prepare(
+          `SELECT psp.problem_pattern_id, psp.solution_pattern_id, psp.relevance_score
+           FROM problem_solution_pairs psp
+           JOIN extracted_patterns ep1 ON psp.problem_pattern_id = ep1.id
+           JOIN extracted_patterns ep2 ON psp.solution_pattern_id = ep2.id
+           WHERE ep1.note_id = ? AND ep2.note_id = ?`,
+        )
+        .all(input.sourceNoteId, input.sourceNoteId) as Array<{
+        problem_pattern_id: number;
+        solution_pattern_id: number;
+        relevance_score: number;
+      }>;
 
       const frontmatter: Record<string, unknown> = sourceNote.frontmatter_json
         ? (JSON.parse(sourceNote.frontmatter_json) as Record<string, unknown>)
@@ -159,10 +176,15 @@ export class NoteTransferService {
               `the other end is not copied in this run)`,
           );
         }
-        if ((sourcePspCount?.c ?? 0) > 0) {
+        const totalPsp = sourcePspCount?.c ?? 0;
+        const inNotePsp = sourceInNotePsps.length;
+        const crossNotePsp = totalPsp - inNotePsp;
+        if (inNotePsp > 0) {
+          copiedTables.push(`problem_solution_pairs (n=${inNotePsp})`);
+        }
+        if (crossNotePsp > 0) {
           warnings.push(
-            `would drop ${sourcePspCount?.c ?? 0} problem_solution_pair(s) ` +
-              `(per-pattern id mapping not supported for single-note transfer)`,
+            `would drop ${crossNotePsp} problem_solution_pair(s) (other endpoint is in a different note)`,
           );
         }
         return {
@@ -218,11 +240,61 @@ export class NoteTransferService {
               `the other end was not copied in this run)`,
           );
         }
-        // Pass 2: problem_solution_pairs — same single-note caveat.
-        if ((sourcePspCount?.c ?? 0) > 0) {
+
+        // Pass 2: problem_solution_pairs whose BOTH endpoints are in this
+        // note. Map source pattern ids -> target pattern ids using the
+        // (pattern_type, content, line_number) composite key, then insert.
+        // psps with the other endpoint in a different note are warned + dropped.
+        const totalSourcePsp = sourcePspCount?.c ?? 0;
+        const inNoteSourcePsp = sourceInNotePsps.length;
+        const crossNoteSourcePsp = totalSourcePsp - inNoteSourcePsp;
+        if (inNoteSourcePsp > 0) {
+          const newPatterns = tgtRepo.getPatternsByNoteId(newTargetNoteId);
+          const keyOf = (p: {
+            pattern_type: string;
+            content: string;
+            line_number: number | null;
+          }): string => `${p.pattern_type}|${p.content}|${p.line_number ?? "_"}`;
+          const newPatternIdByKey = new Map<string, number>();
+          for (const np of newPatterns) newPatternIdByKey.set(keyOf(np), np.id);
+          const oldToNew = new Map<number, number>();
+          for (const sp of sourcePatterns) {
+            const newId = newPatternIdByKey.get(keyOf(sp));
+            if (newId !== undefined) oldToNew.set(sp.id, newId);
+          }
+
+          const mappedPairs: Array<{
+            problemPatternId: number;
+            solutionPatternId: number;
+            relevanceScore: number;
+          }> = [];
+          let unmappedPspCount = 0;
+          for (const psp of sourceInNotePsps) {
+            const np = oldToNew.get(psp.problem_pattern_id);
+            const ns = oldToNew.get(psp.solution_pattern_id);
+            if (np !== undefined && ns !== undefined) {
+              mappedPairs.push({
+                problemPatternId: np,
+                solutionPatternId: ns,
+                relevanceScore: psp.relevance_score,
+              });
+            } else {
+              unmappedPspCount++;
+            }
+          }
+          if (mappedPairs.length > 0) {
+            tgtRepo.saveProblemSolutionPairs(mappedPairs);
+            copiedTables.push(`problem_solution_pairs (n=${mappedPairs.length})`);
+          }
+          if (unmappedPspCount > 0) {
+            warnings.push(
+              `dropped ${unmappedPspCount} problem_solution_pair(s) (could not map pattern ids)`,
+            );
+          }
+        }
+        if (crossNoteSourcePsp > 0) {
           warnings.push(
-            `dropped ${sourcePspCount?.c ?? 0} problem_solution_pair(s) ` +
-              `(per-pattern id mapping not supported for single-note transfer)`,
+            `dropped ${crossNoteSourcePsp} problem_solution_pair(s) (other endpoint is in a different note)`,
           );
         }
       });

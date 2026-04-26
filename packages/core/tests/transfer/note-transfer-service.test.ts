@@ -331,6 +331,58 @@ describe("NoteTransferService.transferNote (copy)", () => {
     expect(result.warnings.some((w) => /note_link/i.test(w))).toBe(true);
   });
 
+  it("copies problem_solution_pairs whose both endpoints are inside this note", async () => {
+    const src = createProjectDir([
+      {
+        filePath: "psp.md",
+        title: "PSP host",
+        content: "see patterns",
+        patterns: [
+          { type: "problem", content: "P-A" },
+          { type: "solution", content: "S-A" },
+        ],
+      },
+    ]);
+    dirs.push(src.dir);
+    // Add a psp pair in source between the two patterns of this note
+    {
+      const dbPath = join(src.dir, ".knowledgine", "index.sqlite");
+      const db = createDatabase(dbPath);
+      const repo = new KnowledgeRepository(db);
+      const note = repo.getNoteByPath("psp.md")!;
+      const pats = repo.getPatternsByNoteId(note.id);
+      const problem = pats.find((p) => p.pattern_type === "problem")!;
+      const solution = pats.find((p) => p.pattern_type === "solution")!;
+      repo.saveProblemSolutionPairs([
+        { problemPatternId: problem.id, solutionPatternId: solution.id, relevanceScore: 0.85 },
+      ]);
+      db.close();
+    }
+
+    const tgt = createEmptyTarget();
+    dirs.push(tgt.dir);
+    const sourceNote = readNote(src.dir, "psp.md")!;
+
+    const svc = new NoteTransferService({ callerSelfName: "caller" });
+    const result = await svc.transferNote({
+      sourceProject: src.project,
+      targetProject: tgt.project,
+      sourceNoteId: sourceNote.id,
+    });
+    expect(result.copiedTables.some((s) => s.startsWith("problem_solution_pairs"))).toBe(true);
+
+    // Verify the psp row is present in target with mapped (new) pattern ids
+    {
+      const dbPath = join(tgt.dir, ".knowledgine", "index.sqlite");
+      const db = createDatabase(dbPath);
+      const row = db.prepare("SELECT COUNT(*) AS c FROM problem_solution_pairs").get() as {
+        c: number;
+      };
+      expect(row.c).toBe(1);
+      db.close();
+    }
+  });
+
   it("KNOWLEDGINE_ALLOW_PRIVATE=1 bypasses visibility (with stderr warning)", async () => {
     const src = createProjectDir([{ filePath: "a.md", title: "A", content: "a" }]);
     dirs.push(src.dir);
