@@ -72,8 +72,11 @@ use --rename or remove duplicate first`. Verified by
 
   - **link**: `knowledgine link --source <p> --note-id <id> --into <q>`
     inserts a link stub note in target (`title = [link] <source title>`,
-    empty content, `frontmatter_json.linked_from = { project: <selfName>,
-sourceNoteId, sourcePath }`) and a `cross_project_links` row.
+    placeholder body, `frontmatter_json.linked_from = { project:
+<selfName>, sourceProjectName, sourceNoteId }` — identity only, no
+    absolute path) and a `cross_project_links` row whose
+    `source_project_path` keeps the absolute path internally for
+    `resolveLink` to use.
     `knowledgine show --path <q> --resolve-link <stub-id>` resolves the
     stub via `NoteLinkService.resolveLink`, returning one of three
     statuses: `ok` (with up-to-date source content), `source_missing`
@@ -132,9 +135,10 @@ source_note_id)` and rejects duplicates.
 
 - **Security**:
   - `transferred_from` and `linked_from` carry the source project's
-    `selfName` only — never an absolute path. (Paths are stored in
-    `cross_project_links.source_project_path` because `resolveLink` needs
-    them, but they never leak into target frontmatter.)
+    identity only (caller `selfName` and the source project's
+    registered name) — never an absolute path. Paths are stored in
+    `cross_project_links.source_project_path` because `resolveLink`
+    needs them, but they never leak into target frontmatter.
   - All path arguments to `transfer` and `link` go through
     `resolveProjectArgs` (which calls `path.resolve()`); `openProjectDb`
     additionally rejects paths whose normalized form contains `..` segments

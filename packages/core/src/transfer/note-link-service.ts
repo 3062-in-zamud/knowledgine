@@ -89,11 +89,15 @@ export class NoteLinkService {
             // saveNote rejects empty strings; the body is fetched on demand
             // by resolveLink, so we keep this placeholder short and obvious.
             content: `[link] -> ${input.sourceProject.name}:${input.sourceNoteId}`,
+            // Frontmatter intentionally carries identity-only metadata. The
+            // absolute source_project_path needed by resolveLink lives in
+            // cross_project_links (internal), never here, to avoid leaking
+            // local filesystem paths via UI/export of frontmatter_json.
             frontmatter: {
               linked_from: {
                 project: callerSelfName,
+                sourceProjectName: input.sourceProject.name,
                 sourceNoteId: input.sourceNoteId,
-                sourcePath: input.sourceProject.path,
               },
             },
             createdAt: now,

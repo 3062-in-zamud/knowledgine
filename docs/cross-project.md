@@ -109,9 +109,11 @@ knowledgine link \
 ```
 
 Inserts a stub note in the target (`title = "[link] <source title>"`,
-body is a marker, `frontmatter_json.linked_from` carries the source
-project name + path + note id) and a row in `cross_project_links`. The
-real body is fetched on demand by `show-link`.
+body is a marker, `frontmatter_json.linked_from` carries the caller's
+`selfName` + the source project's registered name + the source note
+id — **never an absolute path**) and a row in `cross_project_links`
+whose `source_project_path` keeps the absolute path internally for
+`show-link` to use. The real body is fetched on demand by `show-link`.
 
 The target schema must be at version 22 or above (the
 `cross_project_links` table is added by migration 022).

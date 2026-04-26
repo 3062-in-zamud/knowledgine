@@ -79,8 +79,12 @@ describe("NoteLinkService.linkNote", () => {
     const fm = JSON.parse(stub!.frontmatter_json ?? "{}");
     expect(fm.linked_from.project).toBe("callerApp");
     expect(fm.linked_from.sourceNoteId).toBe(src.note.id);
-    // We DO record sourcePath in linked_from because resolveLink needs it.
-    expect(fm.linked_from.sourcePath).toBe(src.dir);
+    // SECURITY: linked_from must NOT carry an absolute source path —
+    // resolveLink reads source_project_path from cross_project_links.
+    expect(fm.linked_from.sourcePath).toBeUndefined();
+    expect(JSON.stringify(fm)).not.toContain(src.dir);
+    // The non-sensitive source project name is acceptable.
+    expect(fm.linked_from.sourceProjectName).toBe("src");
   });
 
   it("UNIQUE collision: linking the same source twice into the same stub fails", async () => {
