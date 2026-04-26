@@ -29,8 +29,11 @@ interface ResolvedFailure {
 function resolveSingleProject(
   rawArg: string,
   rcProjects: ReadonlyArray<{ name: string; path: string }>,
+  cwd: string,
 ): ResolvedSingle | ResolvedFailure {
-  const result = resolveProjectArgs(rawArg, rcProjects);
+  // Same reasoning as transfer.ts: resolve relative paths against the
+  // rc-root so --path selects a consistent reference frame.
+  const result = resolveProjectArgs(rawArg, rcProjects, { cwd });
   if (result.resolved.length === 0) {
     if (result.unresolvedNames.length > 0) {
       return {
@@ -66,13 +69,13 @@ export async function linkCommand(options: LinkCommandOptions): Promise<void> {
   const rcProjects = rcConfig?.projects ?? [];
   const callerSelfName = rcConfig?.selfName ?? null;
 
-  const sourceResolved = resolveSingleProject(options.source, rcProjects);
+  const sourceResolved = resolveSingleProject(options.source, rcProjects, rootPath);
   if (!sourceResolved.ok) {
     emitError("link", `--source: ${sourceResolved.message}`, isJson);
     process.exitCode = 1;
     return;
   }
-  const intoResolved = resolveSingleProject(options.into, rcProjects);
+  const intoResolved = resolveSingleProject(options.into, rcProjects, rootPath);
   if (!intoResolved.ok) {
     emitError("link", `--into: ${intoResolved.message}`, isJson);
     process.exitCode = 1;
