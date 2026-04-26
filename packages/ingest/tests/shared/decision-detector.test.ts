@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isDecisionPoint } from "../../../src/plugins/claude-sessions/decision-detector.js";
+import { isDecisionPoint } from "../../src/shared/decision-detector.js";
 
 describe("isDecisionPoint", () => {
   // 日本語パターン

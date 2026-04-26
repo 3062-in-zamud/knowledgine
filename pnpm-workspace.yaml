@@ -1,2 +1,3 @@
 packages:
   - "packages/*"
+  - "packages/mcp-memory-protocol/examples/*"

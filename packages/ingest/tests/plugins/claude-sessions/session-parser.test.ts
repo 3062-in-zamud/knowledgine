@@ -4,62 +4,12 @@ import { join } from "path";
 import { tmpdir } from "os";
 import {
   parseSessionFile,
-  extractTextContent,
   isRelevantEntry,
 } from "../../../src/plugins/claude-sessions/session-parser.js";
 
 // isValidEntry はモジュール内部のため、間接的にテスト（parseSessionFile経由）
-
-describe("extractTextContent", () => {
-  it("should return string as-is", () => {
-    expect(extractTextContent("hello world")).toBe("hello world");
-  });
-
-  it("should extract text blocks from array", () => {
-    const content = [
-      { type: "text", text: "Hello " },
-      { type: "text", text: "World" },
-    ];
-    expect(extractTextContent(content)).toBe("Hello World");
-  });
-
-  it("should skip non-text blocks (tool_use, tool_result)", () => {
-    const content = [
-      { type: "text", text: "Before" },
-      { type: "tool_use", text: "should be ignored" },
-      { type: "tool_result", text: "also ignored" },
-      { type: "text", text: " After" },
-    ];
-    expect(extractTextContent(content)).toBe("Before After");
-  });
-
-  it("should skip thinking blocks", () => {
-    const content = [
-      { type: "thinking", text: "internal thought" },
-      { type: "text", text: "Visible text" },
-    ];
-    expect(extractTextContent(content)).toBe("Visible text");
-  });
-
-  it("should return empty string when all blocks are non-text (thinking only)", () => {
-    const content = [{ type: "thinking", text: "internal" }, { type: "tool_use" }];
-    expect(extractTextContent(content)).toBe("");
-  });
-
-  it("should handle mixed array with null and numbers", () => {
-    const content = [
-      null,
-      42,
-      { type: "text", text: "valid" },
-      { type: "thinking" },
-    ] as unknown as Array<{ type: string; text?: string }>;
-    expect(extractTextContent(content)).toBe("valid");
-  });
-
-  it("should return empty string for empty array", () => {
-    expect(extractTextContent([])).toBe("");
-  });
-});
+// extractTextContent は packages/ingest/src/shared/text-extractor.ts に昇格したため、
+// テストは tests/shared/text-extractor.test.ts に移動済み
 
 describe("isRelevantEntry", () => {
   it("should return true for user", () => {

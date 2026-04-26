@@ -10,3 +10,9 @@ updates:
     schedule:
       interval: "weekly"
     target-branch: "develop"
+    ignore:
+      # pnpm/action-setup v6 installs a pnpm whose stricter lockfile parser
+      # rejects our lockfileVersion '9.0' file (see closed PR #69, run 24557595680).
+      # Re-enable when we deliberately migrate to pnpm 11.
+      - dependency-name: "pnpm/action-setup"
+        update-types: ["version-update:semver-major"]

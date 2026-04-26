@@ -150,7 +150,7 @@ knowledgine setup --target cursor --path ./my-notes --write
 knowledgine status --path ./my-notes
 ```
 
-Shows database stats, model availability, MCP configuration status, and overall readiness.
+Shows database stats, model availability, MCP configuration status, and overall readiness. The Database section now also includes a per-category storage breakdown (`notes`, `fts`, `embeddings`, `graph`, `events`, `memory`, `other`, plus `freelist` and `wal` when non-zero) so it is easy to see which subsystem dominates the on-disk footprint.
 
 ### search
 
@@ -165,6 +165,63 @@ knowledgine search "debugging tips" --mode hybrid --path ./my-notes --format tab
 - `--limit <n>`: Maximum results. Default: 20
 - `--related <noteId>`: Find related notes by note ID
 - `--demo`: Search in demo notes
+- `--projects <names-or-paths>`: Search across multiple knowledgine projects
+  (comma-separated). See [Cross-Project Search](#cross-project-search) below.
+
+#### Cross-Project Search
+
+Search across multiple knowledgine projects in a single query. Results are
+ranked by FTS5 score (descending). At most 10 projects are searched per query
+(any extras are dropped with a stderr warning). Project databases are opened
+sequentially, not in parallel.
+
+You can pass either registered names from `.knowledginerc` (when configured)
+or absolute / relative / `~/` paths directly:
+
+```bash
+# Registered names from .knowledginerc
+knowledgine search "auth flow" --projects backend,frontend
+
+# Dynamic paths — no rc registration required
+knowledgine search "auth flow" --projects ~/work/<your-repo>,./sibling-repo
+
+# Mixed
+knowledgine search "auth flow" --projects backend,/absolute/path/to/repo
+```
+
+Path detection: an argument is treated as a path if it begins with `/`, `./`,
+`../`, `~/`, or `.`. Otherwise it is looked up as a registered project name.
+When path-detected, registered name lookup is skipped (paths take precedence).
+
+`.knowledginerc` example:
+
+```jsonc
+{
+  "projects": [
+    { "name": "backend", "path": "/Users/me/code/backend" },
+    { "name": "frontend", "path": "/Users/me/code/frontend" },
+  ],
+}
+```
+
+When to use which:
+
+- **Registered names** when paths are stable, shared across team members, or
+  you want short CLI invocations.
+- **Dynamic paths** for ad-hoc exploration, CI/scripts with computed paths,
+  or one-off cross-project queries without modifying `.knowledginerc`.
+
+Constraints:
+
+- Each target project must contain `.knowledgine/index.sqlite` with
+  `schema_version >= 8`. When at least one project resolves, any path that
+  lacks the database file is skipped with a stderr warning and the search
+  continues. When **none** of the supplied entries resolves, the command exits
+  with status `1` and a Case A/B/C/D error message explaining what was wrong.
+- Identical basenames across paths produce ambiguous `projectName` in output;
+  use registered names in `.knowledginerc` to disambiguate.
+- Glob patterns, remote URLs, and dynamic-path support via the MCP server's
+  `search_knowledge` tool are out of scope (future tickets).
 
 ### capture
 
@@ -181,7 +238,14 @@ knowledgine capture delete <id> --path ./my-notes
 knowledgine ingest --source markdown --path ./my-notes
 knowledgine ingest --source github --repo owner/repo --path ./my-notes
 knowledgine ingest --source claude-sessions --path ./my-notes
+knowledgine ingest --source cline-sessions --path ./my-notes
 knowledgine ingest --all --path ./my-notes
+
+# Run the Observer/Reflector agents after ingestion to extract patterns,
+# entities and a 6-vector classification. Optional opt-in.
+# See docs/agents/observer.md for details.
+knowledgine ingest --source markdown --observe --path ./my-notes
+knowledgine ingest --source markdown --observe --observe-limit 200 --path ./my-notes
 ```
 
 ---

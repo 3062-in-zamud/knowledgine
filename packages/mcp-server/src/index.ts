@@ -5,6 +5,7 @@ import { createKnowledgineMcpServer } from "./server.js";
 
 export { createKnowledgineMcpServer } from "./server.js";
 export type { McpServerOptions } from "./server.js";
+export { KnowledgineMemoryProvider } from "./memory-adapter.js";
 export {
   resolveConfig,
   initializeDependencies,

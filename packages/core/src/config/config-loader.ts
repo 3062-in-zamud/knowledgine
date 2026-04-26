@@ -10,6 +10,8 @@ import { DEFAULT_MODEL_NAME, MODEL_REGISTRY } from "../embedding/model-manager.j
 export interface RcConfig {
   semantic?: boolean;
   defaultPath?: string;
+  /** This project's identifier — read by VisibilityGate to gate cross-project access. */
+  selfName?: string;
   plugins?: { enabled?: string[]; [pluginId: string]: unknown };
   search?: { defaultMode?: "keyword" | "semantic" | "hybrid"; defaultLimit?: number };
   serve?: { defaultPort?: number; host?: string; authToken?: string };
@@ -21,7 +23,14 @@ export interface RcConfig {
     excludePatterns?: string[];
   };
   observer?: { enabled?: boolean; limit?: number };
-  projects?: Array<{ name: string; path: string }>;
+  projects?: Array<{
+    name: string;
+    path: string;
+    /** "public" (default) or "private". Private projects are gated by VisibilityGate. */
+    visibility?: "private" | "public";
+    /** Caller `selfName`s allowed to read or transfer-from this project when private. */
+    allowFrom?: string[];
+  }>;
   [key: string]: unknown;
 }
 
@@ -29,6 +38,7 @@ const rcConfigSchema = z
   .object({
     semantic: z.boolean().optional(),
     defaultPath: z.string().optional(),
+    selfName: z.string().optional(),
     plugins: z
       .object({
         enabled: z.array(z.string()).optional(),
@@ -67,6 +77,8 @@ const rcConfigSchema = z
         z.object({
           name: z.string(),
           path: z.string(),
+          visibility: z.enum(["private", "public"]).optional(),
+          allowFrom: z.array(z.string()).optional(),
         }),
       )
       .optional(),

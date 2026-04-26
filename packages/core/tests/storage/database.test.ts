@@ -29,6 +29,18 @@ describe("createDatabase", () => {
     db = createDatabase(":memory:", { enableVec: true });
     expect(db).toBeDefined();
   });
+
+  it("should set synchronous=NORMAL (1) for WAL-safe durability with reduced fsync cost", () => {
+    db = createDatabase(":memory:");
+    const result = db.pragma("synchronous") as Array<{ synchronous: number }>;
+    expect(result[0].synchronous).toBe(1);
+  });
+
+  it("should set cache_size to -20000 (20MB)", () => {
+    db = createDatabase(":memory:");
+    const result = db.pragma("cache_size") as Array<{ cache_size: number }>;
+    expect(result[0].cache_size).toBe(-20000);
+  });
 });
 
 describe("loadSqliteVecExtension", () => {

@@ -17,6 +17,8 @@ import {
 } from "./commands/feedback.js";
 import { demoCommand } from "./commands/demo.js";
 import { searchCommand } from "./commands/search.js";
+import { transferCommand } from "./commands/transfer.js";
+import { linkCommand, showLinkCommand } from "./commands/link.js";
 import { captureAddCommand, captureListCommand, captureDeleteCommand } from "./commands/capture.js";
 import { registerToolCommands } from "./commands/tool.js";
 import { registerRecallCommand } from "./commands/recall.js";
@@ -278,7 +280,13 @@ const searchCmd = program
   )
   .option("--agentic", "Include deprecated notes in search results (agentic mode)")
   .option("--include-deprecated", "Include deprecated notes in search results")
-  .option("--projects <names>", "Search across projects (comma-separated project names)")
+  .option(
+    "--projects <names-or-paths>",
+    "Cross-project search. Comma-separated list of registered project names " +
+      "(.knowledginerc) and/or absolute / relative / ~/ paths " +
+      "(e.g. 'backend,~/work/repo,/abs/path'). Paths are detected by leading " +
+      "'/', './', '../', '~/', or '.'.",
+  )
   .action(
     (
       positionalQuery: string | undefined,
@@ -323,6 +331,97 @@ const searchCmd = program
     },
   );
 searchCmd.showHelpAfterError(true);
+
+program
+  .command("transfer")
+  .description("Copy a note (with its patterns and embedding) from one project into another")
+  .requiredOption(
+    "--from <project>",
+    "Source project: registered name in .knowledginerc OR absolute / relative / ~/ path",
+  )
+  .requiredOption(
+    "--to <project>",
+    "Target project: registered name in .knowledginerc OR absolute / relative / ~/ path",
+  )
+  .requiredOption("--note-id <id>", "Source note id (positive integer)")
+  .option("--dry-run", "Print what would be transferred without modifying the target", false)
+  .option("--format <format>", "Output format: json, plain", "plain")
+  .option("--path <dir>", "Root directory whose .knowledginerc identifies the caller")
+  .addHelpText(
+    "after",
+    `
+Notes:
+  - Two consecutive transfers of the same source produce DIFFERENT target ids.
+  - File-path collisions are rejected; remove the duplicate or use a different target first.
+  - Private source projects require the caller selfName to be in their allowFrom list.
+`,
+  )
+  .action(
+    (opts: {
+      from: string;
+      to: string;
+      noteId: string;
+      dryRun?: boolean;
+      format?: string;
+      path?: string;
+    }) =>
+      transferCommand({
+        from: opts.from,
+        to: opts.to,
+        noteId: opts.noteId,
+        dryRun: opts.dryRun,
+        format: opts.format,
+        path: opts.path,
+      }),
+  );
+
+program
+  .command("link")
+  .description(
+    "Create a lightweight link stub in the target project that points at a note in another project",
+  )
+  .requiredOption(
+    "--source <project>",
+    "Source project: registered name in .knowledginerc OR absolute / relative / ~/ path",
+  )
+  .requiredOption("--note-id <id>", "Source note id (positive integer)")
+  .requiredOption(
+    "--into <project>",
+    "Target project: registered name in .knowledginerc OR absolute / relative / ~/ path",
+  )
+  .option("--format <format>", "Output format: json, plain", "plain")
+  .option("--path <dir>", "Root directory whose .knowledginerc identifies the caller")
+  .addHelpText(
+    "after",
+    `
+Notes:
+  - The stub note is created with placeholder content; resolve it later with 'knowledgine show-link <stub-id>'.
+  - Private source projects require the caller selfName to be in their allowFrom list.
+`,
+  )
+  .action(
+    (opts: { source: string; noteId: string; into: string; format?: string; path?: string }) =>
+      linkCommand({
+        source: opts.source,
+        noteId: opts.noteId,
+        into: opts.into,
+        format: opts.format,
+        path: opts.path,
+      }),
+  );
+
+program
+  .command("show-link <stub-id>")
+  .description("Resolve a cross-project link stub and print the source note body")
+  .option("--format <format>", "Output format: json, plain", "plain")
+  .option("--path <dir>", "Project root containing the link stub")
+  .action((stubId: string, opts: { format?: string; path?: string }) =>
+    showLinkCommand({
+      stubId,
+      format: opts.format,
+      path: opts.path,
+    }),
+  );
 
 const captureCmd = program.command("capture").description("Capture and manage knowledge snippets");
 captureCmd

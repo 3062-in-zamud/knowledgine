@@ -6,6 +6,7 @@ import {
   GitHubPlugin,
   ObsidianPlugin,
   CursorSessionsPlugin,
+  ClineSessionsPlugin,
   CicdPlugin,
 } from "@knowledgine/ingest";
 import type { PluginConfig, PluginInitResult } from "@knowledgine/ingest";
@@ -18,6 +19,7 @@ export function createDefaultRegistry(): PluginRegistry {
   registry.register(new GitHubPlugin());
   registry.register(new ObsidianPlugin());
   registry.register(new CursorSessionsPlugin());
+  registry.register(new ClineSessionsPlugin());
   registry.register(new CicdPlugin());
   return registry;
 }

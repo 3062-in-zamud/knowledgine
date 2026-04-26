@@ -1,6 +1,6 @@
 {
   "name": "@knowledgine/core",
-  "version": "0.6.9",
+  "version": "0.7.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -56,11 +56,11 @@
   },
   "optionalDependencies": {
     "onnxruntime-node": "~1.24.3",
-    "sqlite-vec": "^0.1.6"
+    "sqlite-vec": "^0.1.9"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.0.0",
     "onnxruntime-node": "~1.24.3",
-    "sqlite-vec": "^0.1.6"
+    "sqlite-vec": "^0.1.9"
   }
 }

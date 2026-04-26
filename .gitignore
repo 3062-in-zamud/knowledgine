@@ -11,6 +11,7 @@ coverage/
 !/CLAUDE.md
 *.onnx
 .worktrees/
+.tmp/
 .knowledgine/
 .knowledginerc.json
 packages/core/models/

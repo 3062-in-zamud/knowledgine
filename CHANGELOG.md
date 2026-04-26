@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-26
+
+### Added
+
+#### MCP Memory Protocol (`@knowledgine/mcp-memory-protocol`)
+
+- **Reference implementation prep**: knowledgine is now the reference implementation of the MCP Memory Protocol. Adds gap-analysis (`docs/mcp-memory-protocol-proposal/gap-analysis.md`), a `MemoryProvider`-direct conformance test kit at `@knowledgine/mcp-memory-protocol/conformance`, full `temporal_query` (§8.2 Point-in-Time Recall) and `ttl` (§9.2 lazy-expire) implementation in `KnowledgineMemoryProvider`, expanded implementation guide, and publish metadata (`description`, `keywords`, `repository`, `homepage`, `bugs`, `files`) plus `LICENSE` / `CHANGELOG.md` / `MIGRATION.md` shipped in the tarball.
+- **`RecalledMemory` fields**: `deprecated`, `deprecationReason`, `supersedes`, `validFrom` are now part of the public type (spec §6.1).
+- **Subpath export**: `@knowledgine/mcp-memory-protocol/conformance` provides `runConformanceSuite` separately from the main entry, keeping production imports lean.
+
+#### Core (`@knowledgine/core`)
+
+- **Cross-project link / show-link**: New `NoteLinkService`. Linking inserts a stub note in the destination project (with backlink frontmatter) and returns a `linkId` for later resolution. Stub notes carry only the destination-side metadata (`source`, `linkedFromProject`, `linkedFromNoteId`, `linkId`); origin file paths are intentionally not embedded. See `docs/cross-project.md`.
+- **Cross-project transfer (copy)**: New `NoteTransferService`. Copies a note (optionally with linked problem/solution pairs and pattern metadata) from one project to another. Pattern IDs are remapped on the destination side so transfers across projects do not collide.
+- **Project-level visibility gate**: Visibility metadata on projects controls whether notes can be linked or transferred out. Path-based `--projects` arguments (and `--from`/`--to`/`--source`/`--into` in transfer/link) preserve the registered visibility flag rather than treating ad-hoc paths as fully public.
+- **Migration 019 / 020**: `memory_entries.valid_until` and `memory_entries.expires_at` columns added to support spec §8.2 chain reconstruction and §9.2 ttl. Default `NULL` keeps legacy rows backward-compatible.
+- **`SourceType: "cline"`**: Added `"cline"` to the `SourceType` union so the new `cline-sessions` ingest plugin maps to a dedicated source type rather than `"manual"`.
+- **Migration 021 — int8 vector mirror**: `note_embeddings_vec` is now declared as `INT8[384]` (was `FLOAT[384]`). The canonical float32 BLOB on `note_embeddings.embedding` is unchanged. `searchByVector` runs a coarse vec0 INT8 KNN with `k = 10 × topK` and reranks the candidate set against the float32 BLOBs to keep recall@10 within 5pp of the float32 baseline (synthetic Jaccard@10 = 1.000). Forward-only migration; downgrading the CLI requires re-embedding via `--embed-missing`. See `docs/benchmarks/db-storage-v2.md`.
+- **`KnowledgeRepository.getStorageBreakdown()`**: New API returning per-category storage usage (`notes`, `fts`, `embeddings`, `graph`, `events`, `memory`, `other`) plus freelist and WAL bytes. Backed by the SQLite `dbstat` virtual table; falls back to `PRAGMA page_count * page_size` when `dbstat` is unavailable.
+- **PRAGMA tuning**: `createDatabase()` now sets `synchronous=NORMAL` (safe under WAL) and `cache_size=-20000` (20 MiB page cache). The existing `journal_mode=WAL`, `mmap_size=64 MiB`, and `temp_store=MEMORY` are unchanged.
+
+#### Ingest (`@knowledgine/ingest`)
+
+- **`cline-sessions` plugin**: Pull-type ingest for the Cline VS Code extension
+  (`saoudrizwan.claude-dev`). Reads `state/taskHistory.json` (HistoryItem index)
+  plus `tasks/<id>/api_conversation_history.json` (Anthropic message format) and
+  emits one `capture` note per task with secret redaction. Override storage path
+  via `CLINE_STORAGE_PATH` (absolute path; symlinks resolved). Long tasks keep
+  head 100 + tail 100 messages with a `(... N truncated ...)` marker. Files
+  larger than 10MB are skipped with a stderr warning. Source pinned at Cline
+  `v3.81.0`; see `docs/research/cline-session-storage.md` for schema details
+  and drift mitigation.
+- **`shared/decision-detector` and `shared/text-extractor`**: Promoted from
+  `plugins/claude-sessions/` so both `claude-sessions` and `cline-sessions` can
+  reuse them without cross-plugin relative imports.
+- **Anthropic-key redaction pattern**: `sanitizeContent` now redacts
+  `sk-ant-(api|admin)NN-…` Anthropic key formats whose internal hyphens
+  previously broke the generic `sk-…` pattern.
+
+#### CLI (`@knowledgine/cli`)
+
+- **`knowledgine link` / `knowledgine show-link`**: New cross-project linking commands. `link` inserts a backlink stub in the destination project; `show-link` resolves a `linkId` back to the source-side note metadata.
+- **`knowledgine transfer`**: New cross-project copy command with `--from`, `--to`, `--note-id`, `--dry-run`, and `--format` options. Copies the note plus its linked problem/solution pairs and pattern metadata to the destination project.
+- **`--source cline-sessions`**: Wires the new ingest plugin into the CLI and
+  the `knowledgine-ingest` skill template (ja/en).
+- **`--projects` accepts dynamic paths**: `knowledgine search --projects` now
+  accepts absolute paths, relative paths, and `~/` paths in addition to
+  registered project names from `.knowledginerc`. Paths are detected by leading
+  `/`, `./`, `../`, `~/`, or `.`. Mixing names and paths in a single
+  comma-separated list is supported. Removes the prior requirement that every
+  cross-project target be pre-registered in `.knowledginerc`.
+- **`status` per-category storage breakdown**: The Database section now
+  shows a `Breakdown` block listing bytes for `notes`, `fts`, `embeddings`,
+  `graph`, `events`, `memory`, and `other`, plus `freelist` and `wal` when
+  non-zero. When `dbstat` is unavailable the breakdown is hidden with
+  `unavailable (dbstat not compiled)` rather than failing the command.
+
+### Changed
+
+#### MCP Memory Protocol (`@knowledgine/mcp-memory-protocol`)
+
+- **BREAKING — Conformance API**: replaced `runConformanceSuite(ctx, options)` (MCP Client based) with `runConformanceSuite({ createProvider, teardown?, skip? })` (`MemoryProvider` direct injection). Migration steps in [`packages/mcp-memory-protocol/MIGRATION.md`](packages/mcp-memory-protocol/MIGRATION.md). Released as `@knowledgine/mcp-memory-protocol@0.4.0`.
+
+#### MCP Server (`@knowledgine/mcp-server`)
+
+- **`KnowledgineMemoryProvider` brought to full conformance**: fixed the `recall(includeVersionHistory)` / soft-delete filter, implemented §8.2 asOf branch with chain-collapse, and §9.2 ttl with versioned-update inheritance. Capabilities now include `versioning`, `temporalQuery`, `ttl`, `layerPromotion` (only `semanticSearch` remains deferred).
+
+#### Docs
+
+- **`docs/push-based-capture.md`**: The "Cline Storage Investigation Results"
+  section is updated. Pull-type ingest is now the recommended approach for
+  Cline; push-type capture remains valid for tools without pull adapters
+  (Windsurf, Codex CLI, Copilot Chat).
+
 ## [0.6.9] - 2026-04-09
 
 ### Added
@@ -679,7 +753,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Configurable watch patterns and ignore patterns
 - Graceful shutdown handling (SIGINT/SIGTERM)
 
-[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.9...HEAD
+[Unreleased]: https://github.com/3062-in-zamud/knowledgine/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.9...v0.7.0
 [0.6.9]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/3062-in-zamud/knowledgine/compare/v0.6.6...v0.6.7

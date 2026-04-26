@@ -61,6 +61,22 @@ describe("sanitizeContent", () => {
     expect(result).not.toContain("sk-abcdefghijklmnopqrstuvwxyz1234567890abcd");
   });
 
+  it("Anthropic API キー (sk-ant-api03-...) をマスクする", () => {
+    const anthKey = "sk-ant-" + "api03-" + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const content = `auth: ${anthKey}`;
+    const result = sanitizeContent(content);
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain(anthKey);
+  });
+
+  it("Anthropic admin キー (sk-ant-admin01-...) もマスクする", () => {
+    const admin = "sk-ant-" + "admin01-" + "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+    const content = `header: ${admin}`;
+    const result = sanitizeContent(content);
+    expect(result).toContain("[REDACTED]");
+    expect(result).not.toContain(admin);
+  });
+
   it("GitLab PAT (glpat-) をマスクする", () => {
     const content = "gitlab: glpat-abcdefghijklmnopqrst";
     const result = sanitizeContent(content);
@@ -198,5 +214,17 @@ describe("normalizeToKnowledgeEvent", () => {
     expect(result.content).not.toContain(secret);
     expect(result.content).toContain("[REDACTED]");
     expect(result.contentHash).toBe(computeContentHash(result.content));
+  });
+
+  it("[KNOW-401] env-var 形式の secret は変数名ごと redact され、contentHash に secret は含まれない", () => {
+    const ghpToken = "ghp_" + "f".repeat(36);
+    const event = createMockEvent({ content: `GITHUB_TOKEN="${ghpToken}"` });
+    const result = normalizeToKnowledgeEvent(event);
+    // 変数名ごと redact され、結果は "[REDACTED]" のみ
+    expect(result.content).toBe("[REDACTED]");
+    expect(result.content).not.toContain("GITHUB_");
+    expect(result.content).not.toContain(ghpToken);
+    // contentHash は redact 後の hash（secret を含まない）
+    expect(result.contentHash).toBe(computeContentHash("[REDACTED]"));
   });
 });

@@ -164,6 +164,60 @@ knowledgine search "debugging tips" --mode hybrid --path ./my-notes --format tab
 - `--limit <n>`: 最大件数。デフォルト: 20
 - `--related <noteId>`: ノート ID で関連ノートを検索
 - `--demo`: デモノートを検索
+- `--projects <names-or-paths>`: 複数の knowledgine プロジェクトを横断検索
+  （カンマ区切り）。詳細は [クロスプロジェクト検索](#クロスプロジェクト検索) 参照
+
+#### クロスプロジェクト検索
+
+複数の knowledgine プロジェクトを 1 クエリで横断検索します。FTS5 スコア降順で
+結果を返し、検索対象は最大 10 プロジェクトまでです（11 件目以降は警告を出して
+切り捨てます。並行実行ではなく逐次に各 DB を読みます）。
+
+`.knowledginerc` に登録した名前、または任意のパス（絶対 / 相対 / `~/`）を
+そのまま渡せます:
+
+```bash
+# .knowledginerc の登録名で指定
+knowledgine search "認証フロー" --projects backend,frontend
+
+# 任意のパスで直接指定（rc 登録不要）
+knowledgine search "認証フロー" --projects ~/work/<your-repo>,./sibling-repo
+
+# 混在も可能
+knowledgine search "認証フロー" --projects backend,/absolute/path/to/repo
+```
+
+判定ルール: 引数が `/`、`./`、`../`、`~/`、`.` で始まる場合は path として
+扱われます。それ以外は登録名として `.knowledginerc` から検索します。
+path として認識された引数は登録名検索を行いません（パス優先）。
+
+`.knowledginerc` 例:
+
+```jsonc
+{
+  "projects": [
+    { "name": "backend", "path": "/Users/me/code/backend" },
+    { "name": "frontend", "path": "/Users/me/code/frontend" },
+  ],
+}
+```
+
+使い分け:
+
+- **登録名**: パスが安定している、チームで共有する、CLI を短く打ちたい場合
+- **任意のパス**: ad-hoc な探索、CI / スクリプトで動的に組み立てたパス、
+  `.knowledginerc` を変更せず一度だけ検索したい場合
+
+制約:
+
+- 各プロジェクトに `.knowledgine/index.sqlite`（schema_version >= 8）が必要。
+  少なくとも 1 件解決できる場合は、ファイルがない path のみ stderr に warning
+  を出して skip して検索を続行します。**全件解決できない場合**は
+  Case A/B/C/D のエラーメッセージを stderr に出して exit 1 で終了します
+- 同じ basename を持つパスを複数渡すと出力の `projectName` で識別できなく
+  なります。`.knowledginerc` の登録名で disambiguate してください
+- glob パターン、リモート URL、MCP server `search_knowledge` 経由の
+  動的パスは Out of Scope（後続チケット）
 
 ### capture
 

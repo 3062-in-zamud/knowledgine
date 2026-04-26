@@ -72,6 +72,10 @@ export type {
   KnowledgeNoteSummary,
   ExtractedPatternRow,
 } from "./storage/knowledge-repository.js";
+export { computeStorageBreakdown } from "./storage/storage-breakdown.js";
+export type { StorageBreakdown } from "./storage/storage-breakdown.js";
+export { classifyTable, STORAGE_CATEGORIES } from "./storage/storage-categories.js";
+export type { StorageCategory } from "./storage/storage-categories.js";
 export { Migrator } from "./storage/migrator.js";
 export type { Migration, MigrationStatus } from "./storage/migrator.js";
 export { SCHEMA_SQL } from "./storage/schema.js";
@@ -93,6 +97,15 @@ export { migration013 } from "./storage/migrations/013_unknown_entity_type.js";
 export { migration014 } from "./storage/migrations/014_entity_normalization.js";
 export { migration015 } from "./storage/migrations/015_embedding_format_version.js";
 export { migration016 } from "./storage/migrations/016_note_confidence.js";
+export { migration019 } from "./storage/migrations/019_memory_valid_until.js";
+export { migration020 } from "./storage/migrations/020_memory_expires_at.js";
+export { migration021 } from "./storage/migrations/021_embedding_int8_quantization.js";
+export { migration022 } from "./storage/migrations/022_cross_project_links.js";
+export {
+  quantizeFloat32ToInt8,
+  dequantizeInt8,
+  QUANTIZATION_SCALE,
+} from "./storage/quantization.js";
 
 // Feedback
 export { FeedbackRepository } from "./feedback/feedback-repository.js";
@@ -122,7 +135,15 @@ import { migration013 } from "./storage/migrations/013_unknown_entity_type.js";
 import { migration014 } from "./storage/migrations/014_entity_normalization.js";
 import { migration015 } from "./storage/migrations/015_embedding_format_version.js";
 import { migration016 } from "./storage/migrations/016_note_confidence.js";
+import { migration019 } from "./storage/migrations/019_memory_valid_until.js";
+import { migration020 } from "./storage/migrations/020_memory_expires_at.js";
+import { migration021 } from "./storage/migrations/021_embedding_int8_quantization.js";
+import { migration022 } from "./storage/migrations/022_cross_project_links.js";
 import type { Migration } from "./storage/migrator.js";
+// Migrator sorts by `version`, so order in this array does not affect
+// execution order; new migrations are appended at the end for readability.
+// Note: versions 017 and 018 are intentionally absent (gaps preserved).
+// Current max version: 22 (cross_project_links).
 export const ALL_MIGRATIONS: Migration[] = [
   migration001,
   migration002,
@@ -142,6 +163,10 @@ export const ALL_MIGRATIONS: Migration[] = [
   migration014,
   migration015,
   migration016,
+  migration019,
+  migration020,
+  migration021,
+  migration022,
 ];
 
 // Provenance
@@ -236,7 +261,29 @@ export type {
 export { KnowledgeSearcher } from "./search/knowledge-searcher.js";
 export type { SearchOptions } from "./search/knowledge-searcher.js";
 export { CrossProjectSearcher } from "./search/cross-project-searcher.js";
-export type { ProjectEntry, CrossProjectResult } from "./search/cross-project-searcher.js";
+export type { CrossProjectResult } from "./search/cross-project-searcher.js";
+export type {
+  ProjectEntry,
+  ProjectDbMode,
+  ProjectDbHandle,
+  OpenProjectDbResult,
+  OpenProjectDbError,
+} from "./storage/project-db.js";
+export {
+  openProjectDb,
+  PROJECT_DB_FLOORS,
+  describeOpenProjectDbError,
+} from "./storage/project-db.js";
+export {
+  filterReadableProjects,
+  canTransferFrom,
+  ALLOW_PRIVATE_ENV_VAR,
+  PRIVATE_BYPASS_WARNING,
+} from "./access/visibility-gate.js";
+export { NoteTransferService } from "./transfer/note-transfer-service.js";
+export type { TransferOptions, TransferResult } from "./transfer/note-transfer-service.js";
+export { NoteLinkService } from "./transfer/note-link-service.js";
+export type { LinkResult, ResolveResult } from "./transfer/note-link-service.js";
 export { ReasoningReranker } from "./search/reasoning-reranker.js";
 export type {
   RerankInput,

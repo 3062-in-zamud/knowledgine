@@ -2,4 +2,8 @@ dist/
 coverage/
 pnpm-lock.yaml
 *.tsbuildinfo
+.tmp/
 packages/core/models/
+# Cline session fixtures intentionally include malformed JSON to test
+# parse-error tolerance; do not format them.
+packages/ingest/tests/plugins/cline-sessions/fixtures/

@@ -1,0 +1,19 @@
+{
+  "name": "@knowledgine-examples/minimal-provider",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal in-memory MemoryProvider example for @knowledgine/mcp-memory-protocol. Not published.",
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@knowledgine/mcp-memory-protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
