@@ -39,7 +39,7 @@ refactor. Mark complete only when the listed verification passes.
 
 - [ ] **Task 2.1**: Write `packages/mcp-server/tests/cross-project-search.test.ts`
       covering the `projects: [...]` branch returning `{ crossProject:
-    true }`. (Visibility cases come back in Phase 3.)
+true }`. (Visibility cases come back in Phase 3.)
 - [ ] **Task 2.2**: Wire a placeholder filter in MCP cross-project
       branch (returns identity until Phase 3 lands the real gate).
 - [ ] **Task 2.3**: `pnpm --filter @knowledgine/mcp-server test:run` green.
@@ -56,7 +56,7 @@ refactor. Mark complete only when the listed verification passes.
 - [ ] **Task 3.2**: Write `packages/core/tests/access/visibility-gate.test.ts`
       with all 6 scenarios (public default, private skip, allowFrom
       allow, env bypass + stderr, missing selfName, empty `allowFrom:
-    []`).
+[]`).
 - [ ] **Task 3.3**: Implement `packages/core/src/access/visibility-gate.ts`.
 - [ ] **Task 3.4**: Replace placeholder in MCP server with the real
       `filterReadableProjects`.
@@ -71,7 +71,7 @@ refactor. Mark complete only when the listed verification passes.
 
 - [ ] **Task 4a.0** (**spike, mandatory**): create a temporary DB,
       insert 100 rows in `note_embeddings_vec`, run `BEGIN; INSERT 50
-    more; ROLLBACK;`, assert row count returns to 100. Record date,
+more; ROLLBACK;`, assert row count returns to 100. Record date,
       result, and chosen implementation strategy in `design.md`
       §"Decision 5".
 - [ ] **Task 4a.1**: Write `packages/core/tests/transfer/note-transfer-service.test.ts`
@@ -119,19 +119,19 @@ refactor. Mark complete only when the listed verification passes.
 - [ ] **Task 5.3**: Commit `scripts/e2e-cross-project.sh`. Run it
       locally; confirm `ALL E2E PASSED`.
 - [ ] **Task 5.4** — **Gate A**: `volta run --node 22 pnpm lint
-    && pnpm format:check && pnpm typecheck` green.
+&& pnpm format:check && pnpm typecheck` green.
 - [ ] **Task 5.5** — **Gate B**: `volta run --node 22 pnpm test:run`
       green (full repo).
 - [ ] **Task 5.6** — **Gate C**: `volta run --node 22 pnpm
-    test:coverage` and confirm line coverage ≥ 80 % on
+test:coverage` and confirm line coverage ≥ 80 % on
       `packages/core/src/{transfer,access,storage/project-db.ts}`.
 - [ ] **Task 5.7** — **Gate D**: `volta run --node 20 pnpm verify` green
       and `volta run --node 22 pnpm verify` green and `pnpm audit
-    --audit-level=moderate --prod` shows no new high/critical relative
+--audit-level=moderate --prod` shows no new high/critical relative
       to develop.
 - [ ] **Task 5.8**: Open Draft PR — `gh pr create --draft --base develop`
       with title `feat(core): cross-project knowledge transfer
-    (transfer/link)` (no `KNOW-` in title). PR body must include AC
+(transfer/link)` (no `KNOW-` in title). PR body must include AC
       satisfaction map (one bullet per AC referencing the proving test
       file), the spike result, and the Out-of-Scope list.
 - [ ] **Task 5.9**: `gh pr checks --watch` green for both Node matrices.
@@ -147,7 +147,7 @@ Run before requesting a human review.
 - [ ] All five acceptance criteria in `requirements.md` are covered by
       the listed tests and the manual E2E script
 - [ ] `volta run --node 20 pnpm verify` and `volta run --node 22 pnpm
-    verify` both green locally
+verify` both green locally
 - [ ] `gh pr checks --watch` reports green for the matrix
 - [ ] `scripts/e2e-cross-project.sh` printed `ALL E2E PASSED` on the
       author's machine

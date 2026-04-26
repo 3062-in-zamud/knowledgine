@@ -48,7 +48,7 @@ the verification gate in `tasks.md`.
       (no behavior regression, including `console.warn` wording).
 
 - [ ] **AC-2 (Cross-project search via CLI and MCP)**: `knowledgine search
-    --projects a,b` and the MCP `search_knowledge` tool with
+--projects a,b` and the MCP `search_knowledge` tool with
       `projects: ["a","b"]` both return merged results from the listed
       projects, sorted by FTS5 score descending, with `crossProject: true`
       on the MCP envelope. Verified by an extended
