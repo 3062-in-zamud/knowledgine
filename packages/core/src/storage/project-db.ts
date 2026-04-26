@@ -74,6 +74,24 @@ function dbPathFor(projectPath: string): string {
   return join(resolvePath(projectPath), ".knowledgine", "index.sqlite");
 }
 
+/**
+ * Apply the same connection-level pragmas that `createDatabase()` uses
+ * elsewhere so cross-project write paths behave identically to the
+ * single-project ones (notably: foreign_keys=ON for migration 022's
+ * cross_project_links cascade, busy_timeout for cross-process contention,
+ * and journal_mode=WAL for write modes). Read-only opens get the
+ * non-write pragmas only.
+ */
+function applyConnectionPragmas(db: Database.Database, mode: ProjectDbMode): void {
+  db.pragma("foreign_keys = ON");
+  db.pragma("busy_timeout = 5000");
+  db.pragma("temp_store = MEMORY");
+  if (mode !== "readSource") {
+    db.pragma("journal_mode = WAL");
+    db.pragma("synchronous = NORMAL");
+  }
+}
+
 function readSchemaVersion(db: Database.Database): number | null {
   try {
     const row = db.prepare("SELECT MAX(version) as version FROM schema_version").get() as
@@ -121,6 +139,7 @@ export function openProjectDb(
   let db: Database.Database;
   try {
     db = new Database(path, { readonly });
+    applyConnectionPragmas(db, opts.mode);
   } catch (cause) {
     return { ok: false, error: { kind: "invalid_schema_version", path, cause } };
   }
