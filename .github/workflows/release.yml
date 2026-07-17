@@ -58,7 +58,7 @@ jobs:
       - uses: pnpm/action-setup@v5
         if: steps.gate.outputs.release == 'true'
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: steps.gate.outputs.release == 'true'
         with:
           node-version: 22
